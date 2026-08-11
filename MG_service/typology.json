@@ -1,0 +1,292 @@
+{
+	"typology_name": "brother",
+	"milestones":
+	[
+		{
+			"m_name": "PKO",
+			"m_id": 1,
+			"m_week": 1,
+			"abbreviation": "PKO",
+			"tooltip": "Запуск проекта (Project kick off)"
+		},
+		{
+			"m_name": "CF",
+			"m_id": 2,
+			"m_week": 10,
+			"abbreviation": "CF",
+			"tooltip": "Заморозка концепции (Concept freeze)"
+		},
+		{
+			"m_name": "VPC",
+			"m_id": 3,
+			"m_week": 18,
+			"abbreviation": "VPC",
+			"tooltip": "Преконтракт (Vehicle preContract)"
+		},
+		{
+			"m_name": "CO",
+			"m_id": 4,
+			"m_week": 29,
+			"abbreviation": "CO",
+			"tooltip": "Контракт (Contract)"
+		},
+		{
+			"m_name": "TGA",
+			"m_id": 5,
+			"m_week": 29,
+			"abbreviation": "TGA",
+			"tooltip": "Одобрение изготовления оснастки (Tooling go ahead)"
+		},
+		{
+			"m_name": "ABVC",
+			"m_id": 6,
+			"m_week": 29,
+			"abbreviation": "ABVC",
+			"tooltip": "Проверка автомобиля (Vehicle check)"
+		},
+		{
+			"m_name": "LGC",
+			"m_id": 7,
+			"m_week": 29,
+			"abbreviation": "LGC",
+			"tooltip": ""
+		},
+		{
+			"m_name": "ABPT1",
+			"m_id": 8,
+			"m_week": 29,
+			"abbreviation": "ABPT1",
+			"tooltip": "Проверка производства 1 (Plant trial 1)"
+		},
+		{
+			"m_name": "ABPT2",
+			"m_id": 9,
+			"m_week": 29,
+			"abbreviation": "ABPT2",
+			"tooltip": "Проверка производства 2 (Plant trial 2)"
+		},
+		{
+			"m_name": "PPC",
+			"m_id": 10,
+			"m_week": 29,
+			"abbreviation": "PPC",
+			"tooltip": ""
+		},
+		{
+			"m_name": "MA",
+			"m_id": 11,
+			"m_week": 29,
+			"abbreviation": "MA",
+			"tooltip": "Одобрение производства (Manufacturing approval)"
+		},
+		{
+			"m_name": "DA",
+			"m_id": 12,
+			"m_week": 29,
+			"abbreviation": "DA",
+			"tooltip": ""
+		},
+		{
+			"m_name": "AM",
+			"m_id": 13,
+			"m_week": 29,
+			"abbreviation": "AM",
+			"tooltip": "Одобрение продаж (Approval to market)"
+		}
+	],
+	"attached_project_milestones":
+	[
+		{
+			"m_name": "SP",
+			"m_id": 1,
+			"m_week": 0,
+			"abbreviation": "SP",
+			"tooltip": "Старт проекта (Start of project)"
+		},
+		{
+			"m_name": "PC",
+			"m_id": 2,
+			"m_week": 18,
+			"abbreviation": "PC",
+			"tooltip": "Преконтракт (PreContract)"
+		},
+		{
+			"m_name": "CO",
+			"m_id": 3,
+			"m_week": 35,
+			"abbreviation": "CO",
+			"tooltip": "Контракт (Contract)"
+		},
+		{
+			"m_name": "TGA",
+			"m_id": 4,
+			"m_week": 38,
+			"abbreviation": "TGA",
+			"tooltip": "Одобрение изготовления оснастки (Tooling go ahead)"
+		},
+		{
+			"m_name": "ABPT",
+			"m_id": 5,
+			"m_week": 20,
+			"abbreviation": "ABPT",
+			"tooltip": "Проверка производства (Plant trial)"
+		},
+		{
+			"m_name": "PPC",
+			"m_id": 6,
+			"m_week": 20,
+			"abbreviation": "PPC",
+			"tooltip": ""
+		},
+		{
+			"m_name": "MA",
+			"m_id": 7,
+			"m_week": 20,
+			"abbreviation": "MA",
+			"tooltip": "Одобрение производства (Manufacturing approval)"
+		}
+	]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{
+	"typology_name": "mother",
+	"milestones":
+	[
+		{
+			"m_name": "PKO",
+			"m_id": 1,
+			"m_week": 0,
+			"abbreviation": "PKO",
+			"tooltip": "Запуск проекта (Project kick off)"
+		},
+		{
+			"m_name": "CF",
+			"m_id": 2,
+			"m_week": 3,
+			"abbreviation": "CF",
+			"tooltip": "Заморозка концепции (Concept freeze)"
+		},
+		{
+			"m_name": "VPC",
+			"m_id": 3,
+			"m_week": 8,
+			"abbreviation": "VPC",
+			"tooltip": "Преконтракт (Vehicle preContract)"
+		},
+		{
+			"m_name": "CO",
+			"m_id": 4,
+			"m_week": 14,
+			"abbreviation": "CO",
+			"tooltip": "Контракт (Contract)"
+		},
+		{
+			"m_name": "TGA",
+			"m_id": 5,
+			"m_week": 17,
+			"abbreviation": "TGA",
+			"tooltip": "Одобрение изготовления оснастки (Tooling go ahead)"
+		},
+		{
+			"m_name": "ABVC",
+			"m_id": 6,
+			"m_week": 23,
+			"abbreviation": "ABVC",
+			"tooltip": "Проверка автомобиля (Vehicle check)"
+		},
+		{
+			"m_name": "LGC",
+			"m_id": 7,
+			"m_week": 26,
+			"abbreviation": "LGC",
+			"tooltip": ""
+		},
+		{
+			"m_name": "ABPT1",
+			"m_id": 8,
+			"m_week": 27,
+			"abbreviation": "ABPT1",
+			"tooltip": "Проверка производства 1 (Plant trial 1)"
+		},
+		{
+			"m_name": "ABPT2",
+			"m_id": 9,
+			"m_week": 31,
+			"abbreviation": "ABPT2",
+			"tooltip": "Проверка производства 2 (Plant trial 2)"
+		},
+		{
+			"m_name": "PPC",
+			"m_id": 10,
+			"m_week": 32,
+			"abbreviation": "PPC",
+			"tooltip": ""
+		},
+		{
+			"m_name": "MA",
+			"m_id": 11,
+			"m_week": 33,
+			"abbreviation": "MA",
+			"tooltip": "Одобрение производства (Manufacturing approval)"
+		}
+	],
+	"attached_project_typology": "child",
+	"attached_project_milestones":
+	[
+		{
+			"m_name": "SP",
+			"m_id": 1,
+			"m_week": 3,
+			"abbreviation": "SP",
+			"tooltip": "Старт проекта (Start of project)"
+		},
+		{
+			"m_name": "CO",
+			"m_id": 3,
+			"m_week": 14,
+			"abbreviation": "CO",
+			"tooltip": "Контракт (Contract)"
+		},
+		{
+			"m_name": "ABPT",
+			"m_id": 5,
+			"m_week": 23,
+			"abbreviation": "ABPT",
+			"tooltip": "Проверка производства (Plant trial)"
+		},
+		{
+			"m_name": "PPC",
+			"m_id": 6,
+			"m_week": 32,
+			"abbreviation": "PPC",
+			"tooltip": ""
+		},
+		{
+			"m_name": "MA",
+			"m_id": 7,
+			"m_week": 33,
+			"abbreviation": "MA",
+			"tooltip": "Одобрение производства (Manufacturing approval)"
+		}
+	]
+}

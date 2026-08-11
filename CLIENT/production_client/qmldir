@@ -1,0 +1,24 @@
+module ProductionClient
+linktarget ProductionClientplugin
+optional plugin ProductionClientplugin
+classname ProductionClientPlugin
+typeinfo ProductionClient.qmltypes
+prefer :/ProductionClient/
+AuthWindow 1.0 qml/windows/AuthWindow.qml
+MainWindow 1.0 qml/windows/MainWindow.qml
+SplashScreen 1.0 qml/windows/SplashScreen.qml
+WidgetLoader 1.0 qml/components/WidgetLoader.qml
+ToastNotification 1.0 qml/components/ToastNotification.qml
+LoadingSpinner 1.0 qml/components/LoadingSpinner.qml
+PasswordExpiryWarning 1.0 qml/components/PasswordExpiryWarning.qml
+ChangePasswordDialog 1.0 qml/dialogs/ChangePasswordDialog.qml
+ConfirmDialog 1.0 qml/dialogs/ConfirmDialog.qml
+ErrorDialog 1.0 qml/dialogs/ErrorDialog.qml
+AppStyle 1.0 qml/styles/AppStyle.qml
+Colors 1.0 qml/styles/Colors.qml
+Typography 1.0 qml/styles/Typography.qml
+Button 1.0 qml/styles/Button.qml
+DateUtils 1.0 qml/utils/DateUtils.qml
+StringUtils 1.0 qml/utils/StringUtils.qml
+Validators 1.0 qml/utils/Validators.qml
+

@@ -1,0 +1,48 @@
+{
+	"typology_name": "child",
+	"milestones":
+	[
+		{
+			"m_name": "SP",
+			"m_id": 1,
+			"m_week": 0,
+			"abbreviation": "SP",
+			"tooltip": "Старт проекта (Statrt of project)"
+		},
+		{
+			"m_name": "CO",
+			"m_id": 2,
+			"m_week": 25,
+			"abbreviation": "CO",
+			"tooltip": "Контракт (Contract)"
+		},
+		{
+			"m_name": "TGA",
+			"m_id": 3,
+			"m_week": 35,
+			"abbreviation": "TGA",
+			"tooltip": "Одобрение изготовления оснастки (Tooling go ahead)"
+		},
+		{
+			"m_name": "ABPT1",
+			"m_id": 8,
+			"m_week": 77,
+			"abbreviation": "ABPT1",
+			"tooltip": "Проверка производства 1 (Plant trial 1)"
+		},
+		{
+			"m_name": "PPC",
+			"m_id": 10,
+			"m_week": 80,
+			"abbreviation": "PPC",
+			"tooltip": ""
+		},
+		{
+			"m_name": "MA",
+			"m_id": 11,
+			"m_week": 82,
+			"abbreviation": "MA",
+			"tooltip": "Одобрение производства (Manufacturing approval)"
+		}
+	]
+}
