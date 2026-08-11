@@ -1,0 +1,138 @@
+# ============================================
+# CLIENT (C++ / Qt)
+# ============================================
+
+# Сборка
+build/
+*.build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CMakeUserPresets.json
+
+# Бинарники
+*.exe
+*.out
+*.app
+*.so
+*.dylib
+*.dll
+IS_Client
+ProductionClientApp
+EngineeringClient
+
+# Qt / MOC
+*.moc
+moc_*.cpp
+moc_*.h
+ui_*.h
+qrc_*.cpp
+*.qmlc
+*.jsc
+*.qmltypes
+
+# Файлы IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.user
+*.user.*
+*.creator*
+*.files
+*.includes
+*.config
+
+# ============================================
+# PYTHON (Backend)
+# ============================================
+
+# Python кэш
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.pyc
+*.pyo
+*.pyd
+
+# Виртуальные окружения
+venv/
+env/
+.venv/
+.env/
+ENV/
+
+# Файлы сборки Python
+dist/
+build/
+*.egg-info/
+*.egg
+
+# ============================================
+# DATABASES (локальные SQLite)
+# ============================================
+
+*.db
+*.sqlite3
+*.sqlite
+
+# ============================================
+# LOGS
+# ============================================
+
+logs/
+*.log
+*.log.*
+*.pid
+
+# ============================================
+# CONFIGURATION (с секретами)
+# ============================================
+
+.env
+.env.local
+.env.*.local
+*.env
+*.ini.local
+*.cfg.local
+default_config.json.local
+secrets.json
+
+# ============================================
+# OS FILES
+# ============================================
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+._*
+
+# ============================================
+# TESTING
+# ============================================
+
+.coverage
+*.cover
+*.py,cover
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+
+# ============================================
+# TEMPORARY
+# ============================================
+
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.rej
