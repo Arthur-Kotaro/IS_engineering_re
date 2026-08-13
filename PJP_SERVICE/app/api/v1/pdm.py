@@ -26,7 +26,10 @@ async def get_document(
 ):
     """Получить КД по референсному номеру"""
     async with AsyncSessionLocal() as db:
-        doc = await db.get(PDMDocument, reference_number)
+        result = await db.execute(
+            select(PDMDocument).where(PDMDocument.reference_number == reference_number)
+        )
+        doc = result.scalar_one_or_none()
         if not doc:
             raise HTTPException(404, "Document not found")
         return {
@@ -54,10 +57,10 @@ async def create_document(
     
     async with AsyncSessionLocal() as db:
         # Проверяем, есть ли уже документ с таким номером
-        existing = await db.execute(
+        result = await db.execute(
             select(PDMDocument).where(PDMDocument.reference_number == doc_data["reference_number"])
         )
-        if existing.scalar_one_or_none():
+        if result.scalar_one_or_none():
             raise HTTPException(400, "Document with this reference number already exists")
         
         doc = PDMDocument(

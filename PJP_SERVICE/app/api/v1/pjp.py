@@ -1,83 +1,67 @@
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends, HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy import select, update
-from app.database import AsyncSessionLocal
-from app.models.pjp import PJP, PJPStatus
-import httpx
+from app.database import get_db
+from app.schemas.pjp import PJPResponse, PJPStatusUpdate, PJPPartResponse
+from app.services.pjp_service import PJPService
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 
 router = APIRouter()
 security = HTTPBearer()
 
-async def get_user_roles(token: str) -> list:
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            "http://localhost:8000/users/me",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        if resp.status_code != 200:
-            raise HTTPException(401, "Invalid token")
-        user_data = resp.json()
-        return user_data.get("roles", [])
 
-@router.get("/tasks/proctech")
-async def get_proctech_tasks(
-    credentials: HTTPAuthorizationCredentials = Security(security)
+@router.get("/{pjp_id}", response_model=PJPResponse)
+async def get_pjp(
+    pjp_id: UUID,
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db: AsyncSession = Depends(get_db)
 ):
-    """Список PJP для проработчика"""
-    token = credentials.credentials
-    roles = await get_user_roles(token)
-    
-    if "proctech" not in roles:
-        raise HTTPException(403, "Only proctech can view this list")
-    
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(PJP).where(PJP.status == PJPStatus.UPLOADED)
-        )
-        return result.scalars().all()
+    """Получить PJP по ID"""
+    service = PJPService(db)
+    pjp = await service.get_pjp(pjp_id)
+    if not pjp:
+        raise HTTPException(status_code=404, detail="PJP not found")
+    return pjp
 
-@router.patch("/{pjp_id}/approve")
-async def approve_pjp(
-    pjp_id: int,
-    credentials: HTTPAuthorizationCredentials = Security(security)
-):
-    """Утвердить PJP (проработчик)"""
-    token = credentials.credentials
-    roles = await get_user_roles(token)
-    
-    if "proctech" not in roles:
-        raise HTTPException(403, "Only proctech can approve PJP")
-    
-    async with AsyncSessionLocal() as db:
-        pjp = await db.get(PJP, pjp_id)
-        if not pjp:
-            raise HTTPException(404, "PJP not found")
-        if pjp.status != PJPStatus.UPLOADED:
-            raise HTTPException(400, "PJP is not in uploaded status")
-        
-        pjp.status = PJPStatus.PROCTECH_REVIEW
-        await db.commit()
-        return {"message": "PJP approved", "status": pjp.status}
 
-@router.patch("/{pjp_id}/reject")
-async def reject_pjp(
-    pjp_id: int,
-    credentials: HTTPAuthorizationCredentials = Security(security)
+@router.patch("/{pjp_id}/status")
+async def update_pjp_status(
+    pjp_id: UUID,
+    data: PJPStatusUpdate,
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db: AsyncSession = Depends(get_db)
 ):
-    """Отклонить PJP (проработчик)"""
-    token = credentials.credentials
-    roles = await get_user_roles(token)
-    
-    if "proctech" not in roles:
-        raise HTTPException(403, "Only proctech can reject PJP")
-    
-    async with AsyncSessionLocal() as db:
-        pjp = await db.get(PJP, pjp_id)
-        if not pjp:
-            raise HTTPException(404, "PJP not found")
-        if pjp.status != PJPStatus.UPLOADED:
-            raise HTTPException(400, "PJP is not in uploaded status")
-        
-        pjp.status = PJPStatus.PROCTECH_REVIEW  # Или можно создать статус REJECTED
-        await db.commit()
-        return {"message": "PJP rejected", "status": pjp.status}
+    """Обновить статус PJP"""
+    user_id = 1  # Временно
+    service = PJPService(db)
+    try:
+        pjp = await service.update_status(pjp_id, data.status, user_id, data.comment)
+        return {"message": f"Status updated to {data.status.value}", "pjp_id": pjp.id}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{pjp_id}/parts", response_model=list[PJPPartResponse])
+async def get_pjp_parts(
+    pjp_id: UUID,
+    gfe: str = None,
+    source_type: str = None,
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db: AsyncSession = Depends(get_db)
+):
+    """Получить части PJP с фильтрацией"""
+    service = PJPService(db)
+    parts = await service.get_pjp_parts(pjp_id, gfe, source_type)
+    return parts
+
+
+@router.get("/{pjp_id}/history")
+async def get_pjp_history(
+    pjp_id: UUID,
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db: AsyncSession = Depends(get_db)
+):
+    """Получить историю изменений PJP"""
+    service = PJPService(db)
+    history = await service.get_pjp_history(pjp_id)
+    return history
