@@ -1,3 +1,4 @@
+// production_client/src/qml_bridge/MainWindowBridge.cpp
 #include "MainWindowBridge.h"
 #include "userserviceclient/AuthService.h"
 #include <QDebug>
@@ -40,6 +41,7 @@ QString MainWindowBridge::userPosition() const {
     if (m_profile.roles.contains("test_specialist")) return "Специалист по испытаниям";
     if (m_profile.roles.contains("project_manager_ist")) return "Руководитель проекта (ст.)";
     if (m_profile.roles.contains("project_manager_pfe")) return "Руководитель проекта (мл.)";
+    if (m_profile.roles.contains("proto_purchaser")) return "Специалист по закупкам";
     if (m_profile.roles.isEmpty()) return "Сотрудник";
     return m_profile.roles.first();
 }
@@ -78,6 +80,7 @@ QString MainWindowBridge::widgetsPath() const {
     if (m_profile.roles.contains("test_specialist")) return "widgets/roles/test_specialist/";
     if (m_profile.roles.contains("project_manager_ist")) return "widgets/roles/project_manager_ist/";
     if (m_profile.roles.contains("project_manager_pfe")) return "widgets/roles/project_manager_pfe/";
+    if (m_profile.roles.contains("proto_purchaser")) return "widgets/roles/proto_purchaser/";
     return "widgets/common/";
 }
 
@@ -103,6 +106,7 @@ void MainWindowBridge::loadTiles() {
         return;
     }
 
+    // Исправлено: правильный путь через Gateway
     QNetworkRequest request(QUrl("http://localhost:8080/api/v1/navigation/dashboard"));
     request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
 
@@ -143,6 +147,7 @@ void MainWindowBridge::onPasswordExpiryInfo(int daysRemaining, bool isExpired, c
     Q_UNUSED(isExpired);
     Q_UNUSED(expiresAt);
     m_passwordDaysLeft = daysRemaining;
+    qDebug() << "Password expiry updated: days left =" << daysRemaining;
     emit passwordExpiryChanged();
 }
 

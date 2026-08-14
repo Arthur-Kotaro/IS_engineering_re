@@ -1,48 +1,71 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-#include <QQuickStyle>
+#include <QIcon>
 #include <QDebug>
-#include <memory>
+#include <QDir>
+#include <QFileInfo>
 
-#include "userserviceclient/ApiClient.h"
-#include "userserviceclient/AuthService.h"
+#include "src/core/AppCore.h"
 #include "src/qml_bridge/AuthBridge.h"
 #include "src/qml_bridge/MainWindowBridge.h"
+#include "src/qml_bridge/NotificationBridge.h"
 
-using namespace UsersService;
+// Регистрируем Colors как синглтон
+#include <QQmlEngine>
+#include <QQmlComponent>
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
-    QGuiApplication::setApplicationName("Engineering :re");
+    app.setOrganizationName("Engineering");
+    app.setApplicationName("EngineeringRE");
     
-    QQuickStyle::setStyle("Material");
+    // Инициализация AppCore
+    AppCore core;
+    core.init();
+    
+    auto authService = getAuthService();
+    
+    // Создание мостов
+    AuthBridge authBridge(authService);
+    MainWindowBridge mainWindowBridge(authService);
+    NotificationBridge notificationBridge;
     
     QQmlApplicationEngine engine;
     
-    // Регистрируем Colors как синглтон
+    // Регистрируем Colors как синглтон (из старой версии)
     qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/Colors.qml"), "Styles", 1, 0, "Colors");
-    
-    auto apiClient = std::make_shared<ApiClient>();
-    apiClient->setServerUrl("localhost", 8000);
-    
-    qDebug() << "Connecting to User Service at localhost:8000";
-    
-    auto authService = std::make_shared<AuthService>(apiClient);
-    
-    AuthBridge authBridge(authService);
-    MainWindowBridge mainWindowBridge(authService);
     
     engine.rootContext()->setContextProperty("authBridge", &authBridge);
     engine.rootContext()->setContextProperty("mainWindowBridge", &mainWindowBridge);
+    engine.rootContext()->setContextProperty("notificationBridge", &notificationBridge);
     
-    engine.load(QUrl("qrc:/ProductionClient/qml/main.qml"));
-    
-    if (engine.rootObjects().isEmpty()) {
-        qDebug() << "Failed to load QML";
-        return -1;
+    // Загружаем QML из файловой системы (из новой версии)
+    QString qmlPath = QCoreApplication::applicationDirPath() + "/qml/main.qml";
+    if (!QFile::exists(qmlPath)) {
+        qmlPath = QDir::currentPath() + "/qml/main.qml";
     }
+    if (!QFile::exists(qmlPath)) {
+        qmlPath = QString("%1/../production_client/qml/main.qml")
+            .arg(QCoreApplication::applicationDirPath());
+    }
+    
+    qDebug() << "Loading QML from:" << qmlPath;
+    
+    QUrl url = QUrl::fromLocalFile(qmlPath);
+    
+    QObject::connect(
+        &engine,
+        &QQmlApplicationEngine::objectCreated,
+        &app,
+        [url](QObject *obj, const QUrl &objUrl) {
+            if (!obj && url == objUrl)
+                QCoreApplication::exit(-1);
+        },
+        Qt::QueuedConnection);
+    
+    engine.load(url);
     
     return app.exec();
 }

@@ -8,7 +8,9 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Network Qml Quick QuickControls2)
 
-# Убираем add_subdirectory(common) - он уже добавлен в корневом CMakeLists.txt
+# Путь к common
+set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
+set(COMMON_INCLUDE ${COMMON_DIR}/include)
 
 # QML ресурсы
 set(QML_FILES
@@ -16,7 +18,6 @@ set(QML_FILES
     qml/windows/AuthWindow.qml
     qml/windows/MainWindow.qml
     qml/windows/SplashScreen.qml
-    #   qml/components/TopBar.qml     #FUNCTIONALITY migrated to MainWindow
     qml/components/WidgetLoader.qml
     qml/components/ToastNotification.qml
     qml/components/LoadingSpinner.qml
@@ -34,22 +35,18 @@ set(QML_FILES
     qml/utils/Validators.qml
 )
 
-# Общие виджеты
 file(GLOB COMMON_WIDGETS "qml/widgets/common/*.qml")
 list(APPEND QML_FILES ${COMMON_WIDGETS})
 
-# Виджеты по ролям
 file(GLOB_RECURSE ROLE_WIDGETS "qml/widgets/roles/*.qml")
 list(APPEND QML_FILES ${ROLE_WIDGETS})
 
-# Регистрируем QML модуль
 qt_add_qml_module(ProductionClient
     URI ProductionClient
     VERSION 1.0
     QML_FILES ${QML_FILES}
 )
 
-# Создаём исполняемый файл
 add_executable(ProductionClientApp
     main.cpp
     src/qml_bridge/AuthBridge.cpp
@@ -75,9 +72,7 @@ target_include_directories(ProductionClientApp PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/qml_bridge
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
-    ${CMAKE_SOURCE_DIR}/common/include
+    ${COMMON_INCLUDE}
 )
 
-install(TARGETS ProductionClientApp
-    RUNTIME DESTINATION bin
-)
+install(TARGETS ProductionClientApp RUNTIME DESTINATION bin)

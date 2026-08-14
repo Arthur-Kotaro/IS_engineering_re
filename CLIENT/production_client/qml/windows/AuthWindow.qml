@@ -1,7 +1,7 @@
 import QtQuick 6.0
 import QtQuick.Controls 6.0
 import QtQuick.Layouts 6.0
-import "../styles"
+import Styles 1.0
 
 Rectangle {
     id: root
@@ -11,127 +11,71 @@ Rectangle {
     signal loginSuccess()
 
     ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 20
-        spacing: 20
+        anchors.centerIn: parent
+        width: 350
+        spacing: 15
 
-        Item { Layout.fillHeight: true }
+        Text {
+            text: "Engineering :re"
+            color: Colors.text
+            font.pixelSize: 28
+            font.bold: true
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Text {
+            text: "Вход в систему"
+            color: Colors.textSecondary
+            font.pixelSize: 14
+            Layout.alignment: Qt.AlignHCenter
+        }
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 500
-            radius: 16
+            height: 300
+            radius: 12
             color: Colors.surface
             border.color: Colors.border
-            border.width: 1
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 30
-                spacing: 20
+                anchors.margins: 20
+                spacing: 15
 
-                Text {
-                    text: "🏢"
-                    font.pixelSize: 48
-                    Layout.alignment: Qt.AlignHCenter
-                }
-
-                Text {
-                    text: "Вход в систему"
-                    font.pixelSize: 24
-                    font.bold: true
+                TextField {
+                    id: emailField
+                    Layout.fillWidth: true
+                    placeholderText: "Email"
                     color: Colors.text
-                    Layout.alignment: Qt.AlignHCenter
-                }
-
-                Text {
-                    text: "Engineering :re"
-                    font.pixelSize: 12
-                    color: Colors.textSecondary
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    Text {
-                        text: "Email"
-                        font.pixelSize: 14
-                        font.bold: true
-                        color: Colors.text
-                    }
-
-                    TextField {
-                        id: emailField
-                        Layout.fillWidth: true
-                        height: 48
-                        placeholderText: ""
-                        color: Colors.text
-                        font.pixelSize: 14
-                        selectionColor: Colors.button
-                        selectedTextColor: Colors.buttonText
-                        background: Rectangle {
-                            color: Colors.surface
-                            border.color: emailField.activeFocus ? Colors.button : Colors.border
-                            border.width: emailField.activeFocus ? 2 : 1
-                            radius: 8
-                        }
-                        leftPadding: 12
-                        rightPadding: 12
-                        topPadding: 12
-                        bottomPadding: 12
-                        selectByMouse: true
-                        onAccepted: performLogin()
+                    background: Rectangle {
+                        color: Colors.background
+                        border.color: Colors.border
+                        radius: 6
                     }
                 }
 
-                ColumnLayout {
+                TextField {
+                    id: passwordField
                     Layout.fillWidth: true
-                    spacing: 8
-
-                    Text {
-                        text: "Пароль"
-                        font.pixelSize: 14
-                        font.bold: true
-                        color: Colors.text
+                    placeholderText: "Пароль"
+                    echoMode: TextField.Password
+                    color: Colors.text
+                    background: Rectangle {
+                        color: Colors.background
+                        border.color: Colors.border
+                        radius: 6
                     }
-
-                    TextField {
-                        id: passwordField
-                        Layout.fillWidth: true
-                        height: 48
-                        placeholderText: ""
-                        echoMode: TextField.Password
-                        color: Colors.text
-                        font.pixelSize: 14
-                        selectionColor: Colors.button
-                        selectedTextColor: Colors.buttonText
-                        background: Rectangle {
-                            color: Colors.surface
-                            border.color: passwordField.activeFocus ? Colors.button : Colors.border
-                            border.width: passwordField.activeFocus ? 2 : 1
-                            radius: 8
-                        }
-                        leftPadding: 12
-                        rightPadding: 12
-                        topPadding: 12
-                        bottomPadding: 12
-                        selectByMouse: true
-                        onAccepted: performLogin()
-                    }
+                    onAccepted: performLogin()
                 }
 
                 Button {
                     text: "Войти"
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 48
+                    Layout.preferredHeight: 40
                     onClicked: performLogin()
                     background: Rectangle {
                         color: Colors.button
-                        radius: 8
+                        radius: 6
                     }
                     contentItem: Text {
                         text: parent.text
@@ -141,13 +85,6 @@ Rectangle {
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
-                }
-
-                BusyIndicator {
-                    id: loginBusy
-                    running: false
-                    Layout.alignment: Qt.AlignHCenter
-                    visible: running
                 }
 
                 Text {
@@ -160,26 +97,14 @@ Rectangle {
                     horizontalAlignment: Text.AlignHCenter
                 }
 
-                Item {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 10
-                }
-
-                Text {
-                    text: "Забыли пароль?"
-                    color: Colors.button
-                    font.pixelSize: 12
+                BusyIndicator {
+                    id: loginBusy
+                    running: false
                     Layout.alignment: Qt.AlignHCenter
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: console.log("Reset password requested")
-                    }
+                    visible: running
                 }
             }
         }
-
-        Item { Layout.fillHeight: true }
     }
 
     function performLogin() {

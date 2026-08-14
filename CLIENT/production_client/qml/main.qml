@@ -1,7 +1,7 @@
 import QtQuick 6.0
 import QtQuick.Controls 6.0
 import QtQuick.Window 6.0
-import "styles"
+import Styles 1.0
 import "windows" as Windows
 
 ApplicationWindow {
@@ -10,18 +10,18 @@ ApplicationWindow {
     height: 580
     visible: true
     title: "Engineering :re"
-    
+
     minimumWidth: 450
     maximumWidth: 450
     minimumHeight: 580
     maximumHeight: 580
-    
+
     flags: Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint
-    
+
     Component.onCompleted: {
         Colors.setDarkTheme()
     }
-    
+
     function toggleTheme() {
         if (Colors.isDarkTheme) {
             Colors.setLightTheme()
@@ -29,13 +29,13 @@ ApplicationWindow {
             Colors.setDarkTheme()
         }
     }
-    
+
     StackView {
         id: stackView
         anchors.fill: parent
         initialItem: authWindowComponent
     }
-    
+
     Component {
         id: authWindowComponent
         Windows.AuthWindow {
@@ -50,7 +50,7 @@ ApplicationWindow {
             }
         }
     }
-    
+
     Component {
         id: mainWindowComponent
         Windows.MainWindow {

@@ -1,3 +1,4 @@
+// common/src/AuthService.cpp
 #include "userserviceclient/AuthService.h"
 #include "userserviceclient/ApiClient.h"
 #include <QDebug>
@@ -32,7 +33,7 @@ namespace UsersService {
 
         qDebug() << "Login request to:" << email;
 
-        // Используем прямой URL через Gateway (без /api/v1/auth/)
+        // Исправлено: правильный путь через Gateway
         m_apiClient->post("/login", loginData,
                           [this, email](const ApiResponse& response) {
                               AuthResult result;
@@ -71,6 +72,7 @@ namespace UsersService {
     void AuthService::fetchUserProfile() {
         qDebug() << "Fetching user profile...";
 
+        // Исправлено: правильный путь
         m_apiClient->get("/users/me",
                          [this](const ApiResponse& response) {
                              if (response.success) {
@@ -90,7 +92,8 @@ namespace UsersService {
     void AuthService::checkPasswordExpiry() {
         qDebug() << "Checking password expiry...";
 
-        m_apiClient->get("/users/me/password-expiry",
+        // Исправлено: правильный путь
+        m_apiClient->get("/password-expiry",
                          [this](const ApiResponse& response) {
                              if (response.success) {
                                  QJsonObject data = response.data.object();
@@ -99,6 +102,8 @@ namespace UsersService {
                                  QString expiresAt = data["expires_at"].toString();
                                  qDebug() << "Password expiry:" << daysRemaining << "days left";
                                  emit passwordExpiryInfo(daysRemaining, isExpired, expiresAt);
+                             } else {
+                                 qDebug() << "Failed to get password expiry:" << response.errorString;
                              }
                          });
     }
@@ -107,6 +112,7 @@ namespace UsersService {
         QJsonObject refreshData;
         refreshData["refresh_token"] = refreshToken;
 
+        // Исправлено: правильный путь
         m_apiClient->post("/refresh", refreshData,
                           [this](const ApiResponse& response) {
                               if (response.success) {
@@ -122,6 +128,7 @@ namespace UsersService {
             logoutData["refresh_token"] = refreshToken;
         }
 
+        // Исправлено: правильный путь
         m_apiClient->post("/logout", logoutData,
                           [this](const ApiResponse& response) {
                               m_currentSession = UserSession();
@@ -137,7 +144,8 @@ namespace UsersService {
         changeData["new_password"] = newPassword;
         changeData["confirm_password"] = confirmPassword;
 
-        m_apiClient->post("/users/me/change-password", changeData,
+        // Исправлено: правильный путь
+        m_apiClient->post("/change-password", changeData,
                           [this](const ApiResponse& response) {
                               if (response.success) {
                                   QJsonObject data = response.data.object();
@@ -153,6 +161,7 @@ namespace UsersService {
                                          QJsonObject resetData;
                                          resetData["email"] = email;
 
+                                         // Исправлено: правильный путь
                                          m_apiClient->post("/reset-password", resetData,
                                                            [this](const ApiResponse& response) {
                                                                if (response.success) {
@@ -165,6 +174,7 @@ namespace UsersService {
                                      }
 
                                      void AuthService::fetchUserStatus() {
+                                         // Исправлено: правильный путь
                                          m_apiClient->get("/users/me/status",
                                                           [this](const ApiResponse& response) {
                                                               if (response.success) {

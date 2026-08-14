@@ -35,16 +35,30 @@ namespace UsersService {
     }
 
     QUrl ApiClient::buildUrl(const QString& endpoint) const {
-        // Если endpoint уже начинается с http:// или https:// — используем его как есть
         if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
             return QUrl(endpoint);
         }
 
-        // Иначе строим URL с хостом и портом
-        QString urlStr = QString("http://%1:%2%3")
-        .arg(m_host)
-        .arg(m_port)
-        .arg(endpoint);
+        QString normalizedEndpoint = endpoint;
+        if (!endpoint.startsWith("/api/v1/") && endpoint != "/") {
+            if (endpoint == "/login" || endpoint == "/refresh" || endpoint == "/logout" || 
+                endpoint == "/reset-password" || endpoint == "/password-expiry" ||
+                endpoint == "/change-password") {
+                normalizedEndpoint = "/api/v1/auth" + endpoint;
+            }
+            else if (endpoint.startsWith("/users/")) {
+                normalizedEndpoint = "/api/v1" + endpoint;
+            }
+            else if (endpoint.startsWith("/navigation/")) {
+                normalizedEndpoint = "/api/v1" + endpoint;
+            }
+            else {
+                normalizedEndpoint = "/api/v1" + endpoint;
+            }
+        }
+
+        QString urlStr = QString("http://%1:%2%3").arg(m_host).arg(m_port).arg(normalizedEndpoint);
+        qDebug() << "ApiClient: buildUrl" << endpoint << "→" << urlStr;
         return QUrl(urlStr);
     }
 
@@ -121,18 +135,36 @@ namespace UsersService {
         response.httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
         QByteArray responseData = reply->readAll();
+        
+        qDebug() << "=== HTTP Response ===";
+        qDebug() << "Status code:" << response.httpCode;
+        qDebug() << "Response data:" << responseData;
 
         if (reply->error() == QNetworkReply::NoError) {
-            response.success = true;
-            QJsonParseError parseError;
-            response.data = QJsonDocument::fromJson(responseData, &parseError);
-
-            if (parseError.error != QJsonParseError::NoError) {
-                response.success = false;
-                response.errorType = "parse";
-                response.errorString = parseError.errorString();
+            if (!responseData.isEmpty()) {
+                QJsonParseError parseError;
+                response.data = QJsonDocument::fromJson(responseData, &parseError);
+                
+                if (parseError.error == QJsonParseError::NoError) {
+                    response.success = true;
+                    qDebug() << "JSON parsed successfully";
+                } else {
+                    response.success = false;
+                    response.errorType = "parse";
+                    response.errorString = parseError.errorString();
+                    qDebug() << "JSON parse error:" << parseError.errorString();
+                }
             } else {
-                qDebug() << "Response:" << responseData;
+                // Пустой ответ — может быть 204 No Content
+                if (response.httpCode == 204) {
+                    response.success = true;
+                    response.data = QJsonDocument();
+                    qDebug() << "Empty response (204 No Content)";
+                } else {
+                    response.success = false;
+                    response.errorType = "empty";
+                    response.errorString = "Empty response";
+                }
             }
         } else {
             response.errorString = reply->errorString();
@@ -143,15 +175,18 @@ namespace UsersService {
             } else if (reply->error() == QNetworkReply::ConnectionRefusedError) {
                 response.errorType = "network";
                 response.errorString = "Connection refused";
+            } else if (reply->error() == QNetworkReply::AuthenticationRequiredError) {
+                response.errorType = "auth";
+                response.errorString = "Authentication required";
             } else {
                 response.errorType = "unknown";
             }
 
             qDebug() << "Network error:" << response.errorString;
-            qDebug() << "HTTP code:" << response.httpCode;
-
+            
+            // Пытаемся получить тело ошибки
             if (!responseData.isEmpty()) {
-                qDebug() << "Response data:" << responseData;
+                qDebug() << "Error response body:" << responseData;
             }
         }
 
