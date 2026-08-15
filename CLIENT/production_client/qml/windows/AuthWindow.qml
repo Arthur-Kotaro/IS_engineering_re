@@ -32,7 +32,7 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            height: 300
+            height: 320
             radius: 12
             color: Colors.surface
             border.color: Colors.border
@@ -54,18 +54,47 @@ Rectangle {
                     }
                 }
 
-                TextField {
-                    id: passwordField
+                // Поле пароля с кнопкой показа/скрытия
+                Rectangle {
                     Layout.fillWidth: true
-                    placeholderText: "Пароль"
-                    echoMode: TextField.Password
-                    color: Colors.text
-                    background: Rectangle {
-                        color: Colors.background
-                        border.color: Colors.border
-                        radius: 6
+                    height: 48
+                    color: Colors.background
+                    border.color: Colors.border
+                    radius: 6
+
+                    RowLayout {
+                        anchors.fill: parent
+                        spacing: 0
+
+                        TextField {
+                            id: passwordField
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            placeholderText: "Пароль"
+                            echoMode: passwordVisible ? TextField.Normal : TextField.Password
+                            color: Colors.text
+                            background: Rectangle {
+                                color: "transparent"
+                            }
+                            leftPadding: 12
+                            onAccepted: performLogin()
+                        }
+
+                        Button {
+                            id: togglePasswordButton
+                            Layout.preferredWidth: 48
+                            Layout.fillHeight: true
+                            text: passwordVisible ? "🙈" : "👁️"
+                            font.pixelSize: 18
+                            flat: true
+                            onClicked: {
+                                passwordVisible = !passwordVisible
+                            }
+                            background: Rectangle {
+                                color: "transparent"
+                            }
+                        }
                     }
-                    onAccepted: performLogin()
                 }
 
                 Button {
@@ -106,6 +135,8 @@ Rectangle {
             }
         }
     }
+
+    property bool passwordVisible: false
 
     function performLogin() {
         loginBusy.running = true
