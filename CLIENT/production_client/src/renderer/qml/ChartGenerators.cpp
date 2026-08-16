@@ -454,23 +454,32 @@ QString generateBarCompareChart(const QJsonObject& spec)
     QString valuesStr1 = "[";
     QString valuesStr2 = "[";
     QString labelsStr = "[";
-    QString legendStr = "[";
+    
+    // Легенда: для каждой категории две записи (Ряд 1 и Ряд 2)
+    QStringList legendItems;
     for (int i = 0; i < values1.size(); ++i) {
+        QString label = (i < labels.size()) ? labels[i] : "Категория " + QString::number(i+1);
+        legendItems << QString("%1 (Ряд 1: %2)").arg(label).arg(values1[i].toDouble());
+        legendItems << QString("%1 (Ряд 2: %2)").arg(label).arg(values2[i].toDouble());
+        
         if (i > 0) {
             valuesStr1 += ", ";
             valuesStr2 += ", ";
             labelsStr += ", ";
-            legendStr += ", ";
         }
         valuesStr1 += QString::number(values1[i].toDouble());
         valuesStr2 += QString::number(values2[i].toDouble());
-        QString label = (i < labels.size()) ? labels[i] : "Категория " + QString::number(i+1);
         labelsStr += "\"" + label + "\"";
-        legendStr += "\"" + label + " (" + QString::number(values1[i].toDouble()) + " / " + QString::number(values2[i].toDouble()) + ")\"";
     }
     valuesStr1 += "]";
     valuesStr2 += "]";
     labelsStr += "]";
+    
+    QString legendStr = "[";
+    for (int i = 0; i < legendItems.size(); ++i) {
+        if (i > 0) legendStr += ", ";
+        legendStr += "\"" + legendItems[i] + "\"";
+    }
     legendStr += "]";
 
     return QString(
@@ -517,37 +526,40 @@ QString generateBarCompareChart(const QJsonObject& spec)
         "                    var gap = (width / chartData1.length - groupWidth) / 2;\n"
         "                    var colors1 = [\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\"];\n"
         "                    var colors2 = [\"#ff9f43\", \"#ff6b6b\", \"#1dd1a1\", \"#f368e0\", \"#00d2d3\"];\n"
+        "                    \n"
+        "                    // Сначала рисуем все левые столбцы (ряд 1)\n"
         "                    for (var i = 0; i < chartData1.length; i++) {\n"
         "                        var h1 = (chartData1[i] / maxVal) * (height - 20);\n"
-        "                        var h2 = (chartData2[i] / maxVal) * (height - 20);\n"
         "                        var x = i * (groupWidth + gap * 2) + gap;\n"
         "                        var y1 = height - h1 - 10;\n"
-        "                        var y2 = height - h2 - 10;\n"
-        "                        \n"
-        "                        var isHovered = (i === hoveredIndex);\n"
-        "                        var isBar1Hovered = isHovered && hoveredBar === 0;\n"
-        "                        var isBar2Hovered = isHovered && hoveredBar === 1;\n"
-        "                        \n"
-        "                        var barW1 = isBar1Hovered ? barWidth * 1.15 : barWidth;\n"
-        "                        var offsetX1 = isBar1Hovered ? (barW1 - barWidth) / 2 : 0;\n"
+        "                        var isHovered = (i === hoveredIndex && hoveredBar === 0);\n"
+        "                        var barW = isHovered ? barWidth * 1.15 : barWidth;\n"
+        "                        var offsetX = isHovered ? (barW - barWidth) / 2 : 0;\n"
         "                        ctx.fillStyle = colors1[i % colors1.length];\n"
-        "                        ctx.fillRect(x - offsetX1, y1, barW1, h1);\n"
+        "                        ctx.fillRect(x - offsetX, y1, barW, h1);\n"
         "                        ctx.strokeStyle = \"#333\";\n"
-        "                        ctx.lineWidth = isBar1Hovered ? 3 : 1;\n"
-        "                        ctx.strokeRect(x - offsetX1, y1, barW1, h1);\n"
-        "                        \n"
-        "                        var barW2 = isBar2Hovered ? barWidth * 1.15 : barWidth;\n"
-        "                        var offsetX2 = isBar2Hovered ? (barW2 - barWidth) / 2 : 0;\n"
+        "                        ctx.lineWidth = isHovered ? 3 : 1;\n"
+        "                        ctx.strokeRect(x - offsetX, y1, barW, h1);\n"
+        "                    }\n"
+        "                    \n"
+        "                    // Затем рисуем все правые столбцы (ряд 2) поверх левых\n"
+        "                    for (var i = 0; i < chartData1.length; i++) {\n"
+        "                        var h2 = (chartData2[i] / maxVal) * (height - 20);\n"
+        "                        var x = i * (groupWidth + gap * 2) + gap;\n"
+        "                        var y2 = height - h2 - 10;\n"
+        "                        var isHovered = (i === hoveredIndex && hoveredBar === 1);\n"
+        "                        var barW = isHovered ? barWidth * 1.15 : barWidth;\n"
+        "                        var offsetX = isHovered ? (barW - barWidth) / 2 : 0;\n"
         "                        ctx.fillStyle = colors2[i % colors2.length];\n"
-        "                        ctx.fillRect(x + barWidth + 2 - offsetX2, y2, barW2, h2);\n"
+        "                        ctx.fillRect(x + barWidth + 2 - offsetX, y2, barW, h2);\n"
         "                        ctx.strokeStyle = \"#333\";\n"
-        "                        ctx.lineWidth = isBar2Hovered ? 3 : 1;\n"
-        "                        ctx.strokeRect(x + barWidth + 2 - offsetX2, y2, barW2, h2);\n"
+        "                        ctx.lineWidth = isHovered ? 3 : 1;\n"
+        "                        ctx.strokeRect(x + barWidth + 2 - offsetX, y2, barW, h2);\n"
         "                    }\n"
         "                }\n"
         "                \n"
         "                function getBarAt(mx, my) {\n"
-        "                    if (!chartData1 || !chartData2 || chartData1.length === 0) return -1;\n"
+        "                    if (!chartData1 || !chartData2 || chartData1.length === 0) return null;\n"
         "                    var maxVal = Math.max.apply(null, chartData1.concat(chartData2));\n"
         "                    if (maxVal === 0) maxVal = 1;\n"
         "                    var groupWidth = width / chartData1.length * 0.7;\n"
