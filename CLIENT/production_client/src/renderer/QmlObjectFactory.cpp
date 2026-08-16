@@ -554,7 +554,7 @@ void QmlObjectFactory::registerBuiltInTypes()
     };
 
     // ============================================================
-    // ДИАГРАММЫ С ЛЕГЕНДАМИ (ИСПРАВЛЕННЫЕ)
+    // ДИАГРАММЫ С ЛЕГЕНДАМИ (увеличенный шрифт + значения)
     // ============================================================
 
     // ChartPie
@@ -567,22 +567,24 @@ void QmlObjectFactory::registerBuiltInTypes()
         QStringList labels;
         parseChartData(spec, values, labels);
 
-        qDebug() << "    ChartPie: values count=" << values.size() << "labels count=" << labels.size();
-
         // Формируем массивы для QML
         QString valuesStr = "[";
+        QString labelsStr = "[";
+        QString labelsWithValuesStr = "[";
         for (int i = 0; i < values.size(); ++i) {
-            if (i > 0) valuesStr += ", ";
-            valuesStr += QString::number(values[i].toDouble());
+            if (i > 0) {
+                valuesStr += ", ";
+                labelsStr += ", ";
+                labelsWithValuesStr += ", ";
+            }
+            double val = values[i].toDouble();
+            valuesStr += QString::number(val);
+            labelsStr += "\"" + labels[i] + "\"";
+            labelsWithValuesStr += "\"" + labels[i] + " (" + QString::number(val) + ")\"";
         }
         valuesStr += "]";
-
-        QString labelsStr = "[";
-        for (int i = 0; i < labels.size(); ++i) {
-            if (i > 0) labelsStr += ", ";
-            labelsStr += "\"" + labels[i] + "\"";
-        }
         labelsStr += "]";
+        labelsWithValuesStr += "]";
 
         QString colorsStr =
             "[\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\", "
@@ -640,33 +642,32 @@ void QmlObjectFactory::registerBuiltInTypes()
             "                }\n"
             "            }\n"
             "        }\n"
-            "        // Легенда через Repeater\n"
             "        Flow {\n"
             "            Layout.fillWidth: true\n"
             "            Layout.preferredHeight: implicitHeight\n"
-            "            spacing: 16\n"
+            "            spacing: 20\n"
             "            padding: 8\n"
             "            Repeater {\n"
             "                model: %5\n"
             "                Row {\n"
-            "                    spacing: 4\n"
+            "                    spacing: 6\n"
             "                    Rectangle {\n"
-            "                        width: 12\n"
-            "                        height: 12\n"
+            "                        width: 14\n"
+            "                        height: 14\n"
             "                        color: %4[index % %4.length]\n"
             "                        radius: 2\n"
             "                    }\n"
             "                    Text {\n"
             "                        text: modelData\n"
             "                        color: \"#ccc\"\n"
-            "                        font.pixelSize: 11\n"
+            "                        font.pixelSize: 13\n"
             "                    }\n"
             "                }\n"
             "            }\n"
             "        }\n"
             "    }\n"
             "}\n"
-        ).arg(preferredHeight).arg(title).arg(valuesStr).arg(colorsStr).arg(labelsStr);
+        ).arg(preferredHeight).arg(title).arg(valuesStr).arg(colorsStr).arg(labelsWithValuesStr);
     };
 
     // ChartBar
@@ -680,18 +681,18 @@ void QmlObjectFactory::registerBuiltInTypes()
         parseChartData(spec, values, labels);
 
         QString valuesStr = "[";
+        QString labelsWithValuesStr = "[";
         for (int i = 0; i < values.size(); ++i) {
-            if (i > 0) valuesStr += ", ";
-            valuesStr += QString::number(values[i].toDouble());
+            if (i > 0) {
+                valuesStr += ", ";
+                labelsWithValuesStr += ", ";
+            }
+            double val = values[i].toDouble();
+            valuesStr += QString::number(val);
+            labelsWithValuesStr += "\"" + labels[i] + " (" + QString::number(val) + ")\"";
         }
         valuesStr += "]";
-
-        QString labelsStr = "[";
-        for (int i = 0; i < labels.size(); ++i) {
-            if (i > 0) labelsStr += ", ";
-            labelsStr += "\"" + labels[i] + "\"";
-        }
-        labelsStr += "]";
+        labelsWithValuesStr += "]";
 
         QString colorsStr =
             "[\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\", "
@@ -746,29 +747,29 @@ void QmlObjectFactory::registerBuiltInTypes()
             "        Flow {\n"
             "            Layout.fillWidth: true\n"
             "            Layout.preferredHeight: implicitHeight\n"
-            "            spacing: 16\n"
+            "            spacing: 20\n"
             "            padding: 8\n"
             "            Repeater {\n"
             "                model: %5\n"
             "                Row {\n"
-            "                    spacing: 4\n"
+            "                    spacing: 6\n"
             "                    Rectangle {\n"
-            "                        width: 12\n"
-            "                        height: 12\n"
+            "                        width: 14\n"
+            "                        height: 14\n"
             "                        color: %4[index % %4.length]\n"
             "                        radius: 2\n"
             "                    }\n"
             "                    Text {\n"
             "                        text: modelData\n"
             "                        color: \"#ccc\"\n"
-            "                        font.pixelSize: 11\n"
+            "                        font.pixelSize: 13\n"
             "                    }\n"
             "                }\n"
             "            }\n"
             "        }\n"
             "    }\n"
             "}\n"
-        ).arg(preferredHeight).arg(title).arg(valuesStr).arg(colorsStr).arg(labelsStr);
+        ).arg(preferredHeight).arg(title).arg(valuesStr).arg(colorsStr).arg(labelsWithValuesStr);
     };
 
     // ChartBarCompare
@@ -777,12 +778,10 @@ void QmlObjectFactory::registerBuiltInTypes()
         int preferredHeight = spec["height"].toInt(350);
         if (preferredHeight <= 0) preferredHeight = 350;
 
-        // Первый ряд данных
         QJsonArray values1;
         QStringList labels1;
         parseChartData(spec, values1, labels1);
 
-        // Второй ряд данных (из data2)
         QJsonArray values2;
         QStringList labels2;
         if (spec.contains("data2") && spec["data2"].isObject()) {
@@ -828,7 +827,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         QString colorsStr2 =
             "[\"#ff9f43\", \"#ff6b6b\", \"#1dd1a1\", \"#f368e0\", \"#00d2d3\"]";
 
-        // Легенда для двух рядов (фиксированная)
         return QString(
             "Rectangle {\n"
             "    color: \"transparent\"\n"
@@ -888,17 +886,17 @@ void QmlObjectFactory::registerBuiltInTypes()
             "        Flow {\n"
             "            Layout.fillWidth: true\n"
             "            Layout.preferredHeight: implicitHeight\n"
-            "            spacing: 16\n"
+            "            spacing: 20\n"
             "            padding: 8\n"
             "            Row {\n"
-            "                spacing: 4\n"
-            "                Rectangle { width: 12; height: 12; color: \"#ff6b6b\"; radius: 2 }\n"
-            "                Text { text: \"Ряд 1 (план)\"; color: \"#ccc\"; font.pixelSize: 11 }\n"
+            "                spacing: 6\n"
+            "                Rectangle { width: 14; height: 14; color: \"#ff6b6b\"; radius: 2 }\n"
+            "                Text { text: \"Ряд 1 (план)\"; color: \"#ccc\"; font.pixelSize: 13 }\n"
             "            }\n"
             "            Row {\n"
-            "                spacing: 4\n"
-            "                Rectangle { width: 12; height: 12; color: \"#ff9f43\"; radius: 2 }\n"
-            "                Text { text: \"Ряд 2 (факт)\"; color: \"#ccc\"; font.pixelSize: 11 }\n"
+            "                spacing: 6\n"
+            "                Rectangle { width: 14; height: 14; color: \"#ff9f43\"; radius: 2 }\n"
+            "                Text { text: \"Ряд 2 (факт)\"; color: \"#ccc\"; font.pixelSize: 13 }\n"
             "            }\n"
             "        }\n"
             "    }\n"
@@ -919,18 +917,18 @@ void QmlObjectFactory::registerBuiltInTypes()
         parseChartData(spec, values, labels);
 
         QString valuesStr = "[";
+        QString labelsWithValuesStr = "[";
         for (int i = 0; i < values.size(); ++i) {
-            if (i > 0) valuesStr += ", ";
-            valuesStr += QString::number(values[i].toDouble());
+            if (i > 0) {
+                valuesStr += ", ";
+                labelsWithValuesStr += ", ";
+            }
+            double val = values[i].toDouble();
+            valuesStr += QString::number(val);
+            labelsWithValuesStr += "\"" + labels[i] + " (" + QString::number(val) + ")\"";
         }
         valuesStr += "]";
-
-        QString labelsStr = "[";
-        for (int i = 0; i < labels.size(); ++i) {
-            if (i > 0) labelsStr += ", ";
-            labelsStr += "\"" + labels[i] + "\"";
-        }
-        labelsStr += "]";
+        labelsWithValuesStr += "]";
 
         QString colorsStr =
             "[\"#48dbfb\", \"#ff6b6b\", \"#feca57\", \"#1dd1a1\", \"#ff9ff3\", "
@@ -992,29 +990,29 @@ void QmlObjectFactory::registerBuiltInTypes()
             "        Flow {\n"
             "            Layout.fillWidth: true\n"
             "            Layout.preferredHeight: implicitHeight\n"
-            "            spacing: 16\n"
+            "            spacing: 20\n"
             "            padding: 8\n"
             "            Repeater {\n"
             "                model: %5\n"
             "                Row {\n"
-            "                    spacing: 4\n"
+            "                    spacing: 6\n"
             "                    Rectangle {\n"
-            "                        width: 12\n"
-            "                        height: 12\n"
+            "                        width: 14\n"
+            "                        height: 14\n"
             "                        color: %4[index % %4.length]\n"
             "                        radius: 2\n"
             "                    }\n"
             "                    Text {\n"
             "                        text: modelData\n"
             "                        color: \"#ccc\"\n"
-            "                        font.pixelSize: 11\n"
+            "                        font.pixelSize: 13\n"
             "                    }\n"
             "                }\n"
             "            }\n"
             "        }\n"
             "    }\n"
             "}\n"
-        ).arg(preferredHeight).arg(title).arg(valuesStr).arg(colorsStr).arg(labelsStr);
+        ).arg(preferredHeight).arg(title).arg(valuesStr).arg(colorsStr).arg(labelsWithValuesStr);
     };
 
     qDebug() << "  All widget types registered. Total:" << m_qmlGenerators.size();
