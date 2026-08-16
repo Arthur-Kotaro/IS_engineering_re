@@ -1,0 +1,71 @@
+{
+  "version": "1.0",
+  "title": "Тест полей ввода",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "label_inputs",
+      "text": "Поля ввода",
+      "properties": {
+        "font.pixelSize": 18,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    },
+    {
+      "type": "QLineEdit",
+      "id": "input_text",
+      "placeholder": "Введите текст..."
+    },
+    {
+      "type": "QLineEdit",
+      "id": "input_password",
+      "placeholder": "Пароль"
+    },
+    {
+      "type": "QComboBox",
+      "id": "combo_simple",
+      "items": [
+        {"label": "Опция 1", "value": "opt1"},
+        {"label": "Опция 2", "value": "opt2"},
+        {"label": "Опция 3", "value": "opt3"}
+      ]
+    },
+    {
+      "type": "QDateEdit",
+      "id": "date_picker",
+      "date": "2026-08-16"
+    },
+    {
+      "type": "QDateTimeEdit",
+      "id": "datetime_picker",
+      "datetime": "2026-08-16 14:30"
+    },
+    {
+      "type": "QTextEdit",
+      "id": "text_area",
+      "placeholder": "Многострочный текст..."
+    },
+    {
+      "type": "QSpinBox",
+      "id": "spin_number",
+      "minimum": 0,
+      "maximum": 100,
+      "value": 50
+    },
+    {
+      "type": "QSlider",
+      "id": "slider_value",
+      "minimum": 0,
+      "maximum": 100,
+      "value": 75
+    },
+    {
+      "type": "QProgressBar",
+      "id": "progress_status",
+      "minimum": 0,
+      "maximum": 100,
+      "value": 65
+    }
+  ]
+}

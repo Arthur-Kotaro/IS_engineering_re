@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "title": "Тест графиков",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "label_charts",
+      "text": "Графики и диаграммы",
+      "properties": {
+        "font.pixelSize": 18,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    },
+    {
+      "type": "ChartPie",
+      "id": "pie_status",
+      "title": "Распределение статусов"
+    },
+    {
+      "type": "ChartBar",
+      "id": "bar_monthly",
+      "title": "Показатели по месяцам"
+    },
+    {
+      "type": "ChartLine",
+      "id": "line_trend",
+      "title": "Динамика изменений"
+    },
+    {
+      "type": "ChartBarCompare",
+      "id": "bar_compare",
+      "title": "Сравнение периодов"
+    }
+  ]
+}

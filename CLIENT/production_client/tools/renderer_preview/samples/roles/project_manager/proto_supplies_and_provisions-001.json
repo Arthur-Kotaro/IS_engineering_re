@@ -1,0 +1,168 @@
+{
+  "version": "1.0",
+  "title": "Статус обеспечения КИ",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "header_title",
+      "text": "Статус обеспечения КИ (прототипы)",
+      "properties": {
+        "font.pixelSize": 22,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    },
+    {
+      "type": "QGroupBox",
+      "id": "group_filters",
+      "title": "Фильтры",
+      "widgets": [
+        {
+          "type": "QHBoxLayout",
+          "id": "filters_row1",
+          "widgets": [
+            {
+              "type": "QLabel",
+              "id": "lbl_project",
+              "text": "Проект:"
+            },
+            {
+              "type": "QComboBox",
+              "id": "project_combo",
+              "items": [
+                {"label": "Проект А", "value": "proj_a"},
+                {"label": "Проект Б", "value": "proj_b"},
+                {"label": "Проект В", "value": "proj_c"}
+              ]
+            },
+            {
+              "type": "QLabel",
+              "id": "lbl_stage",
+              "text": "Этап:"
+            },
+            {
+              "type": "QComboBox",
+              "id": "stage_combo",
+              "items": [
+                {"label": "Все этапы", "value": "all"},
+                {"label": "Разработка", "value": "dev"},
+                {"label": "Испытания", "value": "test"},
+                {"label": "Внедрение", "value": "deploy"}
+              ]
+            }
+          ]
+        },
+        {
+          "type": "QHBoxLayout",
+          "id": "filters_row2",
+          "widgets": [
+            {
+              "type": "QLabel",
+              "id": "lbl_date_from",
+              "text": "С:"
+            },
+            {
+              "type": "QDateEdit",
+              "id": "date_from",
+              "date": "2026-01-01"
+            },
+            {
+              "type": "QLabel",
+              "id": "lbl_date_to",
+              "text": "По:"
+            },
+            {
+              "type": "QDateEdit",
+              "id": "date_to",
+              "date": "2026-12-31"
+            },
+            {
+              "type": "QPushButton",
+              "id": "btn_refresh",
+              "text": "Обновить"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "QGroupBox",
+      "id": "group_charts",
+      "title": "Аналитика",
+      "widgets": [
+        {
+          "type": "QHBoxLayout",
+          "id": "charts_row1",
+          "widgets": [
+            {
+              "type": "ChartPie",
+              "id": "pie_status",
+              "title": "Статус КИ по категориям"
+            },
+            {
+              "type": "ChartBar",
+              "id": "bar_progress",
+              "title": "Прогресс по этапам"
+            }
+          ]
+        },
+        {
+          "type": "QHBoxLayout",
+          "id": "charts_row2",
+          "widgets": [
+            {
+              "type": "ChartLine",
+              "id": "line_dynamics",
+              "title": "Динамика поставок"
+            },
+            {
+              "type": "ChartBarCompare",
+              "id": "bar_compare",
+              "title": "Сравнение плана и факта"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "QGroupBox",
+      "id": "group_table",
+      "title": "Перечень КИ",
+      "widgets": [
+        {
+          "type": "QTableWidget",
+          "id": "ki_table",
+          "columns": [
+            {"id": "id", "label": "ID", "width": 50},
+            {"id": "name", "label": "Наименование", "width": 250},
+            {"id": "type", "label": "Тип", "width": 120},
+            {"id": "status", "label": "Статус", "width": 150},
+            {"id": "deadline", "label": "Срок", "width": 120},
+            {"id": "progress", "label": "Прогресс", "width": 100}
+          ]
+        }
+      ]
+    },
+    {
+      "type": "QHBoxLayout",
+      "id": "action_row",
+      "widgets": [
+        {
+          "type": "QPushButton",
+          "id": "btn_export",
+          "text": "📊 Экспорт"
+        },
+        {
+          "type": "QPushButton",
+          "id": "btn_print",
+          "text": "🖨 Печать"
+        },
+        {
+          "type": "QPushButton",
+          "id": "btn_send",
+          "text": "📧 Отправить"
+        }
+      ]
+    }
+  ]
+}

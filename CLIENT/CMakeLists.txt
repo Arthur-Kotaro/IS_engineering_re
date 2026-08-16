@@ -18,7 +18,7 @@ if(BUILD_PRODUCTION_CLIENT)
     find_package(Qt6 REQUIRED COMPONENTS Qml Quick QuickControls2)
 endif()
 
-# Общая библиотека - добавляем ТОЛЬКО ОДИН РАЗ
+# Общая библиотека
 add_subdirectory(common)
 
 # Клиенты

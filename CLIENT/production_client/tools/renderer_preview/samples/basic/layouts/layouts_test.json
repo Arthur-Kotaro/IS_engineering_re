@@ -1,0 +1,87 @@
+{
+  "version": "1.0",
+  "title": "Тест макетов",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "label_layouts",
+      "text": "Сложные макеты",
+      "properties": {
+        "font.pixelSize": 18,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    },
+    {
+      "type": "QGroupBox",
+      "id": "group_filters",
+      "title": "Фильтры",
+      "widgets": [
+        {
+          "type": "QHBoxLayout",
+          "id": "filter_row",
+          "widgets": [
+            {
+              "type": "QLabel",
+              "id": "lbl_period",
+              "text": "Период:"
+            },
+            {
+              "type": "QComboBox",
+              "id": "period_combo",
+              "items": [
+                {"label": "Сегодня", "value": "today"},
+                {"label": "Неделя", "value": "week"},
+                {"label": "Месяц", "value": "month"}
+              ]
+            },
+            {
+              "type": "QPushButton",
+              "id": "btn_apply",
+              "text": "Применить"
+            }
+          ]
+        },
+        {
+          "type": "QHBoxLayout",
+          "id": "filter_row2",
+          "widgets": [
+            {
+              "type": "QLabel",
+              "id": "lbl_search",
+              "text": "Поиск:"
+            },
+            {
+              "type": "QLineEdit",
+              "id": "search_input",
+              "placeholder": "Введите запрос..."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "QGroupBox",
+      "id": "group_stats",
+      "title": "Статистика",
+      "widgets": [
+        {
+          "type": "QHBoxLayout",
+          "id": "stats_row",
+          "widgets": [
+            {
+              "type": "ChartPie",
+              "id": "pie_stats",
+              "title": "Доля"
+            },
+            {
+              "type": "ChartBar",
+              "id": "bar_stats",
+              "title": "Количество"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

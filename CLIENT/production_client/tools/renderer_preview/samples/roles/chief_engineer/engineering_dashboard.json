@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "title": "Инженерный дашборд",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "header",
+      "text": "Инженерный дашборд",
+      "properties": {
+        "font.pixelSize": 22,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    },
+    {
+      "type": "QGroupBox",
+      "id": "group_tech",
+      "title": "Технические показатели",
+      "widgets": [
+        {
+          "type": "QHBoxLayout",
+          "id": "tech_row",
+          "widgets": [
+            {
+              "type": "ChartPie",
+              "id": "pie_components",
+              "title": "Состав компонентов"
+            },
+            {
+              "type": "ChartBar",
+              "id": "bar_tests",
+              "title": "Результаты испытаний"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "QGroupBox",
+      "id": "group_docs",
+      "title": "Документация",
+      "widgets": [
+        {
+          "type": "QTableWidget",
+          "id": "docs_table",
+          "columns": [
+            {"id": "id", "label": "№", "width": 50},
+            {"id": "name", "label": "Документ", "width": 300},
+            {"id": "version", "label": "Версия", "width": 80},
+            {"id": "status", "label": "Статус", "width": 120}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -12,7 +12,36 @@ find_package(Qt6 REQUIRED COMPONENTS Core Network Qml Quick QuickControls2)
 set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
 set(COMMON_INCLUDE ${COMMON_DIR}/include)
 
-# QML ресурсы
+# ========== БИБЛИОТЕКА РЕНДЕРИНГА ==========
+set(RENDERER_SOURCES
+    src/renderer/JsonUiRenderer.cpp
+    src/renderer/QmlObjectFactory.cpp
+)
+
+set(RENDERER_HEADERS
+    src/renderer/JsonUiRenderer.h
+    src/renderer/QmlObjectFactory.h
+)
+
+add_library(RendererLib STATIC
+    ${RENDERER_SOURCES}
+    ${RENDERER_HEADERS}
+)
+
+target_include_directories(RendererLib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer
+)
+
+target_link_libraries(RendererLib
+    PUBLIC
+        Qt6::Core
+        Qt6::Qml
+        Qt6::Quick
+        Qt6::QuickControls2
+)
+
+# ========== QML РЕСУРСЫ ==========
 set(QML_FILES
     qml/main.qml
     qml/windows/AuthWindow.qml
@@ -47,6 +76,7 @@ qt_add_qml_module(ProductionClient
     QML_FILES ${QML_FILES}
 )
 
+# ========== ОСНОВНОЙ КЛИЕНТ ==========
 add_executable(ProductionClientApp
     main.cpp
     src/qml_bridge/AuthBridge.cpp
@@ -60,6 +90,7 @@ add_executable(ProductionClientApp
 target_link_libraries(ProductionClientApp
     PRIVATE
         ProductionClient
+        RendererLib
         UsersServiceClient
         Qt6::Core
         Qt6::Network
@@ -72,7 +103,13 @@ target_include_directories(ProductionClientApp PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/qml_bridge
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer
     ${COMMON_INCLUDE}
 )
+
+# ========== ИНСТРУМЕНТ ПРЕВЬЮ (ТОЛЬКО ДЛЯ РАЗРАБОТКИ) ==========
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_subdirectory(tools/renderer_preview)
+endif()
 
 install(TARGETS ProductionClientApp RUNTIME DESTINATION bin)

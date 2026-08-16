@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "title": "Тест кнопок",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "label_buttons",
+      "text": "Различные кнопки",
+      "properties": {
+        "font.pixelSize": 18,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    },
+    {
+      "type": "QPushButton",
+      "id": "btn_primary",
+      "text": "Основная кнопка"
+    },
+    {
+      "type": "QPushButton",
+      "id": "btn_secondary",
+      "text": "Вторичная кнопка"
+    },
+    {
+      "type": "QPushButton",
+      "id": "btn_danger",
+      "text": "Удалить"
+    },
+    {
+      "type": "QCheckBox",
+      "id": "chk_agree",
+      "text": "Согласен с условиями"
+    },
+    {
+      "type": "QCheckBox",
+      "id": "chk_notify",
+      "text": "Уведомлять по email"
+    },
+    {
+      "type": "QRadioButton",
+      "id": "radio_opt1",
+      "text": "Вариант 1"
+    },
+    {
+      "type": "QRadioButton",
+      "id": "radio_opt2",
+      "text": "Вариант 2"
+    },
+    {
+      "type": "QRadioButton",
+      "id": "radio_opt3",
+      "text": "Вариант 3"
+    }
+  ]
+}
