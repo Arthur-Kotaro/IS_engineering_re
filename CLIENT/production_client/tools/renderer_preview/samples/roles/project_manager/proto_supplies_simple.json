@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "title": "Статус обеспечения КИ (упрощённый)",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "header_title",
+      "text": "Статус обеспечения КИ (прототипы) — упрощённый",
+      "properties": {
+        "font.pixelSize": 22,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    },
+    {
+      "type": "ChartPie",
+      "id": "pie_status",
+      "title": "Статус КИ по категориям",
+      "height": 300
+    },
+    {
+      "type": "ChartBar",
+      "id": "bar_progress",
+      "title": "Прогресс по этапам",
+      "height": 300
+    },
+    {
+      "type": "ChartLine",
+      "id": "line_dynamics",
+      "title": "Динамика поставок",
+      "height": 300
+    },
+    {
+      "type": "ChartBarCompare",
+      "id": "bar_compare",
+      "title": "Сравнение плана и факта",
+      "height": 300
+    }
+  ]
+}

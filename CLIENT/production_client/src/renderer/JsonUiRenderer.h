@@ -38,6 +38,7 @@ private slots:
 
 private:
     void renderWidgets(const QJsonArray& widgets, QQuickItem* parentLayout);
+    QQuickItem* findInnerLayout(QQuickItem* container, int depth = 0);
 
     QQmlEngine* m_engine;
     QmlObjectFactory* m_factory;

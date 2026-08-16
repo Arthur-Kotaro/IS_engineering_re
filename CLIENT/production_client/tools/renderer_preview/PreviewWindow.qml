@@ -4,7 +4,7 @@ import QtQuick.Layouts 6.0
 
 ApplicationWindow {
     id: root
-    width: 1400
+    width: 1200
     height: 900
     visible: true
     title: "UI Renderer Preview"
@@ -43,6 +43,7 @@ ApplicationWindow {
         anchors.margins: 10
         spacing: 10
 
+        // Верхняя панель
         RowLayout {
             spacing: 10
             Layout.fillWidth: true
@@ -107,7 +108,6 @@ ApplicationWindow {
                     return "Выберите образец..."
                 }
 
-                // Стиль для отображения текста в поле
                 contentItem: Text {
                     text: sampleCombo.displayText
                     color: "#ffffff"
@@ -116,13 +116,12 @@ ApplicationWindow {
                     verticalAlignment: Text.AlignVCenter
                 }
 
-                // Стиль для выпадающего списка
                 delegate: ItemDelegate {
                     width: sampleCombo.width
                     height: 30
                     contentItem: Text {
                         text: modelData
-                        color: "#000000"  // Чёрный текст для читаемости
+                        color: "#000000"
                         font.pixelSize: 11
                         elide: Text.ElideLeft
                         verticalAlignment: Text.AlignVCenter
@@ -162,6 +161,7 @@ ApplicationWindow {
             }
         }
 
+        // Статусбар
         Rectangle {
             id: statusBar
             height: 28
@@ -191,59 +191,63 @@ ApplicationWindow {
             }
         }
 
-        Rectangle {
-            id: renderArea
+        // ============================================================
+        // ОСНОВНАЯ ОБЛАСТЬ С ПРОКРУТКОЙ
+        // ============================================================
+        ScrollView {
+            id: scrollView
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: "#121212"
-            border.color: "#333"
-            border.width: 1
-            radius: 4
+            clip: true
 
-            ScrollView {
-                anchors.fill: parent
-                anchors.margins: 1
-                clip: true
-                contentWidth: renderContainer.width
+            ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+            ScrollBar.horizontal.policy: ScrollBar.AsNeeded
 
-                Item {
-                    id: renderContainer
-                    width: renderArea.width - 2
-                    height: implicitHeight
-                    objectName: "renderContainer"
-
-                    ColumnLayout {
-                        id: dynamicContent
-                        anchors.fill: parent
-                        anchors.margins: 20
-                        spacing: 12
-                    }
-                }
+            background: Rectangle {
+                color: "#121212"
             }
 
-            Rectangle {
-                id: loadingOverlay
-                anchors.fill: parent
-                color: "#121212"
-                opacity: 0.7
-                visible: false
-                z: 100
+            // Главный контейнер для рендеринга
+            Item {
+                id: renderContainer
+                width: scrollView.availableWidth
+                height: contentHeight > 0 ? contentHeight : scrollView.height
+                objectName: "renderContainer"
+
+                property int contentHeight: dynamicContent.height
 
                 ColumnLayout {
-                    anchors.centerIn: parent
-                    spacing: 20
+                    id: dynamicContent
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 12
+                }
+            }
+        }
 
-                    BusyIndicator {
-                        running: parent.parent.visible
-                        Layout.alignment: Qt.AlignHCenter
-                    }
+        // Overlay для загрузки
+        Rectangle {
+            id: loadingOverlay
+            anchors.fill: parent
+            color: "#121212"
+            opacity: 0.7
+            visible: false
+            z: 100
 
-                    Text {
-                        text: "Загрузка..."
-                        color: "#aaa"
-                        font.pixelSize: 14
-                        Layout.alignment: Qt.AlignHCenter
-                    }
+            ColumnLayout {
+                anchors.centerIn: parent
+                spacing: 20
+
+                BusyIndicator {
+                    running: parent.parent.visible
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                Text {
+                    text: "Загрузка..."
+                    color: "#aaa"
+                    font.pixelSize: 14
+                    Layout.alignment: Qt.AlignHCenter
                 }
             }
         }

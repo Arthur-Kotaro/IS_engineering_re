@@ -15,22 +15,26 @@
     {
       "type": "ChartPie",
       "id": "pie_status",
-      "title": "Распределение статусов"
+      "title": "Распределение статусов",
+      "height": 300
     },
     {
       "type": "ChartBar",
       "id": "bar_monthly",
-      "title": "Показатели по месяцам"
+      "title": "Показатели по месяцам",
+      "height": 300
     },
     {
       "type": "ChartLine",
       "id": "line_trend",
-      "title": "Динамика изменений"
+      "title": "Динамика изменений",
+      "height": 300
     },
     {
       "type": "ChartBarCompare",
       "id": "bar_compare",
-      "title": "Сравнение периодов"
+      "title": "Сравнение периодов",
+      "height": 300
     }
   ]
 }

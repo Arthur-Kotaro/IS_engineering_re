@@ -1,0 +1,52 @@
+{
+  "version": "1.0",
+  "title": "Тест QHBoxLayout",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "header",
+      "text": "Горизонтальный макет",
+      "properties": {
+        "font.pixelSize": 18,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    },
+    {
+      "type": "QHBoxLayout",
+      "id": "hbox_row1",
+      "widgets": [
+        {
+          "type": "ChartPie",
+          "id": "pie1",
+          "title": "Было",
+          "height": 300
+        },
+        {
+          "type": "ChartPie",
+          "id": "pie2",
+          "title": "Стало",
+          "height": 300
+        }
+      ]
+    },
+    {
+      "type": "QHBoxLayout",
+      "id": "hbox_row2",
+      "widgets": [
+        {
+          "type": "ChartBar",
+          "id": "bar1",
+          "title": "Показатель А",
+          "height": 300
+        },
+        {
+          "type": "ChartBarCompare",
+          "id": "bar2",
+          "title": "Сравнение",
+          "height": 300
+        }
+      ]
+    }
+  ]
+}
