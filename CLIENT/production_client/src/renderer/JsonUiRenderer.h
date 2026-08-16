@@ -8,6 +8,7 @@
 class QQmlEngine;
 class QQuickItem;
 class QmlObjectFactory;
+class DataManager;
 
 class JsonUiRenderer : public QObject
 {
@@ -21,17 +22,26 @@ public:
     QObject* findWidget(const QString& id) const;
     void updateWidgetData(const QString& id, const QJsonObject& data);
     int widgetCount() const { return m_widgets.size(); }
+    void clearWidgets();
+
+    DataManager* dataManager() const { return m_dataManager; }
 
 signals:
     void widgetCreated(const QString& id, QObject* widget);
     void renderStarted();
     void renderFinished();
 
+private slots:
+    void onDataReady(const QString& widgetId, const QJsonDocument& data);
+    void onDataError(const QString& widgetId, const QString& error, const QString& endpoint, int httpCode);
+    void onDataProgress(const QString& widgetId, int percent);
+
 private:
     void renderWidgets(const QJsonArray& widgets, QQuickItem* parentLayout);
 
     QQmlEngine* m_engine;
     QmlObjectFactory* m_factory;
+    DataManager* m_dataManager;
     QMap<QString, QObject*> m_widgets;
 };
 

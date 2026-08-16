@@ -16,11 +16,13 @@ set(COMMON_INCLUDE ${COMMON_DIR}/include)
 set(RENDERER_SOURCES
     src/renderer/JsonUiRenderer.cpp
     src/renderer/QmlObjectFactory.cpp
+    src/core/DataManager.cpp
 )
 
 set(RENDERER_HEADERS
     src/renderer/JsonUiRenderer.h
     src/renderer/QmlObjectFactory.h
+    src/core/DataManager.h
 )
 
 add_library(RendererLib STATIC
@@ -31,6 +33,7 @@ add_library(RendererLib STATIC
 target_include_directories(RendererLib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
 )
 
 target_link_libraries(RendererLib
@@ -39,6 +42,7 @@ target_link_libraries(RendererLib
         Qt6::Qml
         Qt6::Quick
         Qt6::QuickControls2
+        Qt6::Network
 )
 
 # ========== QML РЕСУРСЫ ==========

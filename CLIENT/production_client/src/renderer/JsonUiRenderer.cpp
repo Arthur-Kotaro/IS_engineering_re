@@ -1,5 +1,6 @@
 #include "JsonUiRenderer.h"
 #include "QmlObjectFactory.h"
+#include "core/DataManager.h"
 #include <QQmlEngine>
 #include <QQmlComponent>
 #include <QQuickItem>
@@ -11,8 +12,17 @@ JsonUiRenderer::JsonUiRenderer(QQmlEngine* engine, QObject* parent)
     : QObject(parent)
     , m_engine(engine)
     , m_factory(new QmlObjectFactory(engine, this))
+    , m_dataManager(new DataManager(this))
 {
     qDebug() << "JsonUiRenderer initialized";
+
+    // Подключаем сигналы DataManager
+    connect(m_dataManager, &DataManager::dataReady,
+            this, &JsonUiRenderer::onDataReady);
+    connect(m_dataManager, &DataManager::dataError,
+            this, &JsonUiRenderer::onDataError);
+    connect(m_dataManager, &DataManager::dataProgress,
+            this, &JsonUiRenderer::onDataProgress);
 }
 
 JsonUiRenderer::~JsonUiRenderer()
@@ -39,7 +49,7 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
         return;
     }
 
-    // Создаём ColumnLayout внутри контейнера
+    // Создаём корневой ColumnLayout внутри контейнера
     QString layoutQml = 
         "import QtQuick 6.0\n"
         "import QtQuick.Controls 6.0\n"
@@ -76,7 +86,7 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
     layoutItem->setWidth(container->width());
     layoutItem->setHeight(container->height());
 
-    // Рендерим виджеты в этот Layout
+    // Рендерим виджеты в корневой Layout
     renderWidgets(widgets, layoutItem);
 
     emit renderFinished();
@@ -94,6 +104,9 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
         QString type = spec["type"].toString();
         QString id = spec["id"].toString();
 
+        // Проверяем, является ли виджет Layout-контейнером
+        bool isLayout = (type == "QVBoxLayout" || type == "QHBoxLayout" || type == "QGridLayout");
+
         // Создаём виджет
         QObject* widget = m_factory->create(type, spec, parentLayout);
 
@@ -103,29 +116,35 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                 emit widgetCreated(id, widget);
             }
 
-            // Если это контейнер (QGroupBox, QHBoxLayout) — рендерим дочерние виджеты
-            if ((type == "QGroupBox" || type == "QHBoxLayout") && spec.contains("widgets") && spec["widgets"].isArray()) {
+            // Если это Layout — рекурсивно рендерим дочерние виджеты
+            if (isLayout && spec.contains("widgets") && spec["widgets"].isArray()) {
                 QQuickItem* containerItem = qobject_cast<QQuickItem*>(widget);
                 if (containerItem) {
-                    // Ищем первый дочерний Layout внутри GroupBox
-                    QQuickItem* childLayout = nullptr;
+                    // Ищем внутренний Layout (ColumnLayout/RowLayout/GridLayout)
+                    QQuickItem* innerLayout = nullptr;
                     auto children = containerItem->childItems();
                     for (QQuickItem* child : children) {
-                        // Ищем ColumnLayout или RowLayout
-                        if (child->property("objectName").toString().isEmpty()) {
-                            childLayout = child;
+                        if (child->inherits("QQuickColumnLayout") ||
+                            child->inherits("QQuickRowLayout") ||
+                            child->inherits("QQuickGridLayout")) {
+                            innerLayout = child;
                             break;
                         }
                     }
 
-                    // Если нашли Layout, рендерим в него
-                    if (childLayout) {
-                        renderWidgets(spec["widgets"].toArray(), childLayout);
+                    if (innerLayout) {
+                        renderWidgets(spec["widgets"].toArray(), innerLayout);
                     } else {
-                        // Если Layout не найден, используем сам контейнер
+                        // Если внутренний Layout не найден, используем сам виджет
                         renderWidgets(spec["widgets"].toArray(), containerItem);
                     }
                 }
+            }
+
+            // Обработка данных для конечных виджетов
+            if (!isLayout && spec.contains("data") && spec["data"].isObject()) {
+                QJsonObject dataSpec = spec["data"].toObject();
+                m_dataManager->requestData(id, dataSpec);
             }
         }
     }
@@ -144,5 +163,49 @@ void JsonUiRenderer::updateWidgetData(const QString& id, const QJsonObject& data
         return;
     }
 
+    // TODO: Обновить данные виджета
     Q_UNUSED(data);
+}
+
+void JsonUiRenderer::clearWidgets()
+{
+    m_widgets.clear();
+}
+
+// ============================================================
+// СЛОТЫ ДЛЯ DATA MANAGER
+// ============================================================
+
+void JsonUiRenderer::onDataReady(const QString& widgetId, const QJsonDocument& data)
+{
+    qDebug() << "Data ready for widget:" << widgetId;
+    
+    QObject* widget = findWidget(widgetId);
+    if (!widget) {
+        qWarning() << "Widget not found for data update:" << widgetId;
+        return;
+    }
+
+    // TODO: Обновить виджет данными
+    // Для графиков: передать данные в QML-компонент
+    // Для таблиц: обновить модель
+    // Для текстовых полей: обновить текст
+}
+
+void JsonUiRenderer::onDataError(const QString& widgetId, const QString& error, 
+                                  const QString& endpoint, int httpCode)
+{
+    qWarning() << "Data error for widget:" << widgetId 
+               << "Error:" << error
+               << "Endpoint:" << endpoint
+               << "HTTP:" << httpCode;
+    
+    // TODO: Показать сообщение об ошибке в виджете
+}
+
+void JsonUiRenderer::onDataProgress(const QString& widgetId, int percent)
+{
+    qDebug() << "Data progress for widget:" << widgetId << percent << "%";
+    
+    // TODO: Обновить прогресс-бар в виджете
 }

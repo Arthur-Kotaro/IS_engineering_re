@@ -131,15 +131,7 @@
       "widgets": [
         {
           "type": "QTableWidget",
-          "id": "ki_table",
-          "columns": [
-            {"id": "id", "label": "ID", "width": 50},
-            {"id": "name", "label": "Наименование", "width": 250},
-            {"id": "type", "label": "Тип", "width": 120},
-            {"id": "status", "label": "Статус", "width": 150},
-            {"id": "deadline", "label": "Срок", "width": 120},
-            {"id": "progress", "label": "Прогресс", "width": 100}
-          ]
+          "id": "ki_table"
         }
       ]
     },
