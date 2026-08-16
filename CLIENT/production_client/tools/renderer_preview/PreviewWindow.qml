@@ -189,9 +189,6 @@ ApplicationWindow {
             }
         }
 
-        // ============================================================
-        // ScrollView — ФИКСИРОВАННАЯ ВЫСОТА через количество виджетов
-        // ============================================================
         ScrollView {
             id: scrollView
             Layout.fillWidth: true
@@ -208,29 +205,16 @@ ApplicationWindow {
             Item {
                 id: renderContainer
                 width: scrollView.width - 20
-                // Высота = количество виджетов * 100 + запас
-                height: Math.max(containerHeight, scrollView.height - 10)
+                height: scrollView.height - 10
                 objectName: "renderContainer"
 
-                property int containerHeight: dynamicContent.children.length * 120 + 100
-
-                ColumnLayout {
+                Column {
                     id: dynamicContent
                     anchors.fill: parent
                     anchors.margins: 20
                     spacing: 12
+                    width: parent.width - anchors.margins * 2
                     height: childrenRect.height
-                }
-
-                // Обновляем высоту при изменении количества детей
-                onContainerHeightChanged: {
-                    var newH = Math.max(containerHeight, scrollView.height - 10)
-                    renderContainer.height = newH
-                    console.log("=== HEIGHT UPDATED ===")
-                    console.log("children count:", dynamicContent.children.length)
-                    console.log("containerHeight:", containerHeight)
-                    console.log("newHeight:", newH)
-                    console.log("======================")
                 }
             }
         }
@@ -283,16 +267,20 @@ ApplicationWindow {
         function onRenderComplete() {
             statusText.text = "Рендеринг завершён успешно"
             loadingOverlay.visible = false
-
-            // Принудительно обновляем высоту
-            var newH = Math.max(renderContainer.containerHeight, scrollView.height - 10)
-            renderContainer.height = newH
         }
 
         function onErrorOccurred(message) {
             statusText.text = "Ошибка: " + message
             loadingOverlay.visible = false
             console.error("Preview error:", message)
+        }
+
+        function onContentHeightChanged(height) {
+            console.log("QML: contentHeightChanged received:", height)
+            // Устанавливаем contentHeight ScrollView напрямую
+            scrollView.contentHeight = height
+            // Также обновляем высоту контейнера
+            renderContainer.height = Math.max(height, scrollView.height - 10)
         }
     }
 

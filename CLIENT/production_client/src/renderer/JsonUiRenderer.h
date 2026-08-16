@@ -24,6 +24,8 @@ public:
     int widgetCount() const { return m_widgets.size(); }
     void clearWidgets();
     void updateLayout(QQuickItem* layout);
+    Q_INVOKABLE int getContentHeight(QQuickItem* item);
+    Q_INVOKABLE void refreshContentHeight();
 
     DataManager* dataManager() const { return m_dataManager; }
 
@@ -32,6 +34,7 @@ signals:
     void renderStarted();
     void renderFinished();
     void layoutUpdated();
+    void contentHeightChanged(int height);
 
 private slots:
     void onDataReady(const QString& widgetId, const QJsonDocument& data);
@@ -41,6 +44,7 @@ private slots:
 private:
     void renderWidgets(const QJsonArray& widgets, QQuickItem* parentLayout);
     QQuickItem* findInnerLayout(QQuickItem* container, int depth = 0);
+    void scheduleHeightUpdate(QQuickItem* layoutItem);
 
     QQmlEngine* m_engine;
     QmlObjectFactory* m_factory;

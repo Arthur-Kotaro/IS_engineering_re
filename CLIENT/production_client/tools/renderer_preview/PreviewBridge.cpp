@@ -32,6 +32,9 @@ PreviewBridge::PreviewBridge(QQmlEngine* engine, QObject* parent)
                 emit widgetCountChanged(m_renderer->widgetCount());
             });
 
+    connect(m_renderer, &JsonUiRenderer::contentHeightChanged,
+            this, &PreviewBridge::onContentHeightChanged);
+
     scanSamples();
 }
 
@@ -146,6 +149,12 @@ void PreviewBridge::onFileChanged(const QString& path)
             renderJson();
         }
     });
+}
+
+void PreviewBridge::onContentHeightChanged(int height)
+{
+    qDebug() << "PreviewBridge: contentHeightChanged" << height;
+    emit contentHeightChanged(height);
 }
 
 void PreviewBridge::renderJson()

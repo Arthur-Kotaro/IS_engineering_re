@@ -33,9 +33,11 @@ signals:
     void errorOccurred(const QString& message);
     void sampleFilesChanged();
     void widgetCountChanged(int count);
+    void contentHeightChanged(int height);
 
 private slots:
     void onFileChanged(const QString& path);
+    void onContentHeightChanged(int height);
 
 private:
     void renderJson();
