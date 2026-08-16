@@ -14,11 +14,67 @@ QmlObjectFactory::QmlObjectFactory(QQmlEngine* engine, QObject* parent)
     qDebug() << "  Registered" << m_qmlGenerators.size() << "widget types";
 }
 
+// ============================================================
+// ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ПАРСИНГА ДАННЫХ
+// ============================================================
+static void parseChartData(const QJsonObject& spec, QJsonArray& values, QStringList& labels)
+{
+    values = QJsonArray();
+    labels = QStringList();
+
+    if (!spec.contains("data") || !spec["data"].isObject()) {
+        values = {30, 25, 20, 15, 10};
+        labels = {"Категория 1", "Категория 2", "Категория 3", "Категория 4", "Категория 5"};
+        return;
+    }
+
+    QJsonObject dataObj = spec["data"].toObject();
+
+    if (dataObj.contains("Marked_values") && dataObj["Marked_values"].isArray()) {
+        QJsonArray markedValues = dataObj["Marked_values"].toArray();
+        for (const QJsonValue& item : markedValues) {
+            if (item.isObject()) {
+                QJsonObject obj = item.toObject();
+                if (obj.contains("value")) {
+                    values.append(obj["value"].toDouble());
+                    if (obj.contains("label")) {
+                        labels << obj["label"].toString();
+                    } else {
+                        labels << QString("Значение %1").arg(values.size());
+                    }
+                }
+            }
+        }
+        if (!values.isEmpty()) {
+            return;
+        }
+    }
+
+    if (dataObj.contains("values") && dataObj["values"].isArray()) {
+        QJsonArray valuesArray = dataObj["values"].toArray();
+        for (const QJsonValue& val : valuesArray) {
+            if (val.isDouble()) {
+                values.append(val.toDouble());
+                labels << QString("Значение %1").arg(values.size());
+            }
+        }
+        if (!values.isEmpty()) {
+            return;
+        }
+    }
+
+    values = {30, 25, 20, 15, 10};
+    labels = {"Категория 1", "Категория 2", "Категория 3", "Категория 4", "Категория 5"};
+}
+
 void QmlObjectFactory::registerBuiltInTypes()
 {
     qDebug() << "  Registering built-in widget types...";
 
-    // QLabel → Text
+    // ============================================================
+    // БАЗОВЫЕ ВИДЖЕТЫ (без изменений)
+    // ============================================================
+
     m_qmlGenerators["QLabel"] = [](const QJsonObject& spec) {
         QString text = spec["text"].toString("Label");
         QString color = spec["properties"].toObject()["color"].toString("#ffffff");
@@ -44,7 +100,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(text).arg(color).arg(fontSize).arg(bold ? "true" : "false").arg(alignStr);
     };
 
-    // QPushButton → Button
     m_qmlGenerators["QPushButton"] = [](const QJsonObject& spec) {
         QString text = spec["text"].toString("Button");
         return QString(
@@ -56,7 +111,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(text);
     };
 
-    // QComboBox → ComboBox
     m_qmlGenerators["QComboBox"] = [](const QJsonObject& spec) {
         QStringList items;
         if (spec.contains("items") && spec["items"].isArray()) {
@@ -83,7 +137,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(modelStr);
     };
 
-    // QLineEdit → TextField
     m_qmlGenerators["QLineEdit"] = [](const QJsonObject& spec) {
         QString placeholder = spec["placeholder"].toString("Введите текст...");
         return QString(
@@ -95,7 +148,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(placeholder);
     };
 
-    // QCheckBox → CheckBox
     m_qmlGenerators["QCheckBox"] = [](const QJsonObject& spec) {
         QString text = spec["text"].toString("CheckBox");
         bool checked = spec["checked"].toBool(false);
@@ -109,7 +161,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(text).arg(checked ? "true" : "false");
     };
 
-    // QRadioButton → RadioButton
     m_qmlGenerators["QRadioButton"] = [](const QJsonObject& spec) {
         QString text = spec["text"].toString("RadioButton");
         bool checked = spec["checked"].toBool(false);
@@ -123,7 +174,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(text).arg(checked ? "true" : "false");
     };
 
-    // QProgressBar → ProgressBar
     m_qmlGenerators["QProgressBar"] = [](const QJsonObject& spec) {
         int value = spec["value"].toInt(50);
         int min = spec["minimum"].toInt(0);
@@ -139,7 +189,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(value).arg(min).arg(max);
     };
 
-    // QDateEdit → ComboBox (временная заглушка)
     m_qmlGenerators["QDateEdit"] = [](const QJsonObject& spec) {
         QString date = spec["date"].toString("2026-08-16");
         return QString(
@@ -152,7 +201,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(date);
     };
 
-    // QDateTimeEdit → ComboBox (временная заглушка)
     m_qmlGenerators["QDateTimeEdit"] = [](const QJsonObject& spec) {
         QString datetime = spec["datetime"].toString("2026-08-16 10:30");
         return QString(
@@ -165,7 +213,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(datetime);
     };
 
-    // QCalendarWidget → Rectangle (заглушка)
     m_qmlGenerators["QCalendarWidget"] = [](const QJsonObject& spec) {
         return QString(
             "Rectangle {\n"
@@ -182,11 +229,8 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // ============================================================
-    // QTableWidget → ListView с колонками (рабочая таблица)
-    // ============================================================
+    // QTableWidget — без изменений
     m_qmlGenerators["QTableWidget"] = [](const QJsonObject& spec) {
-        // Парсим колонки из JSON
         QStringList columnLabels;
         QList<int> columnWidths;
 
@@ -206,7 +250,6 @@ void QmlObjectFactory::registerBuiltInTypes()
             columnWidths << 50 << 200 << 120;
         }
 
-        // Формируем заголовки
         QString headerCode;
         for (int i = 0; i < columnLabels.size(); ++i) {
             headerCode += QString(
@@ -227,7 +270,6 @@ void QmlObjectFactory::registerBuiltInTypes()
             ).arg(columnWidths[i]).arg(columnLabels[i]);
         }
 
-        // Формируем строки данных
         QStringList rowData = {
             "1|Заказ №1|Выполнен",
             "2|Заказ №2|В работе",
@@ -317,7 +359,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QTreeWidget → Rectangle (заглушка)
     m_qmlGenerators["QTreeWidget"] = [](const QJsonObject& spec) {
         return QString(
             "Rectangle {\n"
@@ -337,7 +378,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QFrame → Rectangle (разделитель)
     m_qmlGenerators["QFrame"] = [](const QJsonObject& spec) {
         return QString(
             "Rectangle {\n"
@@ -349,7 +389,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QSplitter → SplitView
     m_qmlGenerators["QSplitter"] = [](const QJsonObject& spec) {
         return QString(
             "SplitView {\n"
@@ -360,7 +399,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QToolBox → TabBar (заглушка)
     m_qmlGenerators["QToolBox"] = [](const QJsonObject& spec) {
         return QString(
             "TabBar {\n"
@@ -371,7 +409,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QTextEdit → TextArea
     m_qmlGenerators["QTextEdit"] = [](const QJsonObject& spec) {
         return QString(
             "TextArea {\n"
@@ -382,7 +419,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QPlainTextEdit → TextArea
     m_qmlGenerators["QPlainTextEdit"] = [](const QJsonObject& spec) {
         return QString(
             "TextArea {\n"
@@ -393,7 +429,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QSlider → Slider
     m_qmlGenerators["QSlider"] = [](const QJsonObject& spec) {
         int min = spec["minimum"].toInt(0);
         int max = spec["maximum"].toInt(100);
@@ -408,7 +443,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(min).arg(max).arg(value);
     };
 
-    // QSpinBox → SpinBox
     m_qmlGenerators["QSpinBox"] = [](const QJsonObject& spec) {
         int min = spec["minimum"].toInt(0);
         int max = spec["maximum"].toInt(100);
@@ -423,7 +457,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         ).arg(min).arg(max).arg(value);
     };
 
-    // QTabWidget → TabBar + StackLayout
     m_qmlGenerators["QTabWidget"] = [](const QJsonObject& spec) {
         return QString(
             "ColumnLayout {\n"
@@ -448,7 +481,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QStackedWidget → StackLayout
     m_qmlGenerators["QStackedWidget"] = [](const QJsonObject& spec) {
         return QString(
             "StackLayout {\n"
@@ -462,7 +494,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QToolButton → Button
     m_qmlGenerators["QToolButton"] = [](const QJsonObject& spec) {
         QString text = spec["text"].toString("🔧");
         return QString(
@@ -479,7 +510,6 @@ void QmlObjectFactory::registerBuiltInTypes()
     // LAYOUT-КОНТЕЙНЕРЫ
     // ============================================================
 
-    // QVBoxLayout → ColumnLayout
     m_qmlGenerators["QVBoxLayout"] = [](const QJsonObject& spec) {
         return QString(
             "ColumnLayout {\n"
@@ -489,7 +519,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QHBoxLayout → RowLayout
     m_qmlGenerators["QHBoxLayout"] = [](const QJsonObject& spec) {
         return QString(
             "RowLayout {\n"
@@ -499,7 +528,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QGridLayout → GridLayout (пока заглушка)
     m_qmlGenerators["QGridLayout"] = [](const QJsonObject& spec) {
         return QString(
             "GridLayout {\n"
@@ -510,7 +538,6 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QGroupBox
     m_qmlGenerators["QGroupBox"] = [](const QJsonObject& spec) {
         QString title = spec["title"].toString("Group");
         return QString(
@@ -527,14 +554,39 @@ void QmlObjectFactory::registerBuiltInTypes()
     };
 
     // ============================================================
-    // НАСТОЯЩИЕ ДИАГРАММЫ (Canvas)
+    // ДИАГРАММЫ С ЛЕГЕНДАМИ (ИСПРАВЛЕННЫЕ)
     // ============================================================
 
-    // ChartPie → Круговая диаграмма
+    // ChartPie
     m_qmlGenerators["ChartPie"] = [](const QJsonObject& spec) {
         QString title = spec["title"].toString("Диаграмма");
-        int preferredHeight = spec["height"].toInt(300);
-        if (preferredHeight <= 0) preferredHeight = 300;
+        int preferredHeight = spec["height"].toInt(350);
+        if (preferredHeight <= 0) preferredHeight = 350;
+
+        QJsonArray values;
+        QStringList labels;
+        parseChartData(spec, values, labels);
+
+        qDebug() << "    ChartPie: values count=" << values.size() << "labels count=" << labels.size();
+
+        // Формируем массивы для QML
+        QString valuesStr = "[";
+        for (int i = 0; i < values.size(); ++i) {
+            if (i > 0) valuesStr += ", ";
+            valuesStr += QString::number(values[i].toDouble());
+        }
+        valuesStr += "]";
+
+        QString labelsStr = "[";
+        for (int i = 0; i < labels.size(); ++i) {
+            if (i > 0) labelsStr += ", ";
+            labelsStr += "\"" + labels[i] + "\"";
+        }
+        labelsStr += "]";
+
+        QString colorsStr =
+            "[\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\", "
+            "\"#1dd1a1\", \"#f368e0\", \"#00d2d3\", \"#ff9f43\", \"#a29bfe\"]";
 
         return QString(
             "Rectangle {\n"
@@ -567,9 +619,10 @@ void QmlObjectFactory::registerBuiltInTypes()
             "                    var cy = height / 2;\n"
             "                    var r = Math.min(width, height) / 2 - 20;\n"
             "                    if (r < 10) r = 10;\n"
-            "                    var data = [30, 25, 20, 15, 10];\n"
-            "                    var colors = [\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\"];\n"
+            "                    var data = %3;\n"
+            "                    var colors = %4;\n"
             "                    var total = data.reduce(function(a,b) { return a + b; }, 0);\n"
+            "                    if (total === 0) total = 1;\n"
             "                    var startAngle = 0;\n"
             "                    for (var i = 0; i < data.length; i++) {\n"
             "                        var angle = (data[i] / total) * 2 * Math.PI;\n"
@@ -587,16 +640,62 @@ void QmlObjectFactory::registerBuiltInTypes()
             "                }\n"
             "            }\n"
             "        }\n"
+            "        // Легенда через Repeater\n"
+            "        Flow {\n"
+            "            Layout.fillWidth: true\n"
+            "            Layout.preferredHeight: implicitHeight\n"
+            "            spacing: 16\n"
+            "            padding: 8\n"
+            "            Repeater {\n"
+            "                model: %5\n"
+            "                Row {\n"
+            "                    spacing: 4\n"
+            "                    Rectangle {\n"
+            "                        width: 12\n"
+            "                        height: 12\n"
+            "                        color: %4[index % %4.length]\n"
+            "                        radius: 2\n"
+            "                    }\n"
+            "                    Text {\n"
+            "                        text: modelData\n"
+            "                        color: \"#ccc\"\n"
+            "                        font.pixelSize: 11\n"
+            "                    }\n"
+            "                }\n"
+            "            }\n"
+            "        }\n"
             "    }\n"
             "}\n"
-        ).arg(preferredHeight).arg(title);
+        ).arg(preferredHeight).arg(title).arg(valuesStr).arg(colorsStr).arg(labelsStr);
     };
 
-    // ChartBar → Столбчатая диаграмма
+    // ChartBar
     m_qmlGenerators["ChartBar"] = [](const QJsonObject& spec) {
         QString title = spec["title"].toString("Диаграмма");
-        int preferredHeight = spec["height"].toInt(300);
-        if (preferredHeight <= 0) preferredHeight = 300;
+        int preferredHeight = spec["height"].toInt(350);
+        if (preferredHeight <= 0) preferredHeight = 350;
+
+        QJsonArray values;
+        QStringList labels;
+        parseChartData(spec, values, labels);
+
+        QString valuesStr = "[";
+        for (int i = 0; i < values.size(); ++i) {
+            if (i > 0) valuesStr += ", ";
+            valuesStr += QString::number(values[i].toDouble());
+        }
+        valuesStr += "]";
+
+        QString labelsStr = "[";
+        for (int i = 0; i < labels.size(); ++i) {
+            if (i > 0) labelsStr += ", ";
+            labelsStr += "\"" + labels[i] + "\"";
+        }
+        labelsStr += "]";
+
+        QString colorsStr =
+            "[\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\", "
+            "\"#1dd1a1\", \"#f368e0\", \"#00d2d3\", \"#ff9f43\", \"#a29bfe\"]";
 
         return QString(
             "Rectangle {\n"
@@ -625,8 +724,8 @@ void QmlObjectFactory::registerBuiltInTypes()
             "                anchors.margins: 10\n"
             "                onPaint: {\n"
             "                    var ctx = getContext(\"2d\");\n"
-            "                    var data = [50, 80, 30, 90, 60, 70, 40];\n"
-            "                    var colors = [\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\", \"#1dd1a1\", \"#f368e0\"];\n"
+            "                    var data = %3;\n"
+            "                    var colors = %4;\n"
             "                    var maxVal = Math.max.apply(null, data);\n"
             "                    if (maxVal === 0) maxVal = 1;\n"
             "                    var barWidth = width / data.length * 0.7;\n"
@@ -644,17 +743,92 @@ void QmlObjectFactory::registerBuiltInTypes()
             "                }\n"
             "            }\n"
             "        }\n"
+            "        Flow {\n"
+            "            Layout.fillWidth: true\n"
+            "            Layout.preferredHeight: implicitHeight\n"
+            "            spacing: 16\n"
+            "            padding: 8\n"
+            "            Repeater {\n"
+            "                model: %5\n"
+            "                Row {\n"
+            "                    spacing: 4\n"
+            "                    Rectangle {\n"
+            "                        width: 12\n"
+            "                        height: 12\n"
+            "                        color: %4[index % %4.length]\n"
+            "                        radius: 2\n"
+            "                    }\n"
+            "                    Text {\n"
+            "                        text: modelData\n"
+            "                        color: \"#ccc\"\n"
+            "                        font.pixelSize: 11\n"
+            "                    }\n"
+            "                }\n"
+            "            }\n"
+            "        }\n"
             "    }\n"
             "}\n"
-        ).arg(preferredHeight).arg(title);
+        ).arg(preferredHeight).arg(title).arg(valuesStr).arg(colorsStr).arg(labelsStr);
     };
 
-    // ChartBarCompare → Сравнительная столбчатая диаграмма
+    // ChartBarCompare
     m_qmlGenerators["ChartBarCompare"] = [](const QJsonObject& spec) {
         QString title = spec["title"].toString("Сравнение");
-        int preferredHeight = spec["height"].toInt(300);
-        if (preferredHeight <= 0) preferredHeight = 300;
+        int preferredHeight = spec["height"].toInt(350);
+        if (preferredHeight <= 0) preferredHeight = 350;
 
+        // Первый ряд данных
+        QJsonArray values1;
+        QStringList labels1;
+        parseChartData(spec, values1, labels1);
+
+        // Второй ряд данных (из data2)
+        QJsonArray values2;
+        QStringList labels2;
+        if (spec.contains("data2") && spec["data2"].isObject()) {
+            QJsonObject data2Obj = spec["data2"].toObject();
+            if (data2Obj.contains("Marked_values") && data2Obj["Marked_values"].isArray()) {
+                QJsonArray markedValues = data2Obj["Marked_values"].toArray();
+                for (const QJsonValue& item : markedValues) {
+                    if (item.isObject()) {
+                        QJsonObject obj = item.toObject();
+                        if (obj.contains("value")) {
+                            values2.append(obj["value"].toDouble());
+                            if (obj.contains("label")) {
+                                labels2 << obj["label"].toString();
+                            } else {
+                                labels2 << QString("Значение %1").arg(values2.size());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (values2.isEmpty()) {
+            values2 = {40, 70, 50, 80, 55};
+            labels2 = {"Ряд 2-1", "Ряд 2-2", "Ряд 2-3", "Ряд 2-4", "Ряд 2-5"};
+        }
+
+        QString valuesStr1 = "[";
+        for (int i = 0; i < values1.size(); ++i) {
+            if (i > 0) valuesStr1 += ", ";
+            valuesStr1 += QString::number(values1[i].toDouble());
+        }
+        valuesStr1 += "]";
+
+        QString valuesStr2 = "[";
+        for (int i = 0; i < values2.size(); ++i) {
+            if (i > 0) valuesStr2 += ", ";
+            valuesStr2 += QString::number(values2[i].toDouble());
+        }
+        valuesStr2 += "]";
+
+        QString colorsStr1 =
+            "[\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\"]";
+        QString colorsStr2 =
+            "[\"#ff9f43\", \"#ff6b6b\", \"#1dd1a1\", \"#f368e0\", \"#00d2d3\"]";
+
+        // Легенда для двух рядов (фиксированная)
         return QString(
             "Rectangle {\n"
             "    color: \"transparent\"\n"
@@ -682,10 +856,10 @@ void QmlObjectFactory::registerBuiltInTypes()
             "                anchors.margins: 10\n"
             "                onPaint: {\n"
             "                    var ctx = getContext(\"2d\");\n"
-            "                    var data1 = [50, 80, 30, 90, 60];\n"
-            "                    var data2 = [40, 70, 50, 80, 55];\n"
-            "                    var colors1 = [\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\"];\n"
-            "                    var colors2 = [\"#ff9f43\", \"#ff6b6b\", \"#1dd1a1\", \"#f368e0\", \"#00d2d3\"];\n"
+            "                    var data1 = %3;\n"
+            "                    var data2 = %4;\n"
+            "                    var colors1 = %5;\n"
+            "                    var colors2 = %6;\n"
             "                    var maxVal = Math.max.apply(null, data1.concat(data2));\n"
             "                    if (maxVal === 0) maxVal = 1;\n"
             "                    var groupWidth = width / data1.length * 0.7;\n"
@@ -711,16 +885,56 @@ void QmlObjectFactory::registerBuiltInTypes()
             "                }\n"
             "            }\n"
             "        }\n"
+            "        Flow {\n"
+            "            Layout.fillWidth: true\n"
+            "            Layout.preferredHeight: implicitHeight\n"
+            "            spacing: 16\n"
+            "            padding: 8\n"
+            "            Row {\n"
+            "                spacing: 4\n"
+            "                Rectangle { width: 12; height: 12; color: \"#ff6b6b\"; radius: 2 }\n"
+            "                Text { text: \"Ряд 1 (план)\"; color: \"#ccc\"; font.pixelSize: 11 }\n"
+            "            }\n"
+            "            Row {\n"
+            "                spacing: 4\n"
+            "                Rectangle { width: 12; height: 12; color: \"#ff9f43\"; radius: 2 }\n"
+            "                Text { text: \"Ряд 2 (факт)\"; color: \"#ccc\"; font.pixelSize: 11 }\n"
+            "            }\n"
+            "        }\n"
             "    }\n"
             "}\n"
-        ).arg(preferredHeight).arg(title);
+        ).arg(preferredHeight).arg(title)
+         .arg(valuesStr1).arg(valuesStr2)
+         .arg(colorsStr1).arg(colorsStr2);
     };
 
-    // ChartLine → Линейный график
+    // ChartLine
     m_qmlGenerators["ChartLine"] = [](const QJsonObject& spec) {
         QString title = spec["title"].toString("График");
-        int preferredHeight = spec["height"].toInt(300);
-        if (preferredHeight <= 0) preferredHeight = 300;
+        int preferredHeight = spec["height"].toInt(350);
+        if (preferredHeight <= 0) preferredHeight = 350;
+
+        QJsonArray values;
+        QStringList labels;
+        parseChartData(spec, values, labels);
+
+        QString valuesStr = "[";
+        for (int i = 0; i < values.size(); ++i) {
+            if (i > 0) valuesStr += ", ";
+            valuesStr += QString::number(values[i].toDouble());
+        }
+        valuesStr += "]";
+
+        QString labelsStr = "[";
+        for (int i = 0; i < labels.size(); ++i) {
+            if (i > 0) labelsStr += ", ";
+            labelsStr += "\"" + labels[i] + "\"";
+        }
+        labelsStr += "]";
+
+        QString colorsStr =
+            "[\"#48dbfb\", \"#ff6b6b\", \"#feca57\", \"#1dd1a1\", \"#ff9ff3\", "
+            "\"#54a0ff\", \"#f368e0\", \"#00d2d3\", \"#ff9f43\", \"#a29bfe\"]";
 
         return QString(
             "Rectangle {\n"
@@ -749,12 +963,13 @@ void QmlObjectFactory::registerBuiltInTypes()
             "                anchors.margins: 10\n"
             "                onPaint: {\n"
             "                    var ctx = getContext(\"2d\");\n"
-            "                    var data = [10, 30, 25, 50, 40, 70, 60, 90, 80];\n"
+            "                    var data = %3;\n"
+            "                    var colors = %4;\n"
             "                    var maxVal = Math.max.apply(null, data);\n"
             "                    if (maxVal === 0) maxVal = 1;\n"
             "                    var stepX = width / (data.length - 1);\n"
             "                    ctx.beginPath();\n"
-            "                    ctx.strokeStyle = \"#48dbfb\";\n"
+            "                    ctx.strokeStyle = colors[0];\n"
             "                    ctx.lineWidth = 2;\n"
             "                    for (var i = 0; i < data.length; i++) {\n"
             "                        var x = i * stepX;\n"
@@ -763,7 +978,7 @@ void QmlObjectFactory::registerBuiltInTypes()
             "                        else ctx.lineTo(x, y);\n"
             "                    }\n"
             "                    ctx.stroke();\n"
-            "                    ctx.fillStyle = \"#48dbfb\";\n"
+            "                    ctx.fillStyle = colors[0];\n"
             "                    for (var i = 0; i < data.length; i++) {\n"
             "                        var x = i * stepX;\n"
             "                        var y = height - (data[i] / maxVal) * (height - 20) - 10;\n"
@@ -774,9 +989,32 @@ void QmlObjectFactory::registerBuiltInTypes()
             "                }\n"
             "            }\n"
             "        }\n"
+            "        Flow {\n"
+            "            Layout.fillWidth: true\n"
+            "            Layout.preferredHeight: implicitHeight\n"
+            "            spacing: 16\n"
+            "            padding: 8\n"
+            "            Repeater {\n"
+            "                model: %5\n"
+            "                Row {\n"
+            "                    spacing: 4\n"
+            "                    Rectangle {\n"
+            "                        width: 12\n"
+            "                        height: 12\n"
+            "                        color: %4[index % %4.length]\n"
+            "                        radius: 2\n"
+            "                    }\n"
+            "                    Text {\n"
+            "                        text: modelData\n"
+            "                        color: \"#ccc\"\n"
+            "                        font.pixelSize: 11\n"
+            "                    }\n"
+            "                }\n"
+            "            }\n"
+            "        }\n"
             "    }\n"
             "}\n"
-        ).arg(preferredHeight).arg(title);
+        ).arg(preferredHeight).arg(title).arg(valuesStr).arg(colorsStr).arg(labelsStr);
     };
 
     qDebug() << "  All widget types registered. Total:" << m_qmlGenerators.size();

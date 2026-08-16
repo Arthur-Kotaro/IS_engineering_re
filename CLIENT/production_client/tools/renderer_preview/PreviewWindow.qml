@@ -189,24 +189,30 @@ ApplicationWindow {
             }
         }
 
+        // ============================================================
+        // ScrollView с правильной высотой
+        // ============================================================
         ScrollView {
             id: scrollView
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
 
-            ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
             ScrollBar.horizontal.policy: ScrollBar.AsNeeded
 
             background: Rectangle {
                 color: "#121212"
             }
 
+            // Контейнер с динамической высотой
             Item {
                 id: renderContainer
                 width: scrollView.availableWidth
-                height: implicitHeight
+                height: Math.max(contentHeight, scrollView.height - 10)
                 objectName: "renderContainer"
+
+                property int contentHeight: dynamicContent.height
 
                 ColumnLayout {
                     id: dynamicContent

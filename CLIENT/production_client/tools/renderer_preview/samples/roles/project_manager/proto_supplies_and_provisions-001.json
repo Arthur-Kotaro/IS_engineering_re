@@ -82,25 +82,75 @@
           "type": "ChartPie",
           "id": "pie_status",
           "title": "Статус КИ по категориям",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Разработана", "value": 45},
+              {"label": "На испытаниях", "value": 30},
+              {"label": "Внедрена", "value": 15},
+              {"label": "Отменена", "value": 10}
+            ]
+          }
         },
         {
           "type": "ChartBar",
           "id": "bar_progress",
           "title": "Прогресс по этапам",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Этап 1", "value": 100},
+              {"label": "Этап 2", "value": 80},
+              {"label": "Этап 3", "value": 60},
+              {"label": "Этап 4", "value": 40},
+              {"label": "Этап 5", "value": 20}
+            ]
+          }
         },
         {
           "type": "ChartLine",
           "id": "line_dynamics",
           "title": "Динамика поставок",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Янв", "value": 10},
+              {"label": "Фев", "value": 25},
+              {"label": "Мар", "value": 40},
+              {"label": "Апр", "value": 30},
+              {"label": "Май", "value": 55},
+              {"label": "Июн", "value": 70},
+              {"label": "Июл", "value": 65},
+              {"label": "Авг", "value": 85}
+            ]
+          }
         },
         {
           "type": "ChartBarCompare",
           "id": "bar_compare",
           "title": "Сравнение плана и факта",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Кв.1", "value": 50},
+              {"label": "Кв.2", "value": 70},
+              {"label": "Кв.3", "value": 60},
+              {"label": "Кв.4", "value": 80}
+            ]
+          },
+          "data2": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Кв.1", "value": 40},
+              {"label": "Кв.2", "value": 65},
+              {"label": "Кв.3", "value": 55},
+              {"label": "Кв.4", "value": 75}
+            ]
+          }
         }
       ]
     },
@@ -111,7 +161,14 @@
       "widgets": [
         {
           "type": "QTableWidget",
-          "id": "ki_table"
+          "id": "ki_table",
+          "columns": [
+            {"id": "id", "label": "ID", "width": 50},
+            {"id": "name", "label": "Наименование", "width": 250},
+            {"id": "type", "label": "Тип", "width": 120},
+            {"id": "status", "label": "Статус", "width": 150},
+            {"id": "deadline", "label": "Срок", "width": 120}
+          ]
         }
       ]
     },

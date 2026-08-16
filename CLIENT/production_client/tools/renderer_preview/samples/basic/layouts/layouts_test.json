@@ -1,11 +1,11 @@
 {
   "version": "1.0",
-  "title": "Тест макетов (вертикальные)",
+  "title": "Тест макетов",
   "widgets": [
     {
       "type": "QLabel",
       "id": "label_layouts",
-      "text": "Сложные макеты (вертикальные)",
+      "text": "Сложные макеты",
       "properties": {
         "font.pixelSize": 18,
         "font.bold": true,
@@ -57,13 +57,32 @@
           "type": "ChartPie",
           "id": "pie_stats",
           "title": "Доля",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Категория А", "value": 40},
+              {"label": "Категория Б", "value": 30},
+              {"label": "Категория В", "value": 20},
+              {"label": "Категория Г", "value": 10}
+            ]
+          }
         },
         {
           "type": "ChartBar",
           "id": "bar_stats",
           "title": "Количество",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Значение 1", "value": 50},
+              {"label": "Значение 2", "value": 80},
+              {"label": "Значение 3", "value": 30},
+              {"label": "Значение 4", "value": 90},
+              {"label": "Значение 5", "value": 60}
+            ]
+          }
         }
       ]
     }

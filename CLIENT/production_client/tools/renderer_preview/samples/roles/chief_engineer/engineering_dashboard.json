@@ -21,13 +21,30 @@
           "type": "ChartPie",
           "id": "pie_components",
           "title": "Состав компонентов",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Механика", "value": 35},
+              {"label": "Электроника", "value": 30},
+              {"label": "Софт", "value": 20},
+              {"label": "Документация", "value": 15}
+            ]
+          }
         },
         {
           "type": "ChartBar",
           "id": "bar_tests",
           "title": "Результаты испытаний",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Успешно", "value": 60},
+              {"label": "С ошибками", "value": 25},
+              {"label": "Не пройдено", "value": 15}
+            ]
+          }
         }
       ]
     },
@@ -38,7 +55,13 @@
       "widgets": [
         {
           "type": "QTableWidget",
-          "id": "docs_table"
+          "id": "docs_table",
+          "columns": [
+            {"id": "id", "label": "№", "width": 50},
+            {"id": "name", "label": "Документ", "width": 300},
+            {"id": "version", "label": "Версия", "width": 80},
+            {"id": "status", "label": "Статус", "width": 120}
+          ]
         }
       ]
     }

@@ -16,25 +16,80 @@
       "type": "ChartPie",
       "id": "pie_status",
       "title": "Распределение статусов",
-      "height": 300
+      "height": 350,
+      "data": {
+        "source": "inline",
+        "Marked_values": [
+          {"label": "Выполнен", "value": 45},
+          {"label": "В работе", "value": 30},
+          {"label": "Ожидает", "value": 15},
+          {"label": "Отменён", "value": 10}
+        ]
+      }
     },
     {
       "type": "ChartBar",
       "id": "bar_monthly",
       "title": "Показатели по месяцам",
-      "height": 300
+      "height": 350,
+      "data": {
+        "source": "inline",
+        "Marked_values": [
+          {"label": "Январь", "value": 50},
+          {"label": "Февраль", "value": 80},
+          {"label": "Март", "value": 30},
+          {"label": "Апрель", "value": 90},
+          {"label": "Май", "value": 60},
+          {"label": "Июнь", "value": 70},
+          {"label": "Июль", "value": 40}
+        ]
+      }
     },
     {
       "type": "ChartLine",
       "id": "line_trend",
       "title": "Динамика изменений",
-      "height": 300
+      "height": 350,
+      "data": {
+        "source": "inline",
+        "Marked_values": [
+          {"label": "Янв", "value": 10},
+          {"label": "Фев", "value": 30},
+          {"label": "Мар", "value": 25},
+          {"label": "Апр", "value": 50},
+          {"label": "Май", "value": 40},
+          {"label": "Июн", "value": 70},
+          {"label": "Июл", "value": 60},
+          {"label": "Авг", "value": 90},
+          {"label": "Сен", "value": 80}
+        ]
+      }
     },
     {
       "type": "ChartBarCompare",
       "id": "bar_compare",
       "title": "Сравнение периодов",
-      "height": 300
+      "height": 350,
+      "data": {
+        "source": "inline",
+        "Marked_values": [
+          {"label": "Период А", "value": 50},
+          {"label": "Период Б", "value": 80},
+          {"label": "Период В", "value": 30},
+          {"label": "Период Г", "value": 90},
+          {"label": "Период Д", "value": 60}
+        ]
+      },
+      "data2": {
+        "source": "inline",
+        "Marked_values": [
+          {"label": "Период А", "value": 40},
+          {"label": "Период Б", "value": 70},
+          {"label": "Период В", "value": 50},
+          {"label": "Период Г", "value": 80},
+          {"label": "Период Д", "value": 55}
+        ]
+      }
     }
   ]
 }

@@ -1,0 +1,75 @@
+{
+  "version": "1.0",
+  "title": "Дашборд",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "welcome_label",
+      "text": "Добро пожаловать в систему!",
+      "properties": {
+        "font.pixelSize": 24,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    },
+    {
+      "type": "QGroupBox",
+      "id": "filters_group",
+      "title": "Фильтры",
+      "widgets": [
+        {
+          "type": "QComboBox",
+          "id": "period_filter",
+          "items": [
+            {"label": "Сегодня", "value": "today"},
+            {"label": "Неделя", "value": "week"},
+            {"label": "Месяц", "value": "month"}
+          ]
+        },
+        {
+          "type": "QPushButton",
+          "id": "apply_btn",
+          "text": "Применить"
+        }
+      ]
+    },
+    {
+      "type": "QHBoxLayout",
+      "id": "charts_row",
+      "widgets": [
+        {
+          "type": "ChartPie",
+          "id": "status_pie",
+          "title": "Статусы заказов",
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Выполнен", "value": 45},
+              {"label": "В работе", "value": 30},
+              {"label": "Ожидает", "value": 15},
+              {"label": "Отменён", "value": 10}
+            ]
+          }
+        },
+        {
+          "type": "ChartBar",
+          "id": "amounts_bar",
+          "title": "Суммы по месяцам",
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Янв", "value": 50},
+              {"label": "Фев", "value": 80},
+              {"label": "Мар", "value": 30},
+              {"label": "Апр", "value": 90},
+              {"label": "Май", "value": 60},
+              {"label": "Июн", "value": 70}
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

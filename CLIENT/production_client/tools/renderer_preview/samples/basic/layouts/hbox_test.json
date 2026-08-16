@@ -20,13 +20,31 @@
           "type": "ChartPie",
           "id": "pie1",
           "title": "Было",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "А", "value": 40},
+              {"label": "Б", "value": 30},
+              {"label": "В", "value": 20},
+              {"label": "Г", "value": 10}
+            ]
+          }
         },
         {
           "type": "ChartPie",
           "id": "pie2",
           "title": "Стало",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "А", "value": 30},
+              {"label": "Б", "value": 35},
+              {"label": "В", "value": 25},
+              {"label": "Г", "value": 10}
+            ]
+          }
         }
       ]
     },
@@ -38,13 +56,41 @@
           "type": "ChartBar",
           "id": "bar1",
           "title": "Показатель А",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "Янв", "value": 50},
+              {"label": "Фев", "value": 80},
+              {"label": "Мар", "value": 30},
+              {"label": "Апр", "value": 90},
+              {"label": "Май", "value": 60}
+            ]
+          }
         },
         {
           "type": "ChartBarCompare",
           "id": "bar2",
           "title": "Сравнение",
-          "height": 300
+          "height": 350,
+          "data": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "А", "value": 50},
+              {"label": "Б", "value": 70},
+              {"label": "В", "value": 60},
+              {"label": "Г", "value": 80}
+            ]
+          },
+          "data2": {
+            "source": "inline",
+            "Marked_values": [
+              {"label": "А", "value": 40},
+              {"label": "Б", "value": 65},
+              {"label": "В", "value": 55},
+              {"label": "Г", "value": 75}
+            ]
+          }
         }
       ]
     }
