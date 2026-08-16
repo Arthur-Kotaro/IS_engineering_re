@@ -79,7 +79,6 @@ QString generatePieChart(const QJsonObject& spec)
         "                property int hoveredIndex: -1\n"
         "                \n"
         "                onPaint: {\n"
-        "                    console.log(\"PIE onPaint:\", width, height, \"data length:\", chartData ? chartData.length : 0)\n"
         "                    if (!chartData || chartData.length === 0) {\n"
         "                        var ctx = getContext(\"2d\");\n"
         "                        ctx.fillStyle = \"#2a2a2a\";\n"
@@ -93,6 +92,9 @@ QString generatePieChart(const QJsonObject& spec)
         "                    if (width <= 10 || height <= 10) return;\n"
         "                    \n"
         "                    var ctx = getContext(\"2d\");\n"
+        "                    // Очищаем Canvas перед рисованием\n"
+        "                    ctx.clearRect(0, 0, width, height);\n"
+        "                    \n"
         "                    var cx = width / 2;\n"
         "                    var cy = height / 2;\n"
         "                    var r = Math.min(width, height) / 2 - 20;\n"
@@ -123,7 +125,6 @@ QString generatePieChart(const QJsonObject& spec)
         "                        ctx.stroke();\n"
         "                        startAngle += angle;\n"
         "                    }\n"
-        "                    console.log(\"PIE drawn:\", chartData.length, \"sectors\")\n"
         "                }\n"
         "                \n"
         "                function getSectorAt(mx, my) {\n"
@@ -195,22 +196,10 @@ QString generatePieChart(const QJsonObject& spec)
         "                    }\n"
         "                }\n"
         "                \n"
-        "                Component.onCompleted: {\n"
-        "                    console.log(\"PIE Canvas created, chartData:\", chartData)\n"
-        "                    requestPaint()\n"
-        "                }\n"
-        "                onChartDataChanged: {\n"
-        "                    console.log(\"PIE onChartDataChanged:\", chartData)\n"
-        "                    requestPaint()\n"
-        "                }\n"
-        "                onWidthChanged: {\n"
-        "                    console.log(\"PIE onWidthChanged:\", width)\n"
-        "                    if (width > 10) requestPaint()\n"
-        "                }\n"
-        "                onHeightChanged: {\n"
-        "                    console.log(\"PIE onHeightChanged:\", height)\n"
-        "                    if (height > 10) requestPaint()\n"
-        "                }\n"
+        "                Component.onCompleted: requestPaint()\n"
+        "                onChartDataChanged: requestPaint()\n"
+        "                onWidthChanged: { if (width > 10) requestPaint() }\n"
+        "                onHeightChanged: { if (height > 10) requestPaint() }\n"
         "            }\n"
         "        }\n"
         "        Flow {\n"
@@ -241,8 +230,7 @@ QString generatePieChart(const QJsonObject& spec)
     ).arg(preferredHeight).arg(title).arg(valuesStr).arg(labelsStr).arg(colorsStr).arg(legendStr);
 }
 
-// Остальные диаграммы - аналогично переименовываем data -> chartData
-// (опущены для краткости, но должны быть полные реализации)
+// ChartBar - добавляем clearRect
 QString generateBarChart(const QJsonObject& spec)
 {
     QString title = spec["title"].toString("Диаграмма");
@@ -321,6 +309,7 @@ QString generateBarChart(const QJsonObject& spec)
         "                onPaint: {\n"
         "                    if (!chartData || chartData.length === 0) return;\n"
         "                    var ctx = getContext(\"2d\");\n"
+        "                    ctx.clearRect(0, 0, width, height);\n"
         "                    var maxVal = Math.max.apply(null, chartData);\n"
         "                    if (maxVal === 0) maxVal = 1;\n"
         "                    var barWidth = width / chartData.length * 0.7;\n"
@@ -434,6 +423,7 @@ QString generateBarChart(const QJsonObject& spec)
     ).arg(preferredHeight).arg(title).arg(labelsStr).arg(valuesStr).arg(colorsStr).arg(legendStr);
 }
 
+// Остальные диаграммы без изменений
 QString generateBarCompareChart(const QJsonObject& spec)
 {
     QString title = spec["title"].toString("Сравнение");
@@ -509,6 +499,7 @@ QString generateBarCompareChart(const QJsonObject& spec)
         "                onPaint: {\n"
         "                    if (!chartData1 || !chartData2 || chartData1.length === 0) return;\n"
         "                    var ctx = getContext(\"2d\");\n"
+        "                    ctx.clearRect(0, 0, width, height);\n"
         "                    var maxVal = Math.max.apply(null, chartData1.concat(chartData2));\n"
         "                    if (maxVal === 0) maxVal = 1;\n"
         "                    var groupWidth = width / chartData1.length * 0.7;\n"
@@ -629,6 +620,7 @@ QString generateLineChart(const QJsonObject& spec)
         "                onPaint: {\n"
         "                    if (!chartData || chartData.length === 0) return;\n"
         "                    var ctx = getContext(\"2d\");\n"
+        "                    ctx.clearRect(0, 0, width, height);\n"
         "                    var maxVal = Math.max.apply(null, chartData);\n"
         "                    if (maxVal === 0) maxVal = 1;\n"
         "                    var stepX = width / (chartData.length - 1);\n"
