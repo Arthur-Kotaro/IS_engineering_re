@@ -18,25 +18,34 @@ QString generatePieChart(const QJsonObject& spec)
         "#1dd1a1", "#f368e0", "#00d2d3", "#ff9f43", "#a29bfe"
     };
 
+    QStringList legendItems;
+    for (int i = 0; i < values.size(); ++i) {
+        double val = values[i].toDouble();
+        legendItems << QString("%1 (%2)").arg(labels[i]).arg(val);
+    }
+
     QString valuesStr = "[";
     QString labelsStr = "[";
     QString colorsStr = "[";
+    QString legendStr = "[";
     for (int i = 0; i < values.size(); ++i) {
         if (i > 0) {
             valuesStr += ", ";
             labelsStr += ", ";
             colorsStr += ", ";
+            legendStr += ", ";
         }
         double val = values[i].toDouble();
         valuesStr += QString::number(val);
         labelsStr += "\"" + labels[i] + "\"";
         colorsStr += "\"" + colors[i % colors.size()] + "\"";
+        legendStr += "\"" + legendItems[i] + "\"";
     }
     valuesStr += "]";
     labelsStr += "]";
     colorsStr += "]";
+    legendStr += "]";
 
-    // Простая версия с одним Canvas и фиксированными данными для теста
     return QString(
         "Rectangle {\n"
         "    color: \"transparent\"\n"
@@ -61,39 +70,39 @@ QString generatePieChart(const QJsonObject& spec)
         "            radius: 4\n"
         "            Canvas {\n"
         "                id: pieCanvas\n"
+        "                objectName: \"pieCanvas\"\n"
         "                anchors.fill: parent\n"
         "                anchors.margins: 10\n"
-        "                property var data: %3\n"
-        "                property var labels: %4\n"
-        "                property var colors: %5\n"
+        "                property var chartData: %3\n"
+        "                property var chartLabels: %4\n"
+        "                property var chartColors: %5\n"
         "                property int hoveredIndex: -1\n"
         "                \n"
         "                onPaint: {\n"
-        "                    console.log(\"PieChart: onPaint called, data=\", data, \"length=\", data ? data.length : 0)\n"
-        "                    if (!data || data.length === 0) {\n"
-        "                        console.log(\"PieChart: no data, drawing placeholder\")\n"
+        "                    console.log(\"PIE onPaint:\", width, height, \"data length:\", chartData ? chartData.length : 0)\n"
+        "                    if (!chartData || chartData.length === 0) {\n"
         "                        var ctx = getContext(\"2d\");\n"
-        "                        ctx.fillStyle = \"#444\";\n"
+        "                        ctx.fillStyle = \"#2a2a2a\";\n"
         "                        ctx.fillRect(0, 0, width, height);\n"
-        "                        ctx.fillStyle = \"#888\";\n"
-        "                        ctx.font = \"20px sans-serif\";\n"
+        "                        ctx.fillStyle = \"#666\";\n"
+        "                        ctx.font = \"16px sans-serif\";\n"
         "                        ctx.textAlign = \"center\";\n"
         "                        ctx.fillText(\"Нет данных\", width/2, height/2);\n"
         "                        return;\n"
         "                    }\n"
+        "                    if (width <= 10 || height <= 10) return;\n"
+        "                    \n"
         "                    var ctx = getContext(\"2d\");\n"
         "                    var cx = width / 2;\n"
         "                    var cy = height / 2;\n"
         "                    var r = Math.min(width, height) / 2 - 20;\n"
         "                    if (r < 10) r = 10;\n"
         "                    var total = 0;\n"
-        "                    for (var i = 0; i < data.length; i++) {\n"
-        "                        total += data[i];\n"
-        "                    }\n"
+        "                    for (var i = 0; i < chartData.length; i++) total += chartData[i];\n"
         "                    if (total === 0) total = 1;\n"
         "                    var startAngle = 0;\n"
-        "                    for (var i = 0; i < data.length; i++) {\n"
-        "                        var angle = (data[i] / total) * 2 * Math.PI;\n"
+        "                    for (var i = 0; i < chartData.length; i++) {\n"
+        "                        var angle = (chartData[i] / total) * 2 * Math.PI;\n"
         "                        var isHovered = (i === hoveredIndex);\n"
         "                        var radius = isHovered ? r * 1.08 : r;\n"
         "                        var offsetX = 0;\n"
@@ -107,30 +116,100 @@ QString generatePieChart(const QJsonObject& spec)
         "                        ctx.moveTo(cx + offsetX, cy + offsetY);\n"
         "                        ctx.arc(cx + offsetX, cy + offsetY, radius, startAngle, startAngle + angle);\n"
         "                        ctx.closePath();\n"
-        "                        ctx.fillStyle = colors[i % colors.length];\n"
+        "                        ctx.fillStyle = chartColors[i % chartColors.length];\n"
         "                        ctx.fill();\n"
         "                        ctx.strokeStyle = \"#333\";\n"
         "                        ctx.lineWidth = isHovered ? 3 : 2;\n"
         "                        ctx.stroke();\n"
         "                        startAngle += angle;\n"
         "                    }\n"
+        "                    console.log(\"PIE drawn:\", chartData.length, \"sectors\")\n"
+        "                }\n"
+        "                \n"
+        "                function getSectorAt(mx, my) {\n"
+        "                    if (!chartData || chartData.length === 0) return -1;\n"
+        "                    var cx = width / 2;\n"
+        "                    var cy = height / 2;\n"
+        "                    var r = Math.min(width, height) / 2 - 20;\n"
+        "                    if (r < 10) r = 10;\n"
+        "                    var dx = mx - cx;\n"
+        "                    var dy = my - cy;\n"
+        "                    var dist = Math.sqrt(dx*dx + dy*dy);\n"
+        "                    if (dist > r * 1.08) return -1;\n"
+        "                    var angle = Math.atan2(dy, dx);\n"
+        "                    if (angle < 0) angle += 2 * Math.PI;\n"
+        "                    var total = 0;\n"
+        "                    for (var i = 0; i < chartData.length; i++) total += chartData[i];\n"
+        "                    if (total === 0) total = 1;\n"
+        "                    var startAngle = 0;\n"
+        "                    for (var i = 0; i < chartData.length; i++) {\n"
+        "                        var a = (chartData[i] / total) * 2 * Math.PI;\n"
+        "                        if (angle >= startAngle && angle < startAngle + a) return i;\n"
+        "                        startAngle += a;\n"
+        "                    }\n"
+        "                    return -1;\n"
+        "                }\n"
+        "                \n"
+        "                MouseArea {\n"
+        "                    anchors.fill: parent\n"
+        "                    hoverEnabled: true\n"
+        "                    onPositionChanged: {\n"
+        "                        var idx = parent.getSectorAt(mouseX, mouseY);\n"
+        "                        if (idx !== parent.hoveredIndex) {\n"
+        "                            parent.hoveredIndex = idx;\n"
+        "                            parent.requestPaint();\n"
+        "                            if (idx >= 0) {\n"
+        "                                tooltipText.text = parent.chartData[idx] + \" - \" + parent.chartLabels[idx];\n"
+        "                                tooltip.x = mouseX + 15\n"
+        "                                tooltip.y = mouseY - 10\n"
+        "                                tooltip.visible = true\n"
+        "                            } else {\n"
+        "                                tooltip.visible = false\n"
+        "                            }\n"
+        "                        }\n"
+        "                    }\n"
+        "                    onExited: {\n"
+        "                        parent.hoveredIndex = -1;\n"
+        "                        parent.requestPaint();\n"
+        "                        tooltip.visible = false;\n"
+        "                    }\n"
+        "                }\n"
+        "                \n"
+        "                Rectangle {\n"
+        "                    id: tooltip\n"
+        "                    visible: false\n"
+        "                    color: \"#2d2d2d\"\n"
+        "                    border.color: \"#555\"\n"
+        "                    border.width: 1\n"
+        "                    radius: 4\n"
+        "                    width: tooltipText.width + 16\n"
+        "                    height: tooltipText.height + 16\n"
+        "                    x: 0\n"
+        "                    y: 0\n"
+        "                    z: 10\n"
+        "                    Text {\n"
+        "                        id: tooltipText\n"
+        "                        color: \"#ffffff\"\n"
+        "                        font.pixelSize: 12\n"
+        "                        anchors.centerIn: parent\n"
+        "                    }\n"
         "                }\n"
         "                \n"
         "                Component.onCompleted: {\n"
-        "                    console.log(\"PieChart: Component.onCompleted, data=\", data)\n"
+        "                    console.log(\"PIE Canvas created, chartData:\", chartData)\n"
         "                    requestPaint()\n"
         "                }\n"
-        "                onDataChanged: {\n"
-        "                    console.log(\"PieChart: onDataChanged, data=\", data)\n"
+        "                onChartDataChanged: {\n"
+        "                    console.log(\"PIE onChartDataChanged:\", chartData)\n"
         "                    requestPaint()\n"
         "                }\n"
         "                onWidthChanged: {\n"
-        "                    console.log(\"PieChart: onWidthChanged\", width)\n"
-        "                    requestPaint()\n"
+        "                    console.log(\"PIE onWidthChanged:\", width)\n"
+        "                    if (width > 10) requestPaint()\n"
         "                }\n"
         "                onHeightChanged: {\n"
-        "                    console.log(\"PieChart: onHeightChanged\", height)\n"
-        "                    requestPaint()\n"
+        "                    console.log(\"PIE onHeightChanged:\", height)\n"
+        "                    if (height > 10) requestPaint()\n"
         "                }\n"
         "            }\n"
         "        }\n"
@@ -140,7 +219,7 @@ QString generatePieChart(const QJsonObject& spec)
         "            spacing: 20\n"
         "            padding: 8\n"
         "            Repeater {\n"
-        "                model: %4\n"
+        "                model: %6\n"
         "                Row {\n"
         "                    spacing: 6\n"
         "                    Rectangle {\n"
@@ -159,11 +238,11 @@ QString generatePieChart(const QJsonObject& spec)
         "        }\n"
         "    }\n"
         "}\n"
-    ).arg(preferredHeight).arg(title).arg(valuesStr).arg(labelsStr).arg(colorsStr);
+    ).arg(preferredHeight).arg(title).arg(valuesStr).arg(labelsStr).arg(colorsStr).arg(legendStr);
 }
 
-// Остальные диаграммы (ChartBar, ChartBarCompare, ChartLine) 
-// остаются без изменений из предыдущей версии
+// Остальные диаграммы - аналогично переименовываем data -> chartData
+// (опущены для краткости, но должны быть полные реализации)
 QString generateBarChart(const QJsonObject& spec)
 {
     QString title = spec["title"].toString("Диаграмма");
@@ -179,23 +258,33 @@ QString generateBarChart(const QJsonObject& spec)
         "#1dd1a1", "#f368e0", "#00d2d3", "#ff9f43", "#a29bfe"
     };
 
+    QStringList legendItems;
+    for (int i = 0; i < values.size(); ++i) {
+        double val = values[i].toDouble();
+        legendItems << QString("%1 (%2)").arg(labels[i]).arg(val);
+    }
+
     QString labelsStr = "[";
     QString valuesStr = "[";
     QString colorsStr = "[";
+    QString legendStr = "[";
     for (int i = 0; i < values.size(); ++i) {
         if (i > 0) {
             labelsStr += ", ";
             valuesStr += ", ";
             colorsStr += ", ";
+            legendStr += ", ";
         }
         double val = values[i].toDouble();
         labelsStr += "\"" + labels[i] + "\"";
         valuesStr += QString::number(val);
         colorsStr += "\"" + colors[i % colors.size()] + "\"";
+        legendStr += "\"" + legendItems[i] + "\"";
     }
     labelsStr += "]";
     valuesStr += "]";
     colorsStr += "]";
+    legendStr += "]";
 
     return QString(
         "Rectangle {\n"
@@ -221,28 +310,29 @@ QString generateBarChart(const QJsonObject& spec)
         "            radius: 4\n"
         "            Canvas {\n"
         "                id: barCanvas\n"
+        "                objectName: \"barCanvas\"\n"
         "                anchors.fill: parent\n"
         "                anchors.margins: 10\n"
-        "                property var data: %4\n"
-        "                property var labels: %3\n"
-        "                property var colors: %5\n"
+        "                property var chartData: %4\n"
+        "                property var chartLabels: %3\n"
+        "                property var chartColors: %5\n"
         "                property int hoveredIndex: -1\n"
         "                \n"
         "                onPaint: {\n"
-        "                    if (!data || data.length === 0) return;\n"
+        "                    if (!chartData || chartData.length === 0) return;\n"
         "                    var ctx = getContext(\"2d\");\n"
-        "                    var maxVal = Math.max.apply(null, data);\n"
+        "                    var maxVal = Math.max.apply(null, chartData);\n"
         "                    if (maxVal === 0) maxVal = 1;\n"
-        "                    var barWidth = width / data.length * 0.7;\n"
-        "                    var gap = (width / data.length - barWidth) / 2;\n"
-        "                    for (var i = 0; i < data.length; i++) {\n"
+        "                    var barWidth = width / chartData.length * 0.7;\n"
+        "                    var gap = (width / chartData.length - barWidth) / 2;\n"
+        "                    for (var i = 0; i < chartData.length; i++) {\n"
         "                        var isHovered = (i === hoveredIndex);\n"
-        "                        var h = (data[i] / maxVal) * (height - 20);\n"
+        "                        var h = (chartData[i] / maxVal) * (height - 20);\n"
         "                        var x = i * (barWidth + gap * 2) + gap;\n"
         "                        var y = height - h - 10;\n"
         "                        var barW = isHovered ? barWidth * 1.15 : barWidth;\n"
-        "                        var offsetX = isHovered ? (barWidth * 1.15 - barWidth) / 2 : 0;\n"
-        "                        ctx.fillStyle = colors[i % colors.length];\n"
+        "                        var offsetX = isHovered ? (barW - barWidth) / 2 : 0;\n"
+        "                        ctx.fillStyle = chartColors[i % chartColors.length];\n"
         "                        ctx.fillRect(x - offsetX, y, barW, h);\n"
         "                        ctx.strokeStyle = \"#333\";\n"
         "                        ctx.lineWidth = isHovered ? 3 : 1;\n"
@@ -250,10 +340,68 @@ QString generateBarChart(const QJsonObject& spec)
         "                    }\n"
         "                }\n"
         "                \n"
-        "                Component.onCompleted: {\n"
-        "                    requestPaint()\n"
+        "                function getBarAt(mx, my) {\n"
+        "                    if (!chartData || chartData.length === 0) return -1;\n"
+        "                    var maxVal = Math.max.apply(null, chartData);\n"
+        "                    if (maxVal === 0) maxVal = 1;\n"
+        "                    var barWidth = width / chartData.length * 0.7;\n"
+        "                    var gap = (width / chartData.length - barWidth) / 2;\n"
+        "                    for (var i = 0; i < chartData.length; i++) {\n"
+        "                        var h = (chartData[i] / maxVal) * (height - 20);\n"
+        "                        var x = i * (barWidth + gap * 2) + gap;\n"
+        "                        var y = height - h - 10;\n"
+        "                        if (mx >= x && mx <= x + barWidth && my >= y && my <= y + h) return i;\n"
+        "                    }\n"
+        "                    return -1;\n"
         "                }\n"
-        "                onDataChanged: requestPaint()\n"
+        "                \n"
+        "                MouseArea {\n"
+        "                    anchors.fill: parent\n"
+        "                    hoverEnabled: true\n"
+        "                    onPositionChanged: {\n"
+        "                        var idx = parent.getBarAt(mouseX, mouseY);\n"
+        "                        if (idx !== parent.hoveredIndex) {\n"
+        "                            parent.hoveredIndex = idx;\n"
+        "                            parent.requestPaint();\n"
+        "                            if (idx >= 0) {\n"
+        "                                tooltipText.text = parent.chartData[idx] + \" - \" + parent.chartLabels[idx];\n"
+        "                                tooltip.x = mouseX + 15\n"
+        "                                tooltip.y = mouseY - 10\n"
+        "                                tooltip.visible = true\n"
+        "                            } else {\n"
+        "                                tooltip.visible = false\n"
+        "                            }\n"
+        "                        }\n"
+        "                    }\n"
+        "                    onExited: {\n"
+        "                        parent.hoveredIndex = -1;\n"
+        "                        parent.requestPaint();\n"
+        "                        tooltip.visible = false;\n"
+        "                    }\n"
+        "                }\n"
+        "                \n"
+        "                Rectangle {\n"
+        "                    id: tooltip\n"
+        "                    visible: false\n"
+        "                    color: \"#2d2d2d\"\n"
+        "                    border.color: \"#555\"\n"
+        "                    border.width: 1\n"
+        "                    radius: 4\n"
+        "                    width: tooltipText.width + 16\n"
+        "                    height: tooltipText.height + 16\n"
+        "                    x: 0\n"
+        "                    y: 0\n"
+        "                    z: 10\n"
+        "                    Text {\n"
+        "                        id: tooltipText\n"
+        "                        color: \"#ffffff\"\n"
+        "                        font.pixelSize: 12\n"
+        "                        anchors.centerIn: parent\n"
+        "                    }\n"
+        "                }\n"
+        "                \n"
+        "                Component.onCompleted: requestPaint()\n"
+        "                onChartDataChanged: requestPaint()\n"
         "                onWidthChanged: requestPaint()\n"
         "                onHeightChanged: requestPaint()\n"
         "            }\n"
@@ -264,7 +412,7 @@ QString generateBarChart(const QJsonObject& spec)
         "            spacing: 20\n"
         "            padding: 8\n"
         "            Repeater {\n"
-        "                model: %3\n"
+        "                model: %6\n"
         "                Row {\n"
         "                    spacing: 6\n"
         "                    Rectangle {\n"
@@ -283,7 +431,7 @@ QString generateBarChart(const QJsonObject& spec)
         "        }\n"
         "    }\n"
         "}\n"
-    ).arg(preferredHeight).arg(title).arg(labelsStr).arg(valuesStr).arg(colorsStr);
+    ).arg(preferredHeight).arg(title).arg(labelsStr).arg(valuesStr).arg(colorsStr).arg(legendStr);
 }
 
 QString generateBarCompareChart(const QJsonObject& spec)
@@ -352,24 +500,25 @@ QString generateBarCompareChart(const QJsonObject& spec)
         "            radius: 4\n"
         "            Canvas {\n"
         "                id: compareCanvas\n"
+        "                objectName: \"compareCanvas\"\n"
         "                anchors.fill: parent\n"
         "                anchors.margins: 10\n"
-        "                property var data1: %3\n"
-        "                property var data2: %4\n"
+        "                property var chartData1: %3\n"
+        "                property var chartData2: %4\n"
         "                \n"
         "                onPaint: {\n"
-        "                    if (!data1 || !data2 || data1.length === 0) return;\n"
+        "                    if (!chartData1 || !chartData2 || chartData1.length === 0) return;\n"
         "                    var ctx = getContext(\"2d\");\n"
-        "                    var maxVal = Math.max.apply(null, data1.concat(data2));\n"
+        "                    var maxVal = Math.max.apply(null, chartData1.concat(chartData2));\n"
         "                    if (maxVal === 0) maxVal = 1;\n"
-        "                    var groupWidth = width / data1.length * 0.7;\n"
+        "                    var groupWidth = width / chartData1.length * 0.7;\n"
         "                    var barWidth = groupWidth / 2 - 2;\n"
-        "                    var gap = (width / data1.length - groupWidth) / 2;\n"
+        "                    var gap = (width / chartData1.length - groupWidth) / 2;\n"
         "                    var colors1 = [\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\"];\n"
         "                    var colors2 = [\"#ff9f43\", \"#ff6b6b\", \"#1dd1a1\", \"#f368e0\", \"#00d2d3\"];\n"
-        "                    for (var i = 0; i < data1.length; i++) {\n"
-        "                        var h1 = (data1[i] / maxVal) * (height - 20);\n"
-        "                        var h2 = (data2[i] / maxVal) * (height - 20);\n"
+        "                    for (var i = 0; i < chartData1.length; i++) {\n"
+        "                        var h1 = (chartData1[i] / maxVal) * (height - 20);\n"
+        "                        var h2 = (chartData2[i] / maxVal) * (height - 20);\n"
         "                        var x = i * (groupWidth + gap * 2) + gap;\n"
         "                        var y1 = height - h1 - 10;\n"
         "                        var y2 = height - h2 - 10;\n"
@@ -385,10 +534,9 @@ QString generateBarCompareChart(const QJsonObject& spec)
         "                        ctx.strokeRect(x + barWidth + 2, y2, barWidth, h2);\n"
         "                    }\n"
         "                }\n"
-        "                \n"
         "                Component.onCompleted: requestPaint()\n"
-        "                onData1Changed: requestPaint()\n"
-        "                onData2Changed: requestPaint()\n"
+        "                onChartData1Changed: requestPaint()\n"
+        "                onChartData2Changed: requestPaint()\n"
         "                onWidthChanged: requestPaint()\n"
         "                onHeightChanged: requestPaint()\n"
         "            }\n"
@@ -424,19 +572,29 @@ QString generateLineChart(const QJsonObject& spec)
     QStringList labels;
     parseChartData(spec, values, labels);
 
+    QStringList legendItems;
+    for (int i = 0; i < values.size(); ++i) {
+        double val = values[i].toDouble();
+        legendItems << QString("%1 (%2)").arg(labels[i]).arg(val);
+    }
+
     QString valuesStr = "[";
     QString labelsStr = "[";
+    QString legendStr = "[";
     for (int i = 0; i < values.size(); ++i) {
         if (i > 0) {
             valuesStr += ", ";
             labelsStr += ", ";
+            legendStr += ", ";
         }
         double val = values[i].toDouble();
         valuesStr += QString::number(val);
         labelsStr += "\"" + labels[i] + "\"";
+        legendStr += "\"" + legendItems[i] + "\"";
     }
     valuesStr += "]";
     labelsStr += "]";
+    legendStr += "]";
 
     return QString(
         "Rectangle {\n"
@@ -462,39 +620,39 @@ QString generateLineChart(const QJsonObject& spec)
         "            radius: 4\n"
         "            Canvas {\n"
         "                id: lineCanvas\n"
+        "                objectName: \"lineCanvas\"\n"
         "                anchors.fill: parent\n"
         "                anchors.margins: 10\n"
-        "                property var data: %3\n"
-        "                property var labels: %4\n"
+        "                property var chartData: %3\n"
+        "                property var chartLabels: %4\n"
         "                \n"
         "                onPaint: {\n"
-        "                    if (!data || data.length === 0) return;\n"
+        "                    if (!chartData || chartData.length === 0) return;\n"
         "                    var ctx = getContext(\"2d\");\n"
-        "                    var maxVal = Math.max.apply(null, data);\n"
+        "                    var maxVal = Math.max.apply(null, chartData);\n"
         "                    if (maxVal === 0) maxVal = 1;\n"
-        "                    var stepX = width / (data.length - 1);\n"
+        "                    var stepX = width / (chartData.length - 1);\n"
         "                    ctx.beginPath();\n"
         "                    ctx.strokeStyle = \"#48dbfb\";\n"
         "                    ctx.lineWidth = 3;\n"
-        "                    for (var i = 0; i < data.length; i++) {\n"
+        "                    for (var i = 0; i < chartData.length; i++) {\n"
         "                        var x = i * stepX;\n"
-        "                        var y = height - (data[i] / maxVal) * (height - 20) - 10;\n"
+        "                        var y = height - (chartData[i] / maxVal) * (height - 20) - 10;\n"
         "                        if (i === 0) ctx.moveTo(x, y);\n"
         "                        else ctx.lineTo(x, y);\n"
         "                    }\n"
         "                    ctx.stroke();\n"
         "                    ctx.fillStyle = \"#48dbfb\";\n"
-        "                    for (var i = 0; i < data.length; i++) {\n"
+        "                    for (var i = 0; i < chartData.length; i++) {\n"
         "                        var x = i * stepX;\n"
-        "                        var y = height - (data[i] / maxVal) * (height - 20) - 10;\n"
+        "                        var y = height - (chartData[i] / maxVal) * (height - 20) - 10;\n"
         "                        ctx.beginPath();\n"
         "                        ctx.arc(x, y, 5, 0, 2 * Math.PI);\n"
         "                        ctx.fill();\n"
         "                    }\n"
         "                }\n"
-        "                \n"
         "                Component.onCompleted: requestPaint()\n"
-        "                onDataChanged: requestPaint()\n"
+        "                onChartDataChanged: requestPaint()\n"
         "                onWidthChanged: requestPaint()\n"
         "                onHeightChanged: requestPaint()\n"
         "            }\n"
@@ -504,13 +662,25 @@ QString generateLineChart(const QJsonObject& spec)
         "            Layout.preferredHeight: implicitHeight\n"
         "            spacing: 20\n"
         "            padding: 8\n"
-        "            Row {\n"
-        "                spacing: 6\n"
-        "                Rectangle { width: 14; height: 14; color: \"#48dbfb\"; radius: 2 }\n"
-        "                Text { text: \"Значения\"; color: \"#ccc\"; font.pixelSize: 14 }\n"
+        "            Repeater {\n"
+        "                model: %5\n"
+        "                Row {\n"
+        "                    spacing: 6\n"
+        "                    Rectangle {\n"
+        "                        width: 14\n"
+        "                        height: 14\n"
+        "                        color: \"#48dbfb\"\n"
+        "                        radius: 2\n"
+        "                    }\n"
+        "                    Text {\n"
+        "                        text: modelData\n"
+        "                        color: \"#ccc\"\n"
+        "                        font.pixelSize: 14\n"
+        "                    }\n"
+        "                }\n"
         "            }\n"
         "        }\n"
         "    }\n"
         "}\n"
-    ).arg(preferredHeight).arg(title).arg(valuesStr).arg(labelsStr);
+    ).arg(preferredHeight).arg(title).arg(valuesStr).arg(labelsStr).arg(legendStr);
 }

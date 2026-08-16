@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonValue>
 #include <QTimer>
+#include <QMetaObject>
 
 JsonUiRenderer::JsonUiRenderer(QQmlEngine* engine, QObject* parent)
     : QObject(parent)
@@ -74,6 +75,34 @@ void JsonUiRenderer::scheduleHeightUpdate(QQuickItem* layoutItem)
 void JsonUiRenderer::refreshContentHeight()
 {
     if (m_lastLayout) {
+        scheduleHeightUpdate(m_lastLayout);
+    }
+}
+
+void JsonUiRenderer::repaintCharts(QQuickItem* item)
+{
+    if (!item) return;
+    
+    // Ищем все Canvas внутри и вызываем requestPaint()
+    auto children = item->childItems();
+    for (QQuickItem* child : children) {
+        if (child) {
+            // Проверяем, является ли элемент Canvas
+            if (child->inherits("QQuickCanvasItem")) {
+                qDebug() << "Repainting Canvas:" << child->objectName();
+                QMetaObject::invokeMethod(child, "requestPaint", Qt::QueuedConnection);
+            }
+            // Рекурсивно обходим вложенные элементы
+            repaintCharts(child);
+        }
+    }
+}
+
+void JsonUiRenderer::refreshAllCharts()
+{
+    if (m_lastLayout) {
+        qDebug() << "refreshAllCharts: forcing repaint of all charts";
+        repaintCharts(m_lastLayout);
         scheduleHeightUpdate(m_lastLayout);
     }
 }
@@ -208,10 +237,15 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
     updateLayout(layoutItem);
     
     scheduleHeightUpdate(layoutItem);
+    
+    // Через небольшую задержку принудительно перерисовываем все диаграммы
+    QTimer::singleShot(200, this, [this]() {
+        refreshAllCharts();
+    });
 
     emit renderFinished();
     qDebug() << "========================================";
-    qDebug() << "JsonUiRenderer::render() FINISHED (async height update scheduled)";
+    qDebug() << "JsonUiRenderer::render() FINISHED (async)";
     qDebug() << "========================================";
 }
 
@@ -324,6 +358,10 @@ void JsonUiRenderer::onDataReady(const QString& widgetId, const QJsonDocument& d
     qDebug() << "DATA READY for widget:" << widgetId << "data size=" << data.toJson().size();
     if (m_lastLayout) {
         scheduleHeightUpdate(m_lastLayout);
+        // Принудительно перерисовываем все диаграммы после загрузки данных
+        QTimer::singleShot(100, this, [this]() {
+            refreshAllCharts();
+        });
     }
 }
 

@@ -243,6 +243,15 @@ void PreviewBridge::renderJson()
     try {
         m_renderer->render(root, container);
         qDebug() << "Render completed successfully";
+        
+        // Force repaint all charts after render
+        QTimer::singleShot(250, this, [this]() {
+            if (m_renderer) {
+                m_renderer->refreshAllCharts();
+                qDebug() << "Forced repaint of all charts";
+            }
+        });
+        
     } catch (const std::exception& e) {
         emit errorOccurred("Render error: " + QString::fromStdString(e.what()));
     } catch (...) {

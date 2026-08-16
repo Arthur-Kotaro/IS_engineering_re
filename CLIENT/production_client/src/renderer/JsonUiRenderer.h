@@ -26,6 +26,7 @@ public:
     void updateLayout(QQuickItem* layout);
     Q_INVOKABLE int getContentHeight(QQuickItem* item);
     Q_INVOKABLE void refreshContentHeight();
+    Q_INVOKABLE void refreshAllCharts();
 
     DataManager* dataManager() const { return m_dataManager; }
 
@@ -45,6 +46,7 @@ private:
     void renderWidgets(const QJsonArray& widgets, QQuickItem* parentLayout);
     QQuickItem* findInnerLayout(QQuickItem* container, int depth = 0);
     void scheduleHeightUpdate(QQuickItem* layoutItem);
+    void repaintCharts(QQuickItem* item);
 
     QQmlEngine* m_engine;
     QmlObjectFactory* m_factory;
