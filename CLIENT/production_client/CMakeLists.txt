@@ -16,12 +16,18 @@ set(COMMON_INCLUDE ${COMMON_DIR}/include)
 set(RENDERER_SOURCES
     src/renderer/JsonUiRenderer.cpp
     src/renderer/QmlObjectFactory.cpp
+    src/renderer/qml/GeneratorHelpers.cpp
+    src/renderer/qml/ChartGenerators.cpp
+    src/renderer/qml/TableGenerators.cpp
+    src/renderer/qml/LayoutGenerators.cpp
+    src/renderer/qml/WidgetGenerators.cpp
     src/core/DataManager.cpp
 )
 
 set(RENDERER_HEADERS
     src/renderer/JsonUiRenderer.h
     src/renderer/QmlObjectFactory.h
+    src/renderer/qml/GeneratorHelpers.h
     src/core/DataManager.h
 )
 
@@ -33,6 +39,7 @@ add_library(RendererLib STATIC
 target_include_directories(RendererLib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer/qml
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
 )
 
