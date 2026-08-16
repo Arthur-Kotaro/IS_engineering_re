@@ -23,6 +23,7 @@ public:
     void updateWidgetData(const QString& id, const QJsonObject& data);
     int widgetCount() const { return m_widgets.size(); }
     void clearWidgets();
+    void updateLayout(QQuickItem* layout);
 
     DataManager* dataManager() const { return m_dataManager; }
 
@@ -30,6 +31,7 @@ signals:
     void widgetCreated(const QString& id, QObject* widget);
     void renderStarted();
     void renderFinished();
+    void layoutUpdated();
 
 private slots:
     void onDataReady(const QString& widgetId, const QJsonDocument& data);
@@ -44,6 +46,7 @@ private:
     QmlObjectFactory* m_factory;
     DataManager* m_dataManager;
     QMap<QString, QObject*> m_widgets;
+    QQuickItem* m_lastLayout = nullptr;
 };
 
 #endif // JSONUIRENDERER_H

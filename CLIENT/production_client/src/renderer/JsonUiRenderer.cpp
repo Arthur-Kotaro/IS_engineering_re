@@ -41,7 +41,6 @@ QQuickItem* JsonUiRenderer::findInnerLayout(QQuickItem* container, int depth)
 
     qDebug() << "    findInnerLayout() depth=" << depth << "class=" << container->metaObject()->className();
 
-    // Проверяем сам контейнер
     if (container->inherits("QQuickColumnLayout") ||
         container->inherits("QQuickRowLayout") ||
         container->inherits("QQuickGridLayout")) {
@@ -49,7 +48,6 @@ QQuickItem* JsonUiRenderer::findInnerLayout(QQuickItem* container, int depth)
         return container;
     }
 
-    // Рекурсивно ищем среди дочерних элементов
     auto children = container->childItems();
     for (QQuickItem* child : children) {
         QQuickItem* result = findInnerLayout(child, depth + 1);
@@ -59,6 +57,31 @@ QQuickItem* JsonUiRenderer::findInnerLayout(QQuickItem* container, int depth)
     }
 
     return nullptr;
+}
+
+void JsonUiRenderer::updateLayout(QQuickItem* layout)
+{
+    if (!layout) return;
+
+    qDebug() << "updateLayout() called for" << layout->metaObject()->className();
+
+    // Принудительно пересчитываем геометрию QML-элемента
+    layout->polish();
+    layout->update();
+
+    // Сохраняем последний Layout для дальнейшего использования
+    m_lastLayout = layout;
+
+    emit layoutUpdated();
+
+    // Дополнительно отправляем сигнал через таймер, чтобы дать QML время на обновление
+    QTimer::singleShot(10, this, [this, layout]() {
+        if (layout) {
+            layout->polish();
+            layout->update();
+            qDebug() << "updateLayout() deferred: layout updated again";
+        }
+    });
 }
 
 void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
@@ -135,6 +158,9 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
 
     renderWidgets(widgets, layoutItem);
 
+    // Принудительно обновляем Layout после рендеринга
+    updateLayout(layoutItem);
+
     emit renderFinished();
     qDebug() << "========================================";
     qDebug() << "JsonUiRenderer::render() FINISHED";
@@ -193,15 +219,17 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                 if (containerItem) {
                     qDebug() << "      ContainerItem width=" << containerItem->width() << "height=" << containerItem->height();
 
-                    // Ищем внутренний Layout рекурсивно
                     QQuickItem* innerLayout = findInnerLayout(containerItem, 0);
 
                     if (innerLayout) {
                         qDebug() << "      Found inner Layout:" << innerLayout->metaObject()->className();
                         renderWidgets(spec["widgets"].toArray(), innerLayout);
+                        // Обновляем внутренний Layout после добавления детей
+                        updateLayout(innerLayout);
                     } else {
                         qDebug() << "      WARNING: No inner layout found, using containerItem directly";
                         renderWidgets(spec["widgets"].toArray(), containerItem);
+                        updateLayout(containerItem);
                     }
                 } else {
                     qDebug() << "      WARNING: widget is not QQuickItem, cannot render children";
