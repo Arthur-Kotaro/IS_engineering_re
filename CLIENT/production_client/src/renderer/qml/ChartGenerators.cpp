@@ -450,23 +450,28 @@ QString generateBarCompareChart(const QJsonObject& spec)
         values2 = {40, 70, 50, 80, 55};
     }
 
-    // Формируем строки для передачи в QML
+    // Формируем строки
     QString valuesStr1 = "[";
     QString valuesStr2 = "[";
     QString labelsStr = "[";
+    QString legendStr = "[";
     for (int i = 0; i < values1.size(); ++i) {
         if (i > 0) {
             valuesStr1 += ", ";
             valuesStr2 += ", ";
             labelsStr += ", ";
+            legendStr += ", ";
         }
         valuesStr1 += QString::number(values1[i].toDouble());
         valuesStr2 += QString::number(values2[i].toDouble());
-        labelsStr += "\"" + (i < labels.size() ? labels[i] : "Категория " + QString::number(i+1)) + "\"";
+        QString label = (i < labels.size()) ? labels[i] : "Категория " + QString::number(i+1);
+        labelsStr += "\"" + label + "\"";
+        legendStr += "\"" + label + " (" + QString::number(values1[i].toDouble()) + " / " + QString::number(values2[i].toDouble()) + ")\"";
     }
     valuesStr1 += "]";
     valuesStr2 += "]";
     labelsStr += "]";
+    legendStr += "]";
 
     return QString(
         "Rectangle {\n"
@@ -499,6 +504,7 @@ QString generateBarCompareChart(const QJsonObject& spec)
         "                property var chartData2: %4\n"
         "                property var chartLabels: %5\n"
         "                property int hoveredIndex: -1\n"
+        "                property int hoveredBar: -1  // 0 - первый столбец, 1 - второй\n"
         "                \n"
         "                onPaint: {\n"
         "                    if (!chartData1 || !chartData2 || chartData1.length === 0) return;\n"
@@ -512,27 +518,30 @@ QString generateBarCompareChart(const QJsonObject& spec)
         "                    var colors1 = [\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\"];\n"
         "                    var colors2 = [\"#ff9f43\", \"#ff6b6b\", \"#1dd1a1\", \"#f368e0\", \"#00d2d3\"];\n"
         "                    for (var i = 0; i < chartData1.length; i++) {\n"
-        "                        var isHovered = (i === hoveredIndex);\n"
         "                        var h1 = (chartData1[i] / maxVal) * (height - 20);\n"
         "                        var h2 = (chartData2[i] / maxVal) * (height - 20);\n"
         "                        var x = i * (groupWidth + gap * 2) + gap;\n"
         "                        var y1 = height - h1 - 10;\n"
         "                        var y2 = height - h2 - 10;\n"
         "                        \n"
-        "                        var barW1 = isHovered ? barWidth * 1.15 : barWidth;\n"
-        "                        var offsetX1 = isHovered ? (barW1 - barWidth) / 2 : 0;\n"
+        "                        var isHovered = (i === hoveredIndex);\n"
+        "                        var isBar1Hovered = isHovered && hoveredBar === 0;\n"
+        "                        var isBar2Hovered = isHovered && hoveredBar === 1;\n"
+        "                        \n"
+        "                        var barW1 = isBar1Hovered ? barWidth * 1.15 : barWidth;\n"
+        "                        var offsetX1 = isBar1Hovered ? (barW1 - barWidth) / 2 : 0;\n"
         "                        ctx.fillStyle = colors1[i % colors1.length];\n"
         "                        ctx.fillRect(x - offsetX1, y1, barW1, h1);\n"
         "                        ctx.strokeStyle = \"#333\";\n"
-        "                        ctx.lineWidth = isHovered ? 3 : 1;\n"
+        "                        ctx.lineWidth = isBar1Hovered ? 3 : 1;\n"
         "                        ctx.strokeRect(x - offsetX1, y1, barW1, h1);\n"
         "                        \n"
-        "                        var barW2 = isHovered ? barWidth * 1.15 : barWidth;\n"
-        "                        var offsetX2 = isHovered ? (barW2 - barWidth) / 2 : 0;\n"
+        "                        var barW2 = isBar2Hovered ? barWidth * 1.15 : barWidth;\n"
+        "                        var offsetX2 = isBar2Hovered ? (barW2 - barWidth) / 2 : 0;\n"
         "                        ctx.fillStyle = colors2[i % colors2.length];\n"
         "                        ctx.fillRect(x + barWidth + 2 - offsetX2, y2, barW2, h2);\n"
         "                        ctx.strokeStyle = \"#333\";\n"
-        "                        ctx.lineWidth = isHovered ? 3 : 1;\n"
+        "                        ctx.lineWidth = isBar2Hovered ? 3 : 1;\n"
         "                        ctx.strokeRect(x + barWidth + 2 - offsetX2, y2, barW2, h2);\n"
         "                    }\n"
         "                }\n"
@@ -550,33 +559,42 @@ QString generateBarCompareChart(const QJsonObject& spec)
         "                        var x = i * (groupWidth + gap * 2) + gap;\n"
         "                        var y1 = height - h1 - 10;\n"
         "                        var y2 = height - h2 - 10;\n"
-        "                        if (mx >= x && mx <= x + barWidth && my >= y1 && my <= y1 + h1) return i;\n"
-        "                        if (mx >= x + barWidth + 2 && mx <= x + barWidth + 2 + barWidth && my >= y2 && my <= y2 + h2) return i;\n"
+        "                        if (mx >= x && mx <= x + barWidth && my >= y1 && my <= y1 + h1) return {index: i, bar: 0};\n"
+        "                        if (mx >= x + barWidth + 2 && mx <= x + barWidth + 2 + barWidth && my >= y2 && my <= y2 + h2) return {index: i, bar: 1};\n"
         "                    }\n"
-        "                    return -1;\n"
+        "                    return null;\n"
         "                }\n"
         "                \n"
         "                MouseArea {\n"
         "                    anchors.fill: parent\n"
         "                    hoverEnabled: true\n"
         "                    onPositionChanged: {\n"
-        "                        var idx = parent.getBarAt(mouseX, mouseY);\n"
-        "                        if (idx !== parent.hoveredIndex) {\n"
-        "                            parent.hoveredIndex = idx;\n"
-        "                            parent.requestPaint();\n"
-        "                            if (idx >= 0) {\n"
-        "                                var label = parent.chartLabels && parent.chartLabels.length > idx ? parent.chartLabels[idx] : \"\";\n"
-        "                                tooltipText.text = \"Ряд 1: \" + parent.chartData1[idx] + \"  Ряд 2: \" + parent.chartData2[idx] + (label ? \"  (\" + label + \")\" : \"\");\n"
+        "                        var result = parent.getBarAt(mouseX, mouseY);\n"
+        "                        if (result) {\n"
+        "                            if (result.index !== parent.hoveredIndex || result.bar !== parent.hoveredBar) {\n"
+        "                                parent.hoveredIndex = result.index;\n"
+        "                                parent.hoveredBar = result.bar;\n"
+        "                                parent.requestPaint();\n"
+        "                                var label = parent.chartLabels && parent.chartLabels.length > result.index ? parent.chartLabels[result.index] : \"\";\n"
+        "                                var barName = result.bar === 0 ? \"Ряд 1\" : \"Ряд 2\";\n"
+        "                                var value = result.bar === 0 ? parent.chartData1[result.index] : parent.chartData2[result.index];\n"
+        "                                tooltipText.text = barName + \": \" + value + (label ? \"  (\" + label + \")\" : \"\");\n"
         "                                tooltip.x = mouseX + 15;\n"
         "                                tooltip.y = mouseY - 10;\n"
         "                                tooltip.visible = true;\n"
-        "                            } else {\n"
+        "                            }\n"
+        "                        } else {\n"
+        "                            if (parent.hoveredIndex !== -1) {\n"
+        "                                parent.hoveredIndex = -1;\n"
+        "                                parent.hoveredBar = -1;\n"
+        "                                parent.requestPaint();\n"
         "                                tooltip.visible = false;\n"
         "                            }\n"
         "                        }\n"
         "                    }\n"
         "                    onExited: {\n"
         "                        parent.hoveredIndex = -1;\n"
+        "                        parent.hoveredBar = -1;\n"
         "                        parent.requestPaint();\n"
         "                        tooltip.visible = false;\n"
         "                    }\n"
@@ -614,20 +632,27 @@ QString generateBarCompareChart(const QJsonObject& spec)
         "            Layout.preferredHeight: implicitHeight\n"
         "            spacing: 20\n"
         "            padding: 8\n"
-        "            Row {\n"
-        "                spacing: 6\n"
-        "                Rectangle { width: 14; height: 14; color: \"#ff6b6b\"; radius: 2 }\n"
-        "                Text { text: \"Ряд 1 (план)\"; color: \"#ccc\"; font.pixelSize: 14 }\n"
-        "            }\n"
-        "            Row {\n"
-        "                spacing: 6\n"
-        "                Rectangle { width: 14; height: 14; color: \"#ff9f43\"; radius: 2 }\n"
-        "                Text { text: \"Ряд 2 (факт)\"; color: \"#ccc\"; font.pixelSize: 14 }\n"
+        "            Repeater {\n"
+        "                model: %6\n"
+        "                Row {\n"
+        "                    spacing: 6\n"
+        "                    Rectangle {\n"
+        "                        width: 14\n"
+        "                        height: 14\n"
+        "                        color: index % 2 === 0 ? \"#ff6b6b\" : \"#ff9f43\"\n"
+        "                        radius: 2\n"
+        "                    }\n"
+        "                    Text {\n"
+        "                        text: modelData\n"
+        "                        color: \"#ccc\"\n"
+        "                        font.pixelSize: 14\n"
+        "                    }\n"
+        "                }\n"
         "            }\n"
         "        }\n"
         "    }\n"
         "}\n"
-    ).arg(preferredHeight).arg(title).arg(valuesStr1).arg(valuesStr2).arg(labelsStr);
+    ).arg(preferredHeight).arg(title).arg(valuesStr1).arg(valuesStr2).arg(labelsStr).arg(legendStr);
 }
 
 QString generateLineChart(const QJsonObject& spec)
