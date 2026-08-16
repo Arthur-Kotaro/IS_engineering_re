@@ -4,8 +4,8 @@ import QtQuick.Layouts 6.0
 
 ApplicationWindow {
     id: root
-    width: 1200
-    height: 900
+    width: 1400
+    height: 1000
     visible: true
     title: "UI Renderer Preview"
 
@@ -43,7 +43,6 @@ ApplicationWindow {
         anchors.margins: 10
         spacing: 10
 
-        // Верхняя панель
         RowLayout {
             spacing: 10
             Layout.fillWidth: true
@@ -161,7 +160,6 @@ ApplicationWindow {
             }
         }
 
-        // Статусбар
         Rectangle {
             id: statusBar
             height: 28
@@ -191,9 +189,6 @@ ApplicationWindow {
             }
         }
 
-        // ============================================================
-        // ОСНОВНАЯ ОБЛАСТЬ С ПРОКРУТКОЙ
-        // ============================================================
         ScrollView {
             id: scrollView
             Layout.fillWidth: true
@@ -207,14 +202,11 @@ ApplicationWindow {
                 color: "#121212"
             }
 
-            // Главный контейнер для рендеринга
             Item {
                 id: renderContainer
                 width: scrollView.availableWidth
-                height: contentHeight > 0 ? contentHeight : scrollView.height
+                height: implicitHeight
                 objectName: "renderContainer"
-
-                property int contentHeight: dynamicContent.height
 
                 ColumnLayout {
                     id: dynamicContent
@@ -225,7 +217,6 @@ ApplicationWindow {
             }
         }
 
-        // Overlay для загрузки
         Rectangle {
             id: loadingOverlay
             anchors.fill: parent

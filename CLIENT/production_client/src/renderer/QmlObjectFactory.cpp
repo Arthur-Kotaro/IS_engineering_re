@@ -182,24 +182,119 @@ void QmlObjectFactory::registerBuiltInTypes()
         );
     };
 
-    // QTableWidget → Rectangle (заглушка)
+    // ============================================================
+    // QTableWidget → ListView с колонками (рабочая таблица)
+    // ============================================================
     m_qmlGenerators["QTableWidget"] = [](const QJsonObject& spec) {
+        // Парсим колонки из JSON
+        QStringList columnLabels;
+        QList<int> columnWidths;
+
+        if (spec.contains("columns") && spec["columns"].isArray()) {
+            QJsonArray columns = spec["columns"].toArray();
+            for (const QJsonValue& colVal : columns) {
+                if (colVal.isObject()) {
+                    QJsonObject colObj = colVal.toObject();
+                    columnLabels << colObj["label"].toString("Колонка");
+                    columnWidths << colObj["width"].toInt(100);
+                }
+            }
+        }
+
+        if (columnLabels.isEmpty()) {
+            columnLabels << "ID" << "Наименование" << "Статус";
+            columnWidths << 50 << 200 << 120;
+        }
+
+        // Формируем заголовки
+        QString headerCode;
+        for (int i = 0; i < columnLabels.size(); ++i) {
+            headerCode += QString(
+                "Rectangle {\n"
+                "    width: %1\n"
+                "    height: 30\n"
+                "    color: \"#2a2a2a\"\n"
+                "    border.color: \"#444\"\n"
+                "    border.width: 1\n"
+                "    Text {\n"
+                "        anchors.centerIn: parent\n"
+                "        text: \"%2\"\n"
+                "        color: \"#aaa\"\n"
+                "        font.pixelSize: 12\n"
+                "        font.bold: true\n"
+                "    }\n"
+                "}\n"
+            ).arg(columnWidths[i]).arg(columnLabels[i]);
+        }
+
+        // Формируем строки данных
+        QStringList rowData = {
+            "1|Заказ №1|Выполнен",
+            "2|Заказ №2|В работе",
+            "3|Заказ №3|Ожидает",
+            "4|Заказ №4|Отменён",
+            "5|Заказ №5|Выполнен"
+        };
+
+        QString delegateCode;
+        for (const QString& row : rowData) {
+            QStringList cells = row.split("|");
+            QString rowCode;
+            for (int i = 0; i < cells.size() && i < columnLabels.size(); ++i) {
+                rowCode += QString(
+                    "Rectangle {\n"
+                    "    width: %1\n"
+                    "    height: 28\n"
+                    "    color: index % 2 == 0 ? \"#1a1a1a\" : \"#222222\"\n"
+                    "    border.color: \"#333\"\n"
+                    "    border.width: 1\n"
+                    "    Text {\n"
+                    "        anchors.centerIn: parent\n"
+                    "        text: \"%2\"\n"
+                    "        color: \"#ccc\"\n"
+                    "        font.pixelSize: 11\n"
+                    "        elide: Text.ElideRight\n"
+                    "    }\n"
+                    "}\n"
+                ).arg(columnWidths[i]).arg(cells[i]);
+            }
+            delegateCode += QString(
+                "Row {\n"
+                "    spacing: 0\n"
+                "    %1\n"
+                "}\n"
+            ).arg(rowCode);
+        }
+
         return QString(
             "Rectangle {\n"
-            "    color: \"transparent\"\n"
+            "    color: \"#121212\"\n"
             "    Layout.fillWidth: true\n"
             "    Layout.preferredHeight: 200\n"
             "    border.color: \"#444\"\n"
             "    border.width: 1\n"
             "    radius: 4\n"
-            "    Text {\n"
-            "        anchors.centerIn: parent\n"
-            "        text: \"Таблица\"\n"
-            "        color: \"#888\"\n"
-            "        font.pixelSize: 14\n"
+            "    ColumnLayout {\n"
+            "        anchors.fill: parent\n"
+            "        spacing: 0\n"
+            "        Row {\n"
+            "            spacing: 0\n"
+            "            %1\n"
+            "        }\n"
+            "        Rectangle { height: 1; Layout.fillWidth: true; color: \"#444\" }\n"
+            "        ScrollView {\n"
+            "            Layout.fillWidth: true\n"
+            "            Layout.fillHeight: true\n"
+            "            clip: true\n"
+            "            ScrollBar.vertical.policy: ScrollBar.AsNeeded\n"
+            "            Column {\n"
+            "                spacing: 0\n"
+            "                %2\n"
+            "            }\n"
+            "        }\n"
             "    }\n"
             "}\n"
-        );
+        ).arg(headerCode).arg(delegateCode);
     };
 
     // QListWidget → Rectangle (заглушка)
@@ -432,112 +527,253 @@ void QmlObjectFactory::registerBuiltInTypes()
     };
 
     // ============================================================
-    // ГРАФИКИ (цветные прямоугольники)
+    // НАСТОЯЩИЕ ДИАГРАММЫ (Canvas)
     // ============================================================
 
-    // ChartPie
+    // ChartPie → Круговая диаграмма
     m_qmlGenerators["ChartPie"] = [](const QJsonObject& spec) {
         QString title = spec["title"].toString("Диаграмма");
         int preferredHeight = spec["height"].toInt(300);
         if (preferredHeight <= 0) preferredHeight = 300;
 
-        qDebug() << "    GENERATING ChartPie:" << title << "height=" << preferredHeight;
-
         return QString(
             "Rectangle {\n"
-            "    color: \"#e74c3c\"\n"
+            "    color: \"transparent\"\n"
             "    Layout.fillWidth: true\n"
             "    Layout.preferredHeight: %1\n"
-            "    border.color: \"#c0392b\"\n"
-            "    border.width: 2\n"
-            "    Text {\n"
-            "        anchors.centerIn: parent\n"
-            "        text: \"ChartPie: %2\\nheight=%1\"\n"
-            "        color: \"#ffffff\"\n"
-            "        font.pixelSize: 14\n"
-            "        font.bold: true\n"
-            "        horizontalAlignment: Text.AlignHCenter\n"
+            "    ColumnLayout {\n"
+            "        anchors.fill: parent\n"
+            "        Text {\n"
+            "            text: \"%2\"\n"
+            "            color: \"#aaa\"\n"
+            "            font.pixelSize: 14\n"
+            "            font.bold: true\n"
+            "            Layout.alignment: Qt.AlignHCenter\n"
+            "            Layout.preferredHeight: implicitHeight\n"
+            "        }\n"
+            "        Rectangle {\n"
+            "            Layout.fillWidth: true\n"
+            "            Layout.fillHeight: true\n"
+            "            color: \"transparent\"\n"
+            "            border.color: \"#444\"\n"
+            "            border.width: 1\n"
+            "            radius: 4\n"
+            "            Canvas {\n"
+            "                anchors.fill: parent\n"
+            "                anchors.margins: 10\n"
+            "                onPaint: {\n"
+            "                    var ctx = getContext(\"2d\");\n"
+            "                    var cx = width / 2;\n"
+            "                    var cy = height / 2;\n"
+            "                    var r = Math.min(width, height) / 2 - 20;\n"
+            "                    if (r < 10) r = 10;\n"
+            "                    var data = [30, 25, 20, 15, 10];\n"
+            "                    var colors = [\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\"];\n"
+            "                    var total = data.reduce(function(a,b) { return a + b; }, 0);\n"
+            "                    var startAngle = 0;\n"
+            "                    for (var i = 0; i < data.length; i++) {\n"
+            "                        var angle = (data[i] / total) * 2 * Math.PI;\n"
+            "                        ctx.beginPath();\n"
+            "                        ctx.moveTo(cx, cy);\n"
+            "                        ctx.arc(cx, cy, r, startAngle, startAngle + angle);\n"
+            "                        ctx.closePath();\n"
+            "                        ctx.fillStyle = colors[i % colors.length];\n"
+            "                        ctx.fill();\n"
+            "                        startAngle += angle;\n"
+            "                    }\n"
+            "                    ctx.strokeStyle = \"#333\";\n"
+            "                    ctx.lineWidth = 2;\n"
+            "                    ctx.stroke();\n"
+            "                }\n"
+            "            }\n"
+            "        }\n"
             "    }\n"
             "}\n"
         ).arg(preferredHeight).arg(title);
     };
 
-    // ChartBar
+    // ChartBar → Столбчатая диаграмма
     m_qmlGenerators["ChartBar"] = [](const QJsonObject& spec) {
         QString title = spec["title"].toString("Диаграмма");
         int preferredHeight = spec["height"].toInt(300);
         if (preferredHeight <= 0) preferredHeight = 300;
 
-        qDebug() << "    GENERATING ChartBar:" << title << "height=" << preferredHeight;
-
         return QString(
             "Rectangle {\n"
-            "    color: \"#3498db\"\n"
+            "    color: \"transparent\"\n"
             "    Layout.fillWidth: true\n"
             "    Layout.preferredHeight: %1\n"
-            "    border.color: \"#2980b9\"\n"
-            "    border.width: 2\n"
-            "    Text {\n"
-            "        anchors.centerIn: parent\n"
-            "        text: \"ChartBar: %2\\nheight=%1\"\n"
-            "        color: \"#ffffff\"\n"
-            "        font.pixelSize: 14\n"
-            "        font.bold: true\n"
-            "        horizontalAlignment: Text.AlignHCenter\n"
+            "    ColumnLayout {\n"
+            "        anchors.fill: parent\n"
+            "        Text {\n"
+            "            text: \"%2\"\n"
+            "            color: \"#aaa\"\n"
+            "            font.pixelSize: 14\n"
+            "            font.bold: true\n"
+            "            Layout.alignment: Qt.AlignHCenter\n"
+            "            Layout.preferredHeight: implicitHeight\n"
+            "        }\n"
+            "        Rectangle {\n"
+            "            Layout.fillWidth: true\n"
+            "            Layout.fillHeight: true\n"
+            "            color: \"transparent\"\n"
+            "            border.color: \"#444\"\n"
+            "            border.width: 1\n"
+            "            radius: 4\n"
+            "            Canvas {\n"
+            "                anchors.fill: parent\n"
+            "                anchors.margins: 10\n"
+            "                onPaint: {\n"
+            "                    var ctx = getContext(\"2d\");\n"
+            "                    var data = [50, 80, 30, 90, 60, 70, 40];\n"
+            "                    var colors = [\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\", \"#1dd1a1\", \"#f368e0\"];\n"
+            "                    var maxVal = Math.max.apply(null, data);\n"
+            "                    if (maxVal === 0) maxVal = 1;\n"
+            "                    var barWidth = width / data.length * 0.7;\n"
+            "                    var gap = (width / data.length - barWidth) / 2;\n"
+            "                    for (var i = 0; i < data.length; i++) {\n"
+            "                        var h = (data[i] / maxVal) * (height - 20);\n"
+            "                        var x = i * (barWidth + gap * 2) + gap;\n"
+            "                        var y = height - h - 10;\n"
+            "                        ctx.fillStyle = colors[i % colors.length];\n"
+            "                        ctx.fillRect(x, y, barWidth, h);\n"
+            "                        ctx.strokeStyle = \"#333\";\n"
+            "                        ctx.lineWidth = 1;\n"
+            "                        ctx.strokeRect(x, y, barWidth, h);\n"
+            "                    }\n"
+            "                }\n"
+            "            }\n"
+            "        }\n"
             "    }\n"
             "}\n"
         ).arg(preferredHeight).arg(title);
     };
 
-    // ChartBarCompare
+    // ChartBarCompare → Сравнительная столбчатая диаграмма
     m_qmlGenerators["ChartBarCompare"] = [](const QJsonObject& spec) {
         QString title = spec["title"].toString("Сравнение");
         int preferredHeight = spec["height"].toInt(300);
         if (preferredHeight <= 0) preferredHeight = 300;
 
-        qDebug() << "    GENERATING ChartBarCompare:" << title << "height=" << preferredHeight;
-
         return QString(
             "Rectangle {\n"
-            "    color: \"#2ecc71\"\n"
+            "    color: \"transparent\"\n"
             "    Layout.fillWidth: true\n"
             "    Layout.preferredHeight: %1\n"
-            "    border.color: \"#27ae60\"\n"
-            "    border.width: 2\n"
-            "    Text {\n"
-            "        anchors.centerIn: parent\n"
-            "        text: \"ChartBarCompare: %2\\nheight=%1\"\n"
-            "        color: \"#ffffff\"\n"
-            "        font.pixelSize: 14\n"
-            "        font.bold: true\n"
-            "        horizontalAlignment: Text.AlignHCenter\n"
+            "    ColumnLayout {\n"
+            "        anchors.fill: parent\n"
+            "        Text {\n"
+            "            text: \"%2\"\n"
+            "            color: \"#aaa\"\n"
+            "            font.pixelSize: 14\n"
+            "            font.bold: true\n"
+            "            Layout.alignment: Qt.AlignHCenter\n"
+            "            Layout.preferredHeight: implicitHeight\n"
+            "        }\n"
+            "        Rectangle {\n"
+            "            Layout.fillWidth: true\n"
+            "            Layout.fillHeight: true\n"
+            "            color: \"transparent\"\n"
+            "            border.color: \"#444\"\n"
+            "            border.width: 1\n"
+            "            radius: 4\n"
+            "            Canvas {\n"
+            "                anchors.fill: parent\n"
+            "                anchors.margins: 10\n"
+            "                onPaint: {\n"
+            "                    var ctx = getContext(\"2d\");\n"
+            "                    var data1 = [50, 80, 30, 90, 60];\n"
+            "                    var data2 = [40, 70, 50, 80, 55];\n"
+            "                    var colors1 = [\"#ff6b6b\", \"#feca57\", \"#48dbfb\", \"#ff9ff3\", \"#54a0ff\"];\n"
+            "                    var colors2 = [\"#ff9f43\", \"#ff6b6b\", \"#1dd1a1\", \"#f368e0\", \"#00d2d3\"];\n"
+            "                    var maxVal = Math.max.apply(null, data1.concat(data2));\n"
+            "                    if (maxVal === 0) maxVal = 1;\n"
+            "                    var groupWidth = width / data1.length * 0.7;\n"
+            "                    var barWidth = groupWidth / 2 - 2;\n"
+            "                    var gap = (width / data1.length - groupWidth) / 2;\n"
+            "                    for (var i = 0; i < data1.length; i++) {\n"
+            "                        var h1 = (data1[i] / maxVal) * (height - 20);\n"
+            "                        var h2 = (data2[i] / maxVal) * (height - 20);\n"
+            "                        var x = i * (groupWidth + gap * 2) + gap;\n"
+            "                        var y1 = height - h1 - 10;\n"
+            "                        var y2 = height - h2 - 10;\n"
+            "                        ctx.fillStyle = colors1[i % colors1.length];\n"
+            "                        ctx.fillRect(x, y1, barWidth, h1);\n"
+            "                        ctx.strokeStyle = \"#333\";\n"
+            "                        ctx.lineWidth = 1;\n"
+            "                        ctx.strokeRect(x, y1, barWidth, h1);\n"
+            "                        ctx.fillStyle = colors2[i % colors2.length];\n"
+            "                        ctx.fillRect(x + barWidth + 2, y2, barWidth, h2);\n"
+            "                        ctx.strokeStyle = \"#333\";\n"
+            "                        ctx.lineWidth = 1;\n"
+            "                        ctx.strokeRect(x + barWidth + 2, y2, barWidth, h2);\n"
+            "                    }\n"
+            "                }\n"
+            "            }\n"
+            "        }\n"
             "    }\n"
             "}\n"
         ).arg(preferredHeight).arg(title);
     };
 
-    // ChartLine
+    // ChartLine → Линейный график
     m_qmlGenerators["ChartLine"] = [](const QJsonObject& spec) {
         QString title = spec["title"].toString("График");
         int preferredHeight = spec["height"].toInt(300);
         if (preferredHeight <= 0) preferredHeight = 300;
 
-        qDebug() << "    GENERATING ChartLine:" << title << "height=" << preferredHeight;
-
         return QString(
             "Rectangle {\n"
-            "    color: \"#f39c12\"\n"
+            "    color: \"transparent\"\n"
             "    Layout.fillWidth: true\n"
             "    Layout.preferredHeight: %1\n"
-            "    border.color: \"#e67e22\"\n"
-            "    border.width: 2\n"
-            "    Text {\n"
-            "        anchors.centerIn: parent\n"
-            "        text: \"ChartLine: %2\\nheight=%1\"\n"
-            "        color: \"#ffffff\"\n"
-            "        font.pixelSize: 14\n"
-            "        font.bold: true\n"
-            "        horizontalAlignment: Text.AlignHCenter\n"
+            "    ColumnLayout {\n"
+            "        anchors.fill: parent\n"
+            "        Text {\n"
+            "            text: \"%2\"\n"
+            "            color: \"#aaa\"\n"
+            "            font.pixelSize: 14\n"
+            "            font.bold: true\n"
+            "            Layout.alignment: Qt.AlignHCenter\n"
+            "            Layout.preferredHeight: implicitHeight\n"
+            "        }\n"
+            "        Rectangle {\n"
+            "            Layout.fillWidth: true\n"
+            "            Layout.fillHeight: true\n"
+            "            color: \"transparent\"\n"
+            "            border.color: \"#444\"\n"
+            "            border.width: 1\n"
+            "            radius: 4\n"
+            "            Canvas {\n"
+            "                anchors.fill: parent\n"
+            "                anchors.margins: 10\n"
+            "                onPaint: {\n"
+            "                    var ctx = getContext(\"2d\");\n"
+            "                    var data = [10, 30, 25, 50, 40, 70, 60, 90, 80];\n"
+            "                    var maxVal = Math.max.apply(null, data);\n"
+            "                    if (maxVal === 0) maxVal = 1;\n"
+            "                    var stepX = width / (data.length - 1);\n"
+            "                    ctx.beginPath();\n"
+            "                    ctx.strokeStyle = \"#48dbfb\";\n"
+            "                    ctx.lineWidth = 2;\n"
+            "                    for (var i = 0; i < data.length; i++) {\n"
+            "                        var x = i * stepX;\n"
+            "                        var y = height - (data[i] / maxVal) * (height - 20) - 10;\n"
+            "                        if (i === 0) ctx.moveTo(x, y);\n"
+            "                        else ctx.lineTo(x, y);\n"
+            "                    }\n"
+            "                    ctx.stroke();\n"
+            "                    ctx.fillStyle = \"#48dbfb\";\n"
+            "                    for (var i = 0; i < data.length; i++) {\n"
+            "                        var x = i * stepX;\n"
+            "                        var y = height - (data[i] / maxVal) * (height - 20) - 10;\n"
+            "                        ctx.beginPath();\n"
+            "                        ctx.arc(x, y, 4, 0, 2 * Math.PI);\n"
+            "                        ctx.fill();\n"
+            "                    }\n"
+            "                }\n"
+            "            }\n"
+            "        }\n"
             "    }\n"
             "}\n"
         ).arg(preferredHeight).arg(title);
@@ -560,7 +796,6 @@ QObject* QmlObjectFactory::create(const QString& type, const QJsonObject& spec, 
 
     qDebug() << "      QML code length:" << qmlCode.length() << "bytes";
 
-    // Собираем полный QML-код без внешней обёртки
     QString fullQml = QString(
         "import QtQuick 6.0\n"
         "import QtQuick.Controls 6.0\n"
