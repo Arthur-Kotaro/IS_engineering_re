@@ -18,20 +18,16 @@
       "title": "Технические показатели",
       "widgets": [
         {
-          "type": "QHBoxLayout",
-          "id": "tech_row",
-          "widgets": [
-            {
-              "type": "ChartPie",
-              "id": "pie_components",
-              "title": "Состав компонентов"
-            },
-            {
-              "type": "ChartBar",
-              "id": "bar_tests",
-              "title": "Результаты испытаний"
-            }
-          ]
+          "type": "ChartPie",
+          "id": "pie_components",
+          "title": "Состав компонентов",
+          "height": 300
+        },
+        {
+          "type": "ChartBar",
+          "id": "bar_tests",
+          "title": "Результаты испытаний",
+          "height": 300
         }
       ]
     },
