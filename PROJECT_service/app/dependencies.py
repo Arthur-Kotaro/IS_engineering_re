@@ -1,27 +1,37 @@
 # app/dependencies.py
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import httpx
+from fastapi import HTTPException, status, Request, Depends
+import logging
 
-security = HTTPBearer()
+logger = logging.getLogger(__name__)
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Проверка токена через User Service"""
-    token = credentials.credentials
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            "http://localhost:8000/users/me",
-            headers={"Authorization": f"Bearer {token}"}
+async def get_current_user_id(request: Request) -> int:
+    """Получить ID текущего пользователя из заголовка X-User-ID"""
+    user_id = request.headers.get("X-User-ID")
+    logger.info(f"📌 X-User-ID header: {user_id}")
+    logger.info(f"📌 All headers: {dict(request.headers)}")
+    
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-User-ID header"
         )
-        if resp.status_code != 200:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return resp.json()
+    try:
+        return int(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid X-User-ID format"
+        )
 
-def require_roles(allowed_roles: list):
+async def get_current_user_role(request: Request) -> str:
+    """Получить роль текущего пользователя из заголовка X-User-Role"""
+    role = request.headers.get("X-User-Role", "user")
+    return role
+
+def require_role(allowed_roles: list):
     """Фабрика для проверки ролей"""
-    async def role_checker(current_user: dict = Depends(get_current_user)):
-        user_roles = current_user.get("roles", [])
-        if not any(role in allowed_roles for role in user_roles):
+    async def role_checker(role: str = Depends(get_current_user_role)):
+        if role not in allowed_roles:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
-        return current_user
+        return role
     return role_checker

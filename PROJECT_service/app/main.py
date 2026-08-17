@@ -25,5 +25,4 @@ async def health_check():
     return {"status": "healthy"}
 
 from app.api.v1 import projects
-# Добавляем префикс здесь
 app.include_router(projects.router, prefix="/api/v1", tags=["Projects"])

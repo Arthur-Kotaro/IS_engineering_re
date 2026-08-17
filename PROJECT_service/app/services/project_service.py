@@ -1,6 +1,7 @@
 # app/services/project_service.py
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
+from fastapi import HTTPException, status
 from app.repositories.project_repo import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectDetailResponse, CheckAccessResponse
 from app.models.project import ProjectStatus, Project
@@ -22,7 +23,7 @@ class ProjectService:
             title=data.title,
             description=data.description,
             created_by=created_by,
-            status=data.status
+            status=data.status or ProjectStatus.DRAFT
         )
         return self._to_response(project)
 
@@ -32,26 +33,42 @@ class ProjectService:
             return None
         return self._to_detail_response(project)
 
-    async def update_project(self, project_id: int, data: ProjectUpdate) -> Optional[ProjectResponse]:
+    async def _check_owner(self, project_id: int, user_id: int) -> bool:
+        project = await self.repo.get_by_id(project_id)
+        if not project:
+            return False
+        return project.created_by == user_id
+
+    async def update_project(self, project_id: int, data: ProjectUpdate, current_user_id: int) -> Optional[ProjectResponse]:
+        if not await self._check_owner(project_id, current_user_id):
+            return None
         update_data = data.model_dump(exclude_unset=True)
         project = await self.repo.update(project_id, **update_data)
         if not project:
             return None
         return self._to_response(project)
 
-    async def update_project_status(self, project_id: int, status: ProjectStatus) -> Optional[ProjectResponse]:
+    async def update_project_status(self, project_id: int, status: ProjectStatus, current_user_id: int) -> Optional[ProjectResponse]:
+        if not await self._check_owner(project_id, current_user_id):
+            return None
         project = await self.repo.update(project_id, status=status)
         if not project:
             return None
         return self._to_response(project)
 
-    async def delete_project(self, project_id: int) -> bool:
+    async def delete_project(self, project_id: int, current_user_id: int) -> bool:
+        if not await self._check_owner(project_id, current_user_id):
+            return False
         return await self.repo.delete(project_id)
 
-    async def add_member(self, project_id: int, user_id: int, role: str):
+    async def add_member(self, project_id: int, user_id: int, role: str, current_user_id: int):
+        if not await self._check_owner(project_id, current_user_id):
+            return None
         return await self.repo.add_member(project_id, user_id, role)
 
-    async def remove_member(self, project_id: int, user_id: int) -> bool:
+    async def remove_member(self, project_id: int, user_id: int, current_user_id: int) -> bool:
+        if not await self._check_owner(project_id, current_user_id):
+            return False
         return await self.repo.remove_member(project_id, user_id)
 
     async def check_access(self, project_id: int, user_id: int) -> CheckAccessResponse:
@@ -78,7 +95,7 @@ class ProjectService:
             created_by=project.created_by,
             created_at=project.created_at,
             updated_at=project.updated_at,
-            members_count=len(project.members) if project.members else 0
+            members_count=0
         )
 
     def _to_detail_response(self, project: Project) -> ProjectDetailResponse:
@@ -90,9 +107,6 @@ class ProjectService:
             created_by=project.created_by,
             created_at=project.created_at,
             updated_at=project.updated_at,
-            members_count=len(project.members) if project.members else 0,
-            members=[
-                {"user_id": m.user_id, "role": m.role, "joined_at": m.joined_at}
-                for m in project.members
-            ] if project.members else []
+            members_count=0,
+            members=[]
         )

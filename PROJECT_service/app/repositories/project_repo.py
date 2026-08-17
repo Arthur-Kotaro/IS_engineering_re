@@ -26,18 +26,17 @@ class ProjectRepository:
     async def get_by_id(self, project_id: int) -> Optional[Project]:
         result = await self.db.execute(
             select(Project)
-            .options(selectinload(Project.members))
             .where(Project.project_id == project_id)
         )
-        return result.unique().scalar_one_or_none()
+        return result.scalar_one_or_none()
 
     async def get_all(self, skip: int = 0, limit: int = 100, status: Optional[ProjectStatus] = None) -> List[Project]:
-        query = select(Project).options(selectinload(Project.members))
+        query = select(Project)
         if status:
             query = query.where(Project.status == status)
         query = query.offset(skip).limit(limit)
         result = await self.db.execute(query)
-        return result.unique().scalars().all()
+        return result.scalars().all()
 
     async def update(self, project_id: int, **kwargs) -> Optional[Project]:
         project = await self.get_by_id(project_id)
@@ -103,6 +102,5 @@ class ProjectRepository:
             select(Project)
             .join(ProjectMember)
             .where(ProjectMember.user_id == user_id)
-            .options(selectinload(Project.members))
         )
-        return result.unique().scalars().all()
+        return result.scalars().all()

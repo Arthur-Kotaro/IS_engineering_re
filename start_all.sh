@@ -1,10 +1,6 @@
 #!/bin/bash
 # start_all.sh — Запуск всех микросервисов из корня проекта
 
-# Убираем set -e чтобы скрипт не прерывался при ошибках
-# set -e
-
-# Цвета
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
@@ -19,7 +15,6 @@ echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}🚀 Запуск всех микросервисов${NC}"
 echo -e "${BLUE}========================================${NC}"
 
-# Функция проверки порта
 check_port() {
     local port=$1
     if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1 ; then
@@ -29,7 +24,6 @@ check_port() {
     fi
 }
 
-# Функция запуска сервиса
 start_service() {
     local service_name=$1
     local port=$2
@@ -38,17 +32,17 @@ start_service() {
     echo -e "\n${YELLOW}▶ Запуск $service_name на порту $port...${NC}"
     
     if [ ! -d "$service_path" ]; then
-        echo -e "${YELLOW}⚠️  Директория $service_name не найдена, пропускаем${NC}"
+        echo -e "${YELLOW}⚠  Директория $service_name не найдена, пропускаем${NC}"
         return 0
     fi
     
     if [ ! -f "$service_path/run.sh" ]; then
-        echo -e "${YELLOW}⚠️  run.sh не найден в $service_name, пропускаем${NC}"
+        echo -e "${YELLOW}⚠  run.sh не найден в $service_name, пропускаем${NC}"
         return 0
     fi
     
     if check_port $port; then
-        echo -e "${YELLOW}⚠️  Порт $port занят. Пропускаем $service_name${NC}"
+        echo -e "${YELLOW}⚠  Порт $port занят. Пропускаем $service_name${NC}"
         return 0
     fi
     
@@ -57,7 +51,7 @@ start_service() {
     local pid=$!
     echo $pid > "$LOG_DIR/${service_name}.pid"
     
-    sleep 2
+    sleep 3
     
     if ps -p $pid > /dev/null 2>&1; then
         echo -e "${GREEN}✅ $service_name запущен (PID: $pid)${NC}"
@@ -68,7 +62,6 @@ start_service() {
     fi
 }
 
-# Функция запуска API Gateway
 start_gateway() {
     echo -e "\n${YELLOW}▶ Запуск API Gateway (nginx)...${NC}"
     
@@ -85,11 +78,9 @@ start_gateway() {
     fi
 }
 
-# Функция запуска клиента
 start_client() {
     echo -e "\n${YELLOW}▶ Запуск клиента...${NC}"
     
-    # Ищем клиент в разных возможных местах
     local client_paths=(
         "$PROJECT_ROOT/CLIENT/build/production_client/ProductionClientApp"
         "$PROJECT_ROOT/CLIENT/build/ProductionClientApp"
@@ -106,8 +97,7 @@ start_client() {
     done
     
     if [ -z "$client_bin" ]; then
-        echo -e "${YELLOW}⚠️  Исполняемый файл клиента не найден, пропускаем${NC}"
-        echo -e "   Искали в: ${client_paths[*]}"
+        echo -e "${YELLOW}⚠  Исполняемый файл клиента не найден, пропускаем${NC}"
         return 0
     fi
     
@@ -117,10 +107,8 @@ start_client() {
     echo $pid > "$LOG_DIR/client.pid"
     echo -e "${GREEN}✅ Клиент запущен (PID: $pid)${NC}"
     echo -e "   Лог: $LOG_DIR/client.log"
-    echo -e "   Бинарь: $client_bin"
 }
 
-# Остановка всех сервисов
 stop_all() {
     echo -e "\n${YELLOW}🛑 Остановка всех сервисов...${NC}"
     
@@ -139,11 +127,11 @@ stop_all() {
     echo -e "${GREEN}✅ Все сервисы остановлены${NC}"
 }
 
-# Обработка сигналов
 trap stop_all EXIT INT TERM
 
 # Запуск сервисов
 echo -e "\n${BLUE}📋 Запуск сервисов:${NC}"
+echo "   • Auth Service (8010)"
 echo "   • User Service (8000)"
 echo "   • Project Service (8001)"
 echo "   • PJP Service (8002)"
@@ -153,6 +141,7 @@ echo "   • Navigation Service (8009)"
 echo "   • API Gateway (8080)"
 echo "   • Клиент"
 
+start_service "AUTH_SERVICE" 8010
 start_service "USER_service" 8000
 start_service "PROJECT_service" 8001
 start_service "PJP_SERVICE" 8002
@@ -165,7 +154,7 @@ start_client
 
 # Health Check
 echo -e "\n${BLUE}🔍 Проверка здоровья...${NC}"
-sleep 3
+sleep 5
 
 check_health() {
     local service=$1
@@ -177,6 +166,7 @@ check_health() {
     fi
 }
 
+check_health "Auth" 8010
 check_health "User" 8000
 check_health "Project" 8001
 check_health "PJP" 8002
@@ -192,5 +182,4 @@ echo -e "\n📊 Логи: $LOG_DIR/"
 echo -e "🛑 Для остановки нажмите Ctrl+C"
 echo -e "\n🌐 API Gateway: http://localhost:8080"
 
-# Ждем завершения
 wait

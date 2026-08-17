@@ -1,6 +1,5 @@
-# app/api/v1/navigation.py
-from fastapi import APIRouter, Depends, HTTPException, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+# app/api/v1/navigation.py (ОБНОВЛЕННАЯ ВЕРСИЯ - ЧЕРЕЗ AUTH SERVICE)
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models.tile import Tile
@@ -8,30 +7,38 @@ import httpx
 import asyncio
 
 router = APIRouter()
-security = HTTPBearer()
 
-async def get_user_roles(token: str) -> list:
-    """Получить роли пользователя из User Service"""
+
+async def get_user_id(request: Request) -> int:
+    """Получить ID пользователя из заголовка X-User-ID (от Auth Service)"""
+    user_id = request.headers.get("X-User-ID")
+    if not user_id:
+        raise HTTPException(401, "Missing X-User-ID header")
+    try:
+        return int(user_id)
+    except ValueError:
+        raise HTTPException(401, "Invalid X-User-ID format")
+
+
+async def get_user_roles_from_service(user_id: int) -> list:
+    """Получить роли пользователя из User Service по ID"""
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            "http://localhost:8000/users/me",
-            headers={"Authorization": f"Bearer {token}"}
+            f"http://localhost:8000/api/v1/users/{user_id}/roles"
         )
         if resp.status_code != 200:
-            raise HTTPException(401, "Invalid token")
-        user_data = resp.json()
-        return user_data.get("roles", [])
+            return []
+        return resp.json().get("roles", [])
 
-async def get_badge_count(endpoint: str, token: str) -> int:
+
+async def get_badge_count(endpoint: str) -> int:
     """Получить количество из микросервиса по badge_endpoint"""
     if not endpoint:
         return 0
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
-            resp = await client.get(
-                f"http://localhost:8080{endpoint}",
-                headers={"Authorization": f"Bearer {token}"}
-            )
+            # Запрос к микросервису через API Gateway
+            resp = await client.get(f"http://localhost:8080{endpoint}")
             if resp.status_code == 200:
                 data = resp.json()
                 return data.get("count", 0)
@@ -39,12 +46,19 @@ async def get_badge_count(endpoint: str, token: str) -> int:
         print(f"Failed to get badge count from {endpoint}: {e}")
     return 0
 
+
 @router.get("/dashboard")
 async def get_dashboard(
-    credentials: HTTPAuthorizationCredentials = Security(security)
+    request: Request,
+    user_id: int = Depends(get_user_id)
 ):
-    token = credentials.credentials
-    roles = await get_user_roles(token)
+    """Получить дашборд с плитками для пользователя"""
+    # Получаем роли пользователя из User Service
+    roles = await get_user_roles_from_service(user_id)
+    
+    if not roles:
+        # Если у пользователя нет ролей, возвращаем пустой дашборд
+        return {"tiles": [], "user_roles": []}
     
     # Загружаем плитки из БД
     async with AsyncSessionLocal() as db:
@@ -60,7 +74,7 @@ async def get_dashboard(
     tasks = []
     for tile in tiles:
         if tile.badge_enabled and tile.badge_endpoint:
-            tasks.append(get_badge_count(tile.badge_endpoint, token))
+            tasks.append(get_badge_count(tile.badge_endpoint))
         else:
             tasks.append(asyncio.sleep(0, result=0))
     
@@ -85,19 +99,19 @@ async def get_dashboard(
         "user_roles": roles
     }
 
+
 @router.post("/tiles")
 async def create_tile(
     tile_data: dict,
-    credentials: HTTPAuthorizationCredentials = Security(security)
+    user_id: int = Depends(get_user_id),
+    roles: list = Depends(get_user_roles_from_service)
 ):
     """Административный эндпоинт для создания плиток"""
-    token = credentials.credentials
-    roles = await get_user_roles(token)
-    
     if "admin" not in roles:
         raise HTTPException(403, "Only admin can manage tiles")
     
     async with AsyncSessionLocal() as db:
+        from app.models.tile import Tile
         tile = Tile(
             role=tile_data["role"],
             tile_id=tile_data["tile_id"],
