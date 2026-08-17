@@ -1,10 +1,15 @@
-# app/api/v1/navigation.py (ОБНОВЛЕННАЯ ВЕРСИЯ - ЧЕРЕЗ AUTH SERVICE)
+# app/api/v1/navigation.py
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models.tile import Tile
 import httpx
 import asyncio
+import logging
+import jwt
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -20,15 +25,50 @@ async def get_user_id(request: Request) -> int:
         raise HTTPException(401, "Invalid X-User-ID format")
 
 
-async def get_user_roles_from_service(user_id: int) -> list:
-    """Получить роли пользователя из User Service по ID"""
+async def get_user_info_from_service(request: Request, user_id: int) -> dict:
+    """Получить информацию о пользователе из User Service через Gateway"""
+    # Получаем токен из заголовка
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        logger.warning("No Authorization header for user info request")
+        return {}
+    
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"http://localhost:8000/api/v1/users/{user_id}/roles"
+            f"http://localhost:8080/api/v1/admin/users/{user_id}",
+            headers={"Authorization": auth_header}
         )
         if resp.status_code != 200:
-            return []
-        return resp.json().get("roles", [])
+            logger.warning(f"Failed to get user info for {user_id}: {resp.status_code}")
+            logger.warning(f"Response: {resp.text}")
+            return {}
+        return resp.json()
+
+
+async def is_user_admin_via_service(request: Request, user_id: int) -> bool:
+    """Проверить, является ли пользователь администратором через User Service"""
+    user_data = await get_user_info_from_service(request, user_id)
+    if not user_data:
+        # Если не удалось получить через сервис, проверяем токен
+        auth_header = request.headers.get("Authorization")
+        if auth_header:
+            token = auth_header.replace("Bearer ", "").strip()
+            try:
+                payload = jwt.decode(token, options={"verify_signature": False})
+                roles = payload.get("roles", [])
+                is_super_admin = payload.get("is_super_admin", False)
+                result = is_super_admin or "admin" in roles
+                logger.info(f"📌 Admin check from token: {result}")
+                return result
+            except Exception as e:
+                logger.warning(f"Failed to decode token: {e}")
+        return False
+    
+    roles = user_data.get("roles", [])
+    is_super_admin = user_data.get("is_super_admin", False)
+    result = is_super_admin or "admin" in roles
+    logger.info(f"📌 Is user {user_id} admin? {result} (super_admin: {is_super_admin}, roles: {roles})")
+    return result
 
 
 async def get_badge_count(endpoint: str) -> int:
@@ -37,7 +77,6 @@ async def get_badge_count(endpoint: str) -> int:
         return 0
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
-            # Запрос к микросервису через API Gateway
             resp = await client.get(f"http://localhost:8080{endpoint}")
             if resp.status_code == 200:
                 data = resp.json()
@@ -53,24 +92,47 @@ async def get_dashboard(
     user_id: int = Depends(get_user_id)
 ):
     """Получить дашборд с плитками для пользователя"""
-    # Получаем роли пользователя из User Service
-    roles = await get_user_roles_from_service(user_id)
+    logger.info(f"🔍 Getting dashboard for user {user_id}")
     
-    if not roles:
-        # Если у пользователя нет ролей, возвращаем пустой дашборд
-        return {"tiles": [], "user_roles": []}
+    # Проверяем, является ли пользователь администратором
+    is_admin = await is_user_admin_via_service(request, user_id)
+    logger.info(f"📌 is_admin: {is_admin}")
+    
+    # Получаем роли из токена
+    auth_header = request.headers.get("Authorization")
+    roles = []
+    if auth_header:
+        token = auth_header.replace("Bearer ", "").strip()
+        try:
+            payload = jwt.decode(token, options={"verify_signature": False})
+            roles = payload.get("roles", [])
+            logger.info(f"📌 Roles from token: {roles}")
+        except Exception as e:
+            logger.warning(f"Failed to decode token: {e}")
     
     # Загружаем плитки из БД
     async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(Tile).where(
-                Tile.role.in_(roles),
-                Tile.is_active == True
-            ).order_by(Tile.sort_order)
-        )
+        if is_admin:
+            logger.info("👑 Admin detected, loading ALL tiles")
+            result = await db.execute(
+                select(Tile).where(
+                    Tile.is_active == True
+                ).order_by(Tile.sort_order)
+            )
+        else:
+            if not roles:
+                return {"tiles": [], "user_roles": [], "is_admin": False}
+            logger.info(f"👤 Regular user with roles: {roles}")
+            result = await db.execute(
+                select(Tile).where(
+                    Tile.role.in_(roles),
+                    Tile.is_active == True
+                ).order_by(Tile.sort_order)
+            )
         tiles = result.scalars().all()
+        logger.info(f"📌 Found {len(tiles)} tiles")
     
-    # Собираем счетчики параллельно (для плиток с badge_enabled)
+    # Собираем счетчики параллельно
     tasks = []
     for tile in tiles:
         if tile.badge_enabled and tile.badge_endpoint:
@@ -96,18 +158,20 @@ async def get_dashboard(
     
     return {
         "tiles": result_tiles,
-        "user_roles": roles
+        "user_roles": roles,
+        "is_admin": is_admin
     }
 
 
 @router.post("/tiles")
 async def create_tile(
     tile_data: dict,
-    user_id: int = Depends(get_user_id),
-    roles: list = Depends(get_user_roles_from_service)
+    request: Request,
+    user_id: int = Depends(get_user_id)
 ):
     """Административный эндпоинт для создания плиток"""
-    if "admin" not in roles:
+    is_admin = await is_user_admin_via_service(request, user_id)
+    if not is_admin:
         raise HTTPException(403, "Only admin can manage tiles")
     
     async with AsyncSessionLocal() as db:
