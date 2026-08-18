@@ -93,6 +93,7 @@ add_executable(ProductionClientApp
     src/qml_bridge/AuthBridge.cpp
     src/qml_bridge/MainWindowBridge.cpp
     src/qml_bridge/NotificationBridge.cpp
+    src/qml_bridge/WidgetBridge.cpp
     src/core/AppCore.cpp
     src/core/ConfigManager.cpp
     src/core/CacheManager.cpp

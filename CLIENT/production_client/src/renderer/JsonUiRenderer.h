@@ -28,6 +28,8 @@ public:
     Q_INVOKABLE void refreshContentHeight();
     Q_INVOKABLE void refreshAllCharts();
 
+    // Метод для установки DataManager
+    void setDataManager(DataManager* dataManager) { m_dataManager = dataManager; }
     DataManager* dataManager() const { return m_dataManager; }
 
 signals:
@@ -56,3 +58,5 @@ private:
 };
 
 #endif // JSONUIRENDERER_H
+
+Q_DECLARE_METATYPE(JsonUiRenderer*)

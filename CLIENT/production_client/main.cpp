@@ -10,10 +10,7 @@
 #include "src/qml_bridge/AuthBridge.h"
 #include "src/qml_bridge/MainWindowBridge.h"
 #include "src/qml_bridge/NotificationBridge.h"
-
-// Регистрируем Colors как синглтон
-#include <QQmlEngine>
-#include <QQmlComponent>
+#include "src/qml_bridge/WidgetBridge.h"
 
 int main(int argc, char *argv[])
 {
@@ -21,27 +18,39 @@ int main(int argc, char *argv[])
     app.setOrganizationName("Engineering");
     app.setApplicationName("EngineeringRE");
     
-    // Инициализация AppCore
-    AppCore core;
+    QQmlApplicationEngine engine;
+    
+    // Регистрируем WidgetBridge для QML
+    qmlRegisterType<WidgetBridge>("ProductionClient", 1, 0, "WidgetBridge");
+    
+    // Инициализация AppCore с engine
+    AppCore core(&engine);
     core.init();
     
-    auto authService = getAuthService();
+    // Получаем сервисы
+    auto authService = AppCore::authService();
     
     // Создание мостов
     AuthBridge authBridge(authService);
     MainWindowBridge mainWindowBridge(authService);
     NotificationBridge notificationBridge;
+    WidgetBridge widgetBridge;
     
-    QQmlApplicationEngine engine;
+    // Связываем WidgetBridge с AppCore
+    widgetBridge.setDataManager(core.dataManager());
+    widgetBridge.setRenderer(core.renderer());
     
-    // Регистрируем Colors как синглтон (из старой версии)
+    // Регистрируем Colors как синглтон
     qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/Colors.qml"), "Styles", 1, 0, "Colors");
     
+    // Экспортируем в QML
+    engine.rootContext()->setContextProperty("appCore", &core);
     engine.rootContext()->setContextProperty("authBridge", &authBridge);
     engine.rootContext()->setContextProperty("mainWindowBridge", &mainWindowBridge);
     engine.rootContext()->setContextProperty("notificationBridge", &notificationBridge);
+    engine.rootContext()->setContextProperty("widgetBridge", &widgetBridge);
     
-    // Загружаем QML из файловой системы (из новой версии)
+    // Загружаем QML
     QString qmlPath = QCoreApplication::applicationDirPath() + "/qml/main.qml";
     if (!QFile::exists(qmlPath)) {
         qmlPath = QDir::currentPath() + "/qml/main.qml";
@@ -54,17 +63,6 @@ int main(int argc, char *argv[])
     qDebug() << "Loading QML from:" << qmlPath;
     
     QUrl url = QUrl::fromLocalFile(qmlPath);
-    
-    QObject::connect(
-        &engine,
-        &QQmlApplicationEngine::objectCreated,
-        &app,
-        [url](QObject *obj, const QUrl &objUrl) {
-            if (!obj && url == objUrl)
-                QCoreApplication::exit(-1);
-        },
-        Qt::QueuedConnection);
-    
     engine.load(url);
     
     return app.exec();

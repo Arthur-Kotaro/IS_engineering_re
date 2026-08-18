@@ -31,13 +31,25 @@ QString generateLabel(const QJsonObject& spec)
 QString generatePushButton(const QJsonObject& spec)
 {
     QString text = spec["text"].toString("Button");
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "Button {\n"
         "    text: \"%1\"\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 36\n"
+        "    onClicked: {\n"
+        "        if (widgetBridge) {\n"
+        "            var input = {\n"
+        "                'type': 'button',\n"
+        "                'value': text,\n"
+        "                'paramName': '%2'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%2', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    ).arg(text);
+    ).arg(text).arg(widgetId);
 }
 
 QString generateComboBox(const QJsonObject& spec)
@@ -57,54 +69,104 @@ QString generateComboBox(const QJsonObject& spec)
         items << "Option 1" << "Option 2" << "Option 3";
     }
 
+    QString widgetId = spec["id"].toString();
     QString modelStr = "[\"" + items.join("\", \"") + "\"]";
+    
     return QString(
         "ComboBox {\n"
-        "    model: %1\n"
+        "    id: combo_%1\n"
+        "    model: %2\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 36\n"
+        "    onCurrentTextChanged: {\n"
+        "        if (widgetBridge) {\n"
+        "            var input = {\n"
+        "                'type': 'select',\n"
+        "                'value': currentText,\n"
+        "                'paramName': '%1'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%1', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    ).arg(modelStr);
+    ).arg(widgetId).arg(modelStr);
 }
 
 QString generateLineEdit(const QJsonObject& spec)
 {
     QString placeholder = spec["placeholder"].toString("Введите текст...");
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "TextField {\n"
-        "    placeholderText: \"%1\"\n"
+        "    id: lineEdit_%1\n"
+        "    placeholderText: \"%2\"\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 36\n"
+        "    onTextChanged: {\n"
+        "        if (widgetBridge) {\n"
+        "            var input = {\n"
+        "                'type': 'text',\n"
+        "                'value': text,\n"
+        "                'paramName': '%1'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%1', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    ).arg(placeholder);
+    ).arg(widgetId).arg(placeholder);
 }
 
 QString generateCheckBox(const QJsonObject& spec)
 {
     QString text = spec["text"].toString("CheckBox");
     bool checked = spec["checked"].toBool(false);
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "CheckBox {\n"
         "    text: \"%1\"\n"
         "    checked: %2\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: implicitHeight\n"
+        "    onCheckedChanged: {\n"
+        "        if (widgetBridge) {\n"
+        "            var input = {\n"
+        "                'type': 'checkbox',\n"
+        "                'value': checked,\n"
+        "                'paramName': '%3'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%3', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    ).arg(text).arg(checked ? "true" : "false");
+    ).arg(text).arg(checked ? "true" : "false").arg(widgetId);
 }
 
 QString generateRadioButton(const QJsonObject& spec)
 {
     QString text = spec["text"].toString("RadioButton");
     bool checked = spec["checked"].toBool(false);
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "RadioButton {\n"
         "    text: \"%1\"\n"
         "    checked: %2\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: implicitHeight\n"
+        "    onCheckedChanged: {\n"
+        "        if (widgetBridge && checked) {\n"
+        "            var input = {\n"
+        "                'type': 'radio',\n"
+        "                'value': text,\n"
+        "                'paramName': '%3'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%3', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    ).arg(text).arg(checked ? "true" : "false");
+    ).arg(text).arg(checked ? "true" : "false").arg(widgetId);
 }
 
 QString generateProgressBar(const QJsonObject& spec)
@@ -126,27 +188,53 @@ QString generateProgressBar(const QJsonObject& spec)
 QString generateDateEdit(const QJsonObject& spec)
 {
     QString date = spec["date"].toString("2026-08-16");
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "ComboBox {\n"
-        "    model: [\"%1\"]\n"
+        "    id: date_%1\n"
+        "    model: [\"%2\"]\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 36\n"
         "    editable: true\n"
+        "    onCurrentTextChanged: {\n"
+        "        if (widgetBridge) {\n"
+        "            var input = {\n"
+        "                'type': 'date',\n"
+        "                'value': currentText,\n"
+        "                'paramName': '%1'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%1', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    ).arg(date);
+    ).arg(widgetId).arg(date);
 }
 
 QString generateDateTimeEdit(const QJsonObject& spec)
 {
     QString datetime = spec["datetime"].toString("2026-08-16 10:30");
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "ComboBox {\n"
-        "    model: [\"%1\"]\n"
+        "    id: datetime_%1\n"
+        "    model: [\"%2\"]\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 36\n"
         "    editable: true\n"
+        "    onCurrentTextChanged: {\n"
+        "        if (widgetBridge) {\n"
+        "            var input = {\n"
+        "                'type': 'datetime',\n"
+        "                'value': currentText,\n"
+        "                'paramName': '%1'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%1', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    ).arg(datetime);
+    ).arg(widgetId).arg(datetime);
 }
 
 QString generateCalendarWidget(const QJsonObject& spec)
@@ -168,13 +256,26 @@ QString generateCalendarWidget(const QJsonObject& spec)
 
 QString generateTextEdit(const QJsonObject& spec)
 {
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "TextArea {\n"
+        "    id: textArea_%1\n"
         "    placeholderText: \"Введите текст...\"\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 100\n"
+        "    onTextChanged: {\n"
+        "        if (widgetBridge) {\n"
+        "            var input = {\n"
+        "                'type': 'textarea',\n"
+        "                'value': text,\n"
+        "                'paramName': '%1'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%1', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    );
+    ).arg(widgetId);
 }
 
 QString generateSlider(const QJsonObject& spec)
@@ -182,14 +283,27 @@ QString generateSlider(const QJsonObject& spec)
     int min = spec["minimum"].toInt(0);
     int max = spec["maximum"].toInt(100);
     int value = spec["value"].toInt(50);
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "Slider {\n"
-        "    from: %1\n"
-        "    to: %2\n"
-        "    value: %3\n"
+        "    id: slider_%1\n"
+        "    from: %2\n"
+        "    to: %3\n"
+        "    value: %4\n"
         "    Layout.fillWidth: true\n"
+        "    onValueChanged: {\n"
+        "        if (widgetBridge) {\n"
+        "            var input = {\n"
+        "                'type': 'slider',\n"
+        "                'value': value,\n"
+        "                'paramName': '%1'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%1', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    ).arg(min).arg(max).arg(value);
+    ).arg(widgetId).arg(min).arg(max).arg(value);
 }
 
 QString generateSpinBox(const QJsonObject& spec)
@@ -197,17 +311,30 @@ QString generateSpinBox(const QJsonObject& spec)
     int min = spec["minimum"].toInt(0);
     int max = spec["maximum"].toInt(100);
     int value = spec["value"].toInt(50);
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "SpinBox {\n"
-        "    from: %1\n"
-        "    to: %2\n"
-        "    value: %3\n"
+        "    id: spin_%1\n"
+        "    from: %2\n"
+        "    to: %3\n"
+        "    value: %4\n"
         "    Layout.fillWidth: true\n"
+        "    onValueChanged: {\n"
+        "        if (widgetBridge) {\n"
+        "            var input = {\n"
+        "                'type': 'number',\n"
+        "                'value': value,\n"
+        "                'paramName': '%1'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%1', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    ).arg(min).arg(max).arg(value);
+    ).arg(widgetId).arg(min).arg(max).arg(value);
 }
 
-// Заглушки для сложных виджетов
+// Заглушки для сложных виджетов (без ввода)
 QString generateListWidget(const QJsonObject& spec)
 {
     return QString(
@@ -324,12 +451,24 @@ QString generateStackedWidget(const QJsonObject& spec)
 QString generateToolButton(const QJsonObject& spec)
 {
     QString text = spec["text"].toString("🔧");
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "Button {\n"
         "    text: \"%1\"\n"
         "    Layout.preferredWidth: 40\n"
         "    Layout.preferredHeight: 40\n"
         "    flat: true\n"
+        "    onClicked: {\n"
+        "        if (widgetBridge) {\n"
+        "            var input = {\n"
+        "                'type': 'button',\n"
+        "                'value': text,\n"
+        "                'paramName': '%2'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%2', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
-    ).arg(text);
+    ).arg(text).arg(widgetId);
 }

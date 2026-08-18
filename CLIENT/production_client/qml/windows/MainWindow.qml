@@ -13,7 +13,9 @@ Rectangle {
     signal themeToggleRequested()
 
     property var tiles: []
+    property var tabs: []
 
+    // Верхняя панель
     Rectangle {
         id: topBar
         anchors.top: parent.top
@@ -30,7 +32,6 @@ Rectangle {
             anchors.margins: 15
             spacing: 10
 
-            // Левая часть: Имя + Email
             ColumnLayout {
                 spacing: 2
                 Layout.alignment: Qt.AlignVCenter
@@ -50,7 +51,6 @@ Rectangle {
                 }
             }
 
-            // Центральная часть: срок действия пароля
             Item {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 100
@@ -83,7 +83,6 @@ Rectangle {
                 }
             }
 
-            // Правая часть: кнопки
             RowLayout {
                 spacing: 8
                 Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
@@ -199,6 +198,7 @@ Rectangle {
         target: mainWindowBridge
         function onTilesLoaded(tilesList) {
             root.tiles = tilesList
+            console.log("Tiles loaded:", tilesList.length)
         }
     }
 }

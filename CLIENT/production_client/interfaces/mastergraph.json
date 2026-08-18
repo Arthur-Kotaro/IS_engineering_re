@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "title": "Мастерграф",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "mastergraph_title",
+      "text": "Мастерграф",
+      "properties": {
+        "font.pixelSize": 24,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    }
+  ]
+}

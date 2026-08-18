@@ -72,3 +72,5 @@ private:
 };
 
 #endif // DATAMANAGER_H
+
+Q_DECLARE_METATYPE(DataManager*)

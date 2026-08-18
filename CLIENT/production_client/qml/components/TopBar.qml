@@ -1,6 +1,7 @@
 import QtQuick 6.0
 import QtQuick.Controls 6.0
 import QtQuick.Layouts 6.0
+import Styles 1.0
 
 Rectangle {
     id: root
@@ -22,7 +23,6 @@ Rectangle {
         anchors.margins: 10
         spacing: 15
         
-        // Логотип
         Image {
             source: "qrc:/assets/images/icons/logo.svg"
             width: 40
@@ -30,16 +30,14 @@ Rectangle {
             fillMode: Image.PreserveAspectFit
         }
         
-        // Название приложения
         Text {
             text: "Корпоративная ИС"
-            font.pixelSize: Typography.h3
+            font.pixelSize: 18
             font.bold: true
             color: Colors.onPrimary
             Layout.fillWidth: true
         }
         
-        // Индикатор истечения пароля
         Rectangle {
             visible: !passwordExpired && passwordDaysLeft > 0 && passwordDaysLeft <= 7
             height: 40
@@ -51,23 +49,15 @@ Rectangle {
                 anchors.centerIn: parent
                 spacing: 8
                 
-                Image {
-                    source: "qrc:/assets/images/icons/warning.svg"
-                    width: 20
-                    height: 20
-                }
-                
                 Text {
                     id: warningText
-                    text: "Пароль истекает через " + passwordDaysLeft + " " + 
-                          getDaysDeclension(passwordDaysLeft)
-                    font.pixelSize: Typography.caption
+                    text: "⚠ Пароль истекает через " + passwordDaysLeft + " дн."
+                    font.pixelSize: 12
                     color: Colors.onWarning
                 }
             }
         }
         
-        // Индикатор просроченного пароля
         Rectangle {
             visible: passwordExpired
             height: 40
@@ -79,22 +69,15 @@ Rectangle {
                 anchors.centerIn: parent
                 spacing: 8
                 
-                Image {
-                    source: "qrc:/assets/images/icons/error.svg"
-                    width: 20
-                    height: 20
-                }
-                
                 Text {
                     id: expiredText
-                    text: "Пароль просрочен! Смените пароль"
-                    font.pixelSize: Typography.caption
+                    text: "❌ Пароль просрочен!"
+                    font.pixelSize: 12
                     color: Colors.onError
                 }
             }
         }
         
-        // Разделитель
         Rectangle {
             width: 1
             height: 40
@@ -102,63 +85,52 @@ Rectangle {
             visible: userName !== ""
         }
         
-        // Информация о пользователе
         ColumnLayout {
             visible: userName !== ""
             spacing: 2
             
             Text {
                 text: userName
-                font.pixelSize: Typography.body1
+                font.pixelSize: 14
                 font.bold: true
                 color: Colors.onPrimary
             }
             
             Text {
                 text: userPosition
-                font.pixelSize: Typography.caption
+                font.pixelSize: 11
                 color: Colors.onPrimaryVariant
             }
             
             Text {
                 text: userEmail
-                font.pixelSize: Typography.caption
+                font.pixelSize: 10
                 color: Colors.onPrimaryVariant
                 opacity: 0.8
             }
         }
         
-        // Кнопка смены пароля
         Button {
             text: "Сменить пароль"
             icon.source: "qrc:/assets/images/icons/password.svg"
             onClicked: root.passwordChangeRequested()
-            
             background: Rectangle {
                 color: parent.down ? Colors.primaryDark : Colors.primaryLight
                 radius: 20
             }
         }
         
-        // Кнопка полного экрана
         Button {
             icon.source: "qrc:/assets/images/icons/fullscreen.svg"
             onClicked: root.fullScreenToggled()
             flat: true
         }
         
-        // Кнопка выхода
         Button {
             text: "Выйти"
             icon.source: "qrc:/assets/images/icons/logout.svg"
             onClicked: root.logoutRequested()
             flat: true
         }
-    }
-    
-    function getDaysDeclension(days) {
-        if (days % 10 === 1 && days % 100 !== 11) return "день"
-        if (days % 10 >= 2 && days % 10 <= 4 && (days % 100 < 10 || days % 100 >= 20)) return "дня"
-        return "дней"
     }
 }

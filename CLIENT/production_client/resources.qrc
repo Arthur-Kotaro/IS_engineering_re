@@ -2,4 +2,9 @@
     <qresource prefix="/">
         <file>qml/main.qml</file>
     </qresource>
+    <qresource prefix="/interfaces">
+        <file>interfaces/dashboard.json</file>
+        <file>interfaces/projects.json</file>
+        <file>interfaces/mastergraph.json</file>
+    </qresource>
 </RCC>

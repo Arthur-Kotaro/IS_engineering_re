@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "title": "Проекты",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "projects_title",
+      "text": "Список проектов",
+      "properties": {
+        "font.pixelSize": 24,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    }
+  ]
+}

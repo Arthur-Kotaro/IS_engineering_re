@@ -1,39 +1,65 @@
-// production_client/src/core/AppCore.cpp
 #include "AppCore.h"
+#include "core/DataManager.h"
+#include "renderer/JsonUiRenderer.h"
 #include "userserviceclient/ApiClient.h"
 #include "userserviceclient/AuthService.h"
 #include "userserviceclient/TokenManager.h"
+#include <QQmlEngine>
 #include <QDebug>
-#include <memory>
 
-// Глобальные экземпляры для доступа из Bridge
-std::shared_ptr<UsersService::ApiClient> g_apiClient;
-std::shared_ptr<UsersService::AuthService> g_authService;
-std::shared_ptr<UsersService::TokenManager> g_tokenManager;
+// Статические экземпляры
+std::shared_ptr<UsersService::ApiClient> AppCore::s_apiClient;
+std::shared_ptr<UsersService::AuthService> AppCore::s_authService;
+std::shared_ptr<UsersService::TokenManager> AppCore::s_tokenManager;
 
-AppCore::AppCore() {}
+AppCore::AppCore(QQmlEngine* engine, QObject* parent)
+    : QObject(parent)
+    , m_engine(engine)
+{
+    qDebug() << "AppCore created";
+}
 
-void AppCore::init() {
+AppCore::~AppCore()
+{
+    qDebug() << "AppCore destroyed";
+}
+
+void AppCore::init()
+{
     qDebug() << "AppCore: Initializing...";
 
     // Создаем ApiClient с Gateway (порт 8080)
-    g_apiClient = std::make_shared<UsersService::ApiClient>();
-    g_apiClient->setServerUrl("localhost", 8080);  // ← Gateway!
+    s_apiClient = std::make_shared<UsersService::ApiClient>();
+    s_apiClient->setServerUrl("localhost", 8080);
 
     // Создаем TokenManager
-    g_tokenManager = std::make_shared<UsersService::TokenManager>();
+    s_tokenManager = std::make_shared<UsersService::TokenManager>();
 
     // Создаем AuthService
-    g_authService = std::make_shared<UsersService::AuthService>(g_apiClient);
+    s_authService = std::make_shared<UsersService::AuthService>(s_apiClient);
+
+    // Создаем DataManager (использует ApiClient через common)
+    m_dataManager = new DataManager(this);
+    
+    // Создаем JsonUiRenderer
+    m_renderer = new JsonUiRenderer(m_engine, this);
+    m_renderer->setDataManager(m_dataManager);
 
     qDebug() << "AppCore: Initialized with Gateway on localhost:8080";
+    qDebug() << "AppCore: DataManager and Renderer created";
 }
 
-// Геттеры для доступа из Bridge
-std::shared_ptr<UsersService::AuthService> getAuthService() {
-    return g_authService;
+std::shared_ptr<UsersService::AuthService> AppCore::authService()
+{
+    return s_authService;
 }
 
-std::shared_ptr<UsersService::ApiClient> getApiClient() {
-    return g_apiClient;
+std::shared_ptr<UsersService::ApiClient> AppCore::apiClient()
+{
+    return s_apiClient;
+}
+
+std::shared_ptr<UsersService::TokenManager> AppCore::tokenManager()
+{
+    return s_tokenManager;
 }

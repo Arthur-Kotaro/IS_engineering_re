@@ -13,6 +13,7 @@ MainWindowBridge::MainWindowBridge(std::shared_ptr<UsersService::AuthService> au
 : QObject(parent)
 , m_authService(authService)
 , m_networkManager(new QNetworkAccessManager(this))
+, m_tilesLoaded(false)
 {
     connect(m_authService.get(), &UsersService::AuthService::profileFetched,
             this, &MainWindowBridge::onProfileFetched);
@@ -84,6 +85,10 @@ QString MainWindowBridge::widgetsPath() const {
     return "widgets/common/";
 }
 
+QString MainWindowBridge::accessToken() const {
+    return m_authService->currentSession().accessToken;
+}
+
 void MainWindowBridge::changePassword(const QString& currentPassword, const QString& newPassword) {
     m_authService->changePassword(currentPassword, newPassword, newPassword);
 }
@@ -98,15 +103,19 @@ void MainWindowBridge::checkPasswordExpiry() {
 }
 
 void MainWindowBridge::loadTiles() {
+    if (m_tilesLoaded) {
+        qDebug() << "Tiles already loaded, skipping";
+        return;
+    }
+    
     qDebug() << "Loading tiles from Navigation Service...";
 
     QString token = m_authService->currentSession().accessToken;
     if (token.isEmpty()) {
-        qDebug() << "No access token available";
+        qDebug() << "No access token available, will retry after profile fetch";
         return;
     }
 
-    // Исправлено: правильный путь через Gateway
     QNetworkRequest request(QUrl("http://localhost:8080/api/v1/navigation/dashboard"));
     request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
 
@@ -133,7 +142,9 @@ void MainWindowBridge::loadTiles() {
             tileList.append(tile.toVariant());
         }
 
+        m_tilesLoaded = true;
         emit tilesLoaded(tileList);
+        qDebug() << "Tiles loaded:" << tileList.size();
     });
 }
 
@@ -141,6 +152,9 @@ void MainWindowBridge::onProfileFetched(const UsersService::UserProfile& profile
     m_profile = profile;
     emit userDataChanged();
     m_authService->checkPasswordExpiry();
+    
+    // Загружаем плитки после получения профиля
+    loadTiles();
 }
 
 void MainWindowBridge::onPasswordExpiryInfo(int daysRemaining, bool isExpired, const QString& expiresAt) {

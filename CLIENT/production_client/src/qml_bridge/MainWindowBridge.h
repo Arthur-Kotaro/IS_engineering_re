@@ -23,6 +23,7 @@ class MainWindowBridge : public QObject
     Q_PROPERTY(bool passwordExpired READ passwordExpired NOTIFY passwordExpiryChanged)
     Q_PROPERTY(QVariantList projects READ projects NOTIFY userDataChanged)
     Q_PROPERTY(QString widgetsPath READ widgetsPath NOTIFY userDataChanged)
+    Q_PROPERTY(QString accessToken READ accessToken NOTIFY userDataChanged)
 
 public:
     explicit MainWindowBridge(std::shared_ptr<UsersService::AuthService> authService, QObject *parent = nullptr);
@@ -35,6 +36,7 @@ public:
     bool passwordExpired() const;
     QVariantList projects() const;
     QString widgetsPath() const;
+    QString accessToken() const;
 
     Q_INVOKABLE void changePassword(const QString& currentPassword, const QString& newPassword);
     Q_INVOKABLE void logout();
@@ -59,6 +61,7 @@ private:
     UsersService::UserProfile m_profile;
     int m_passwordDaysLeft = 0;
     QNetworkAccessManager* m_networkManager;
+    bool m_tilesLoaded = false;
 };
 
 #endif // MAINWINDOWBRIDGE_H

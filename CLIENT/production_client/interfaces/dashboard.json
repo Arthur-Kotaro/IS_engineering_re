@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "title": "Инженерный дашборд",
+  "widgets": [
+    {
+      "type": "QLabel",
+      "id": "welcome",
+      "text": "Добро пожаловать в систему!",
+      "properties": {
+        "font.pixelSize": 24,
+        "font.bold": true,
+        "color": "#ffffff"
+      }
+    }
+  ]
+}
