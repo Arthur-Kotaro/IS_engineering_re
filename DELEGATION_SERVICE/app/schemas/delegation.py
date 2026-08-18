@@ -12,7 +12,7 @@ class DelegationCreate(BaseModel):
     starts_at: datetime
     expires_at: datetime
     reason: Optional[str] = Field(None, max_length=500)
-    main_delegate_id: Optional[int] = None  # Для TEMPORARY типа
+    main_delegate_id: Optional[int] = None
     
     @field_validator('expires_at')
     def validate_dates(cls, v, info):
@@ -21,11 +21,11 @@ class DelegationCreate(BaseModel):
             raise ValueError('expires_at must be after starts_at')
         return v
     
-    @field_validator('delegation_type')
-    def validate_type(cls, v, info):
-        if v == DelegationType.TEMPORARY:
-            if not info.data.get('main_delegate_id'):
-                raise ValueError('main_delegate_id required for TEMPORARY delegation')
+    @field_validator('main_delegate_id')
+    def validate_main_delegate(cls, v, info):
+        delegation_type = info.data.get('delegation_type')
+        if delegation_type == DelegationType.TEMPORARY and v is None:
+            raise ValueError('main_delegate_id required for TEMPORARY delegation')
         return v
 
 
