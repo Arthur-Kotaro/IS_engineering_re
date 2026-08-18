@@ -134,20 +134,22 @@ echo -e "\n${BLUE}📋 Запуск сервисов:${NC}"
 echo "   • Auth Service (8010)"
 echo "   • User Service (8000)"
 echo "   • Project Service (8001)"
+echo "   • Navigation Service (8009)"
+echo "   • Delegation Service (8011)"
 echo "   • PJP Service (8002)"
 echo "   • Mastergraphics Service (8003)"
 echo "   • PROTO Service (8004)"
-echo "   • Navigation Service (8009)"
 echo "   • API Gateway (8080)"
 echo "   • Клиент"
 
 start_service "AUTH_SERVICE" 8010
 start_service "USER_service" 8000
 start_service "PROJECT_service" 8001
+start_service "NAVIGATION_SERVICE" 8009
+start_service "DELEGATION_SERVICE" 8011
 start_service "PJP_SERVICE" 8002
 start_service "MG_service" 8003
 start_service "PROTO_service" 8004
-start_service "NAVIGATION_SERVICE" 8009
 
 start_gateway
 start_client
@@ -169,10 +171,11 @@ check_health() {
 check_health "Auth" 8010
 check_health "User" 8000
 check_health "Project" 8001
+check_health "Navigation" 8009
+check_health "Delegation" 8011
 check_health "PJP" 8002
 check_health "MG" 8003
 check_health "PROTO" 8004
-check_health "Navigation" 8009
 check_health "Gateway" 8080
 
 echo -e "\n${GREEN}========================================${NC}"
@@ -181,5 +184,6 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "\n📊 Логи: $LOG_DIR/"
 echo -e "🛑 Для остановки нажмите Ctrl+C"
 echo -e "\n🌐 API Gateway: http://localhost:8080"
+echo -e "📋 Delegation Service: http://localhost:8011/docs"
 
 wait

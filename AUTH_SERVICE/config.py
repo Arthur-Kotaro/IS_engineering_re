@@ -17,7 +17,7 @@ REDIS_BLACKLIST_PREFIX = "blacklist:"
 
 # Сервисы для проксирования
 SERVICE_ROUTES: Dict[str, str] = {
-    "auth": "http://127.0.0.1:8000",      # auth эндпоинты идут в User Service
+    "auth": "http://127.0.0.1:8000",
     "users": "http://127.0.0.1:8000",
     "admin": "http://127.0.0.1:8000",
     "projects": "http://127.0.0.1:8001",
@@ -25,6 +25,8 @@ SERVICE_ROUTES: Dict[str, str] = {
     "mg": "http://127.0.0.1:8003",
     "proto": "http://127.0.0.1:8004",
     "navigation": "http://127.0.0.1:8009",
+    "delegations": "http://127.0.0.1:8011",
+    "delegation-rules": "http://127.0.0.1:8011",
 }
 
 # Эндпоинты, которые НЕ требуют авторизации (идут напрямую в user_service)
