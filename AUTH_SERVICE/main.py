@@ -50,7 +50,9 @@ async def gateway(request: Request, path: str):
         full_path = f"{full_path}?{query_string}"
     
     # Проверяем публичные эндпоинты
-    if full_path.split('?')[0] in PUBLIC_ENDPOINTS:
+    # Убираем параметры для сравнения
+    path_without_params = full_path.split('?')[0]
+    if path_without_params in PUBLIC_ENDPOINTS:
         logger.info(f"Public endpoint: {full_path}")
         return await proxy_to_service(request, full_path, add_auth_headers=False)
     
@@ -133,7 +135,9 @@ async def proxy_to_service(
     Проксирование запроса в целевой микросервис
     """
     # Определяем целевой сервис по первому сегменту пути после /api/v1/
-    parts = full_path.strip('/').split('/')
+    # Убираем параметры запроса для определения сервиса
+    path_without_params = full_path.split('?')[0]
+    parts = path_without_params.strip('/').split('/')
     if len(parts) >= 3:
         service_name = parts[2]  # users, projects, navigation, etc.
     else:
@@ -157,23 +161,20 @@ async def proxy_to_service(
     headers.pop("host", None)
     headers.pop("content-length", None)
     
-    # Добавляем заголовки аутентификации
     if add_auth_headers and user_id:
         headers["X-User-ID"] = str(user_id)
         if role:
             headers["X-User-Role"] = str(role)
     
-    # Получаем тело запроса для POST/PUT/PATCH
     body = await request.body()
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.request(
                 method=request.method,
                 url=target_url,
                 headers=headers,
-                content=body if body else None,
-                follow_redirects=True
+                content=body if body else None
             )
         
         return Response(

@@ -27,6 +27,7 @@ SERVICE_ROUTES: Dict[str, str] = {
     "navigation": "http://127.0.0.1:8009",
     "delegations": "http://127.0.0.1:8011",
     "delegation-rules": "http://127.0.0.1:8011",
+    "notifications": "http://127.0.0.1:8012",  # НОВЫЙ СЕРВИС
 }
 
 # Эндпоинты, которые НЕ требуют авторизации (идут напрямую в user_service)

@@ -86,17 +86,42 @@ class ExternalService:
         return subordinate_id in subordinates
     
     @staticmethod
-    async def send_notification(user_id: int, message: str, notification_type: str = "delegation"):
-        """Отправить уведомление пользователю"""
+    async def send_notification(
+        user_id: int,
+        message: str,
+        title: str = "Уведомление",
+        notification_type: str = "system",
+        reference_id: Optional[int] = None,
+        reference_type: Optional[str] = None,
+        data: Optional[Dict] = None,
+        send_email: bool = True
+    ):
+        """Отправить уведомление пользователю через Notification Service"""
         try:
+            user_info = await ExternalService.get_user_info(user_id)
+            if not user_info:
+                logger.warning(f"Cannot send notification to {user_id}: user not found")
+                return
+            
             async with httpx.AsyncClient(timeout=5.0) as client:
-                await client.post(
+                resp = await client.post(
                     f"{settings.NOTIFICATION_SERVICE_URL}/api/v1/notifications",
                     json={
                         "user_id": user_id,
+                        "user_email": user_info.get("email"),
+                        "user_name": user_info.get("user_name"),
+                        "notification_type": notification_type,
+                        "title": title,
                         "message": message,
-                        "type": notification_type
+                        "reference_id": reference_id,
+                        "reference_type": reference_type,
+                        "data": data or {},
+                        "send_email": send_email
                     }
                 )
+                if resp.status_code == 200:
+                    logger.info(f"Notification sent to user {user_id}")
+                else:
+                    logger.warning(f"Failed to send notification: {resp.status_code}")
         except Exception as e:
             logger.error(f"Error sending notification to {user_id}: {e}")

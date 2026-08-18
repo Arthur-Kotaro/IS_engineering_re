@@ -1,6 +1,25 @@
 #!/bin/bash
-# start_all.sh — Запуск всех микросервисов из корня проекта
+# start_all.sh — Запуск микросервисов с поддержкой ключей командной строки
+#
+# Использование:
+#   ./start_all.sh [OPTION]
+#
+# Опции:
+#   -d, --default    Инфраструктура (все сервисы кроме бизнес-логики)
+#   -b, --business   Инфраструктура + бизнес-сервисы (PJP, MG, PROTO)
+#   -f, --full       Все сервисы + клиент
+#   -h, --help       Показать эту справку
+#
+# Инфраструктура: Auth, User, Project, Navigation, Delegation, Notification, Gateway
+# Бизнес-сервисы: PJP, Mastergraphics, PROTO
+#
+# Примеры:
+#   ./start_all.sh -d          # Инфраструктура
+#   ./start_all.sh -b          # Инфраструктура + бизнес
+#   ./start_all.sh -f          # Все сервисы + клиент
+#   ./start_all.sh             # default (инфраструктура)
 
+# ========== НАСТРОЙКИ ==========
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
@@ -11,10 +30,65 @@ PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="$PROJECT_ROOT/logs"
 mkdir -p "$LOG_DIR"
 
+# ========== ПОМОЩЬ ==========
+show_help() {
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${BLUE}🚀 start_all.sh — Запуск микросервисов${NC}"
+    echo -e "${BLUE}========================================${NC}"
+    echo ""
+    echo -e "${YELLOW}Использование:${NC}"
+    echo "  ./start_all.sh [OPTION]"
+    echo ""
+    echo -e "${YELLOW}Опции:${NC}"
+    echo "  -d, --default    Инфраструктура (все сервисы кроме бизнес-логики)"
+    echo "  -b, --business   Инфраструктура + бизнес-сервисы (PJP, MG, PROTO)"
+    echo "  -f, --full       Все сервисы + клиент"
+    echo "  -h, --help       Показать эту справку"
+    echo ""
+    echo -e "${YELLOW}Инфраструктура:${NC} Auth, User, Project, Navigation, Delegation, Notification, Gateway"
+    echo -e "${YELLOW}Бизнес-сервисы:${NC} PJP, Mastergraphics, PROTO"
+    echo ""
+    echo -e "${YELLOW}Примеры:${NC}"
+    echo "  ./start_all.sh -d          # Инфраструктура"
+    echo "  ./start_all.sh -b          # Инфраструктура + бизнес"
+    echo "  ./start_all.sh -f          # Все сервисы + клиент"
+    echo "  ./start_all.sh             # default (инфраструктура)"
+    echo ""
+    echo -e "${BLUE}========================================${NC}"
+}
+
+# ========== ПАРСИНГ АРГУМЕНТОВ ==========
+MODE="default"
+
+case "$1" in
+    -h|--help)
+        show_help
+        exit 0
+        ;;
+    -d|--default)
+        MODE="default"
+        ;;
+    -b|--business)
+        MODE="business"
+        ;;
+    -f|--full)
+        MODE="full"
+        ;;
+    "")
+        MODE="default"
+        ;;
+    *)
+        echo -e "${RED}❌ Неизвестная опция: $1${NC}"
+        echo "Используйте: ./start_all.sh [-d|--default] [-b|--business] [-f|--full] [-h|--help]"
+        exit 1
+        ;;
+esac
+
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}🚀 Запуск всех микросервисов${NC}"
+echo -e "${BLUE}🚀 Запуск микросервисов (режим: ${YELLOW}$MODE${BLUE})${NC}"
 echo -e "${BLUE}========================================${NC}"
 
+# ========== ФУНКЦИИ ==========
 check_port() {
     local port=$1
     if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1 ; then
@@ -51,7 +125,7 @@ start_service() {
     local pid=$!
     echo $pid > "$LOG_DIR/${service_name}.pid"
     
-    sleep 3
+    sleep 2
     
     if ps -p $pid > /dev/null 2>&1; then
         echo -e "${GREEN}✅ $service_name запущен (PID: $pid)${NC}"
@@ -107,6 +181,7 @@ start_client() {
     echo $pid > "$LOG_DIR/client.pid"
     echo -e "${GREEN}✅ Клиент запущен (PID: $pid)${NC}"
     echo -e "   Лог: $LOG_DIR/client.log"
+    echo -e "   Бинарь: $client_bin"
 }
 
 stop_all() {
@@ -127,37 +202,6 @@ stop_all() {
     echo -e "${GREEN}✅ Все сервисы остановлены${NC}"
 }
 
-trap stop_all EXIT INT TERM
-
-# Запуск сервисов
-echo -e "\n${BLUE}📋 Запуск сервисов:${NC}"
-echo "   • Auth Service (8010)"
-echo "   • User Service (8000)"
-echo "   • Project Service (8001)"
-echo "   • Navigation Service (8009)"
-echo "   • Delegation Service (8011)"
-echo "   • PJP Service (8002)"
-echo "   • Mastergraphics Service (8003)"
-echo "   • PROTO Service (8004)"
-echo "   • API Gateway (8080)"
-echo "   • Клиент"
-
-start_service "AUTH_SERVICE" 8010
-start_service "USER_service" 8000
-start_service "PROJECT_service" 8001
-start_service "NAVIGATION_SERVICE" 8009
-start_service "DELEGATION_SERVICE" 8011
-start_service "PJP_SERVICE" 8002
-start_service "MG_service" 8003
-start_service "PROTO_service" 8004
-
-start_gateway
-start_client
-
-# Health Check
-echo -e "\n${BLUE}🔍 Проверка здоровья...${NC}"
-sleep 5
-
 check_health() {
     local service=$1
     local port=$2
@@ -168,22 +212,80 @@ check_health() {
     fi
 }
 
+# ========== ОБРАБОТКА СИГНАЛОВ ==========
+trap stop_all EXIT INT TERM
+
+# ========== ЗАПУСК ИНФРАСТРУКТУРЫ (всегда) ==========
+echo -e "\n${BLUE}🏗️  Инфраструктурные сервисы:${NC}"
+echo "   • Auth Service (8010)"
+echo "   • User Service (8000)"
+echo "   • Project Service (8001)"
+echo "   • Navigation Service (8009)"
+echo "   • Delegation Service (8011)"
+echo "   • Notification Service (8012)"
+
+start_service "AUTH_SERVICE" 8010
+start_service "USER_service" 8000
+start_service "PROJECT_service" 8001
+start_service "NAVIGATION_SERVICE" 8009
+start_service "DELEGATION_SERVICE" 8011
+start_service "NOTIFICATION_SERVICE" 8012
+
+# ========== API GATEWAY ==========
+start_gateway
+
+# ========== БИЗНЕС-СЕРВИСЫ (business или full) ==========
+if [[ "$MODE" == "business" ]] || [[ "$MODE" == "full" ]]; then
+    echo -e "\n${BLUE}📊 Бизнес-сервисы:${NC}"
+    echo "   • PJP Service (8002)"
+    echo "   • Mastergraphics Service (8003)"
+    echo "   • PROTO Service (8004)"
+    
+    start_service "PJP_SERVICE" 8002
+    start_service "MG_service" 8003
+    start_service "PROTO_service" 8004
+fi
+
+# ========== КЛИЕНТ (только full) ==========
+if [[ "$MODE" == "full" ]]; then
+    echo -e "\n${BLUE}🖥️  Клиент:${NC}"
+    start_client
+else
+    echo -e "\n${YELLOW}⏭️  Клиент пропущен (режим: $MODE)${NC}"
+fi
+
+# ========== HEALTH CHECK ==========
+echo -e "\n${BLUE}🔍 Проверка здоровья...${NC}"
+sleep 3
+
 check_health "Auth" 8010
 check_health "User" 8000
 check_health "Project" 8001
 check_health "Navigation" 8009
 check_health "Delegation" 8011
-check_health "PJP" 8002
-check_health "MG" 8003
-check_health "PROTO" 8004
+check_health "Notification" 8012
 check_health "Gateway" 8080
 
+if [[ "$MODE" == "business" ]] || [[ "$MODE" == "full" ]]; then
+    check_health "PJP" 8002
+    check_health "MG" 8003
+    check_health "PROTO" 8004
+fi
+
+# ========== ИТОГ ==========
 echo -e "\n${GREEN}========================================${NC}"
-echo -e "${GREEN}✅ Все сервисы запущены!${NC}"
+echo -e "${GREEN}✅ Запуск завершен!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo -e "\n📊 Логи: $LOG_DIR/"
 echo -e "🛑 Для остановки нажмите Ctrl+C"
 echo -e "\n🌐 API Gateway: http://localhost:8080"
-echo -e "📋 Delegation Service: http://localhost:8011/docs"
+
+if [[ "$MODE" == "default" ]]; then
+    echo -e "\n${YELLOW}💡 Для запуска бизнес-сервисов:${NC}"
+    echo "   ./start_all.sh -b"
+elif [[ "$MODE" == "business" ]]; then
+    echo -e "\n${YELLOW}💡 Для запуска всех сервисов с клиентом:${NC}"
+    echo "   ./start_all.sh -f"
+fi
 
 wait
