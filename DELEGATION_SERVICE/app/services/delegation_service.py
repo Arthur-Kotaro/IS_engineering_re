@@ -62,12 +62,15 @@ class DelegationService:
         delegator_info = await ExternalService.get_user_info(data.delegator_id, token)
         delegate_info = await ExternalService.get_user_info(data.delegate_id, token)
         
+        delegator_name = delegator_info.get("user_name") if delegator_info else f"User {data.delegator_id}"
+        delegate_name = delegate_info.get("user_name") if delegate_info else f"User {data.delegate_id}"
+        
         # Создаем делегирование
         delegation_data = {
             "delegator_id": data.delegator_id,
-            "delegator_name": delegator_info.get("user_name") if delegator_info else None,
+            "delegator_name": delegator_name,
             "delegate_id": data.delegate_id,
-            "delegate_name": delegate_info.get("user_name") if delegate_info else None,
+            "delegate_name": delegate_name,
             "delegation_type": data.delegation_type,
             "starts_at": data.starts_at,
             "expires_at": data.expires_at,
@@ -94,16 +97,77 @@ class DelegationService:
             user_agent=user_agent
         )
         
-        # Отправляем уведомления
+        # ----- ОТПРАВКА УВЕДОМЛЕНИЙ -----
+        
+        type_names = {
+            DelegationType.DIRECT: "прямое делегирование",
+            DelegationType.REVERSE: "обратное делегирование",
+            DelegationType.TEMPORARY: "временное делегирование"
+        }
+        
+        # 1. Уведомление делегату (получателю полномочий)
         await ExternalService.send_notification(
-            data.delegate_id,
-            f"You have been delegated by {delegator_info.get('user_name', 'Unknown')}"
+            user_id=data.delegate_id,
+            title=f"Вам делегированы полномочия",
+            message=(
+                f"Пользователь {delegator_name} делегировал вам полномочия.\n"
+                f"Тип: {type_names.get(data.delegation_type, data.delegation_type)}\n"
+                f"Действует до: {data.expires_at.strftime('%d.%m.%Y %H:%M')}"
+            ),
+            notification_type="delegation_created",
+            reference_id=delegation.delegation_id,
+            reference_type="delegation",
+            data={
+                "delegator_id": data.delegator_id,
+                "delegator_name": delegator_name,
+                "delegation_type": data.delegation_type,
+                "expires_at": data.expires_at.isoformat()
+            },
+            token=token
         )
         
+        # 2. Уведомление делегатору (создателю) о том, что делегирование создано
+        await ExternalService.send_notification(
+            user_id=data.delegator_id,
+            title=f"Делегирование создано",
+            message=(
+                f"Вы делегировали полномочия пользователю {delegate_name}.\n"
+                f"Тип: {type_names.get(data.delegation_type, data.delegation_type)}\n"
+                f"Действует до: {data.expires_at.strftime('%d.%m.%Y %H:%M')}"
+            ),
+            notification_type="delegation_created",
+            reference_id=delegation.delegation_id,
+            reference_type="delegation",
+            data={
+                "delegate_id": data.delegate_id,
+                "delegate_name": delegate_name,
+                "delegation_type": data.delegation_type,
+                "expires_at": data.expires_at.isoformat()
+            },
+            token=token
+        )
+        
+        # 3. Если временное делегирование — уведомление основному сотруднику
         if data.delegation_type == DelegationType.TEMPORARY and data.main_delegate_id:
+            main_info = await ExternalService.get_user_info(data.main_delegate_id, token)
+            main_name = main_info.get("user_name") if main_info else f"User {data.main_delegate_id}"
+            
             await ExternalService.send_notification(
-                data.main_delegate_id,
-                f"{delegate_info.get('user_name', 'Unknown')} is temporarily replacing you"
+                user_id=data.main_delegate_id,
+                title=f"Временное замещение",
+                message=(
+                    f"Пользователь {delegate_name} временно замещает вас.\n"
+                    f"Действует до: {data.expires_at.strftime('%d.%m.%Y %H:%M')}"
+                ),
+                notification_type="delegation_temporary",
+                reference_id=delegation.delegation_id,
+                reference_type="delegation",
+                data={
+                    "delegate_id": data.delegate_id,
+                    "delegate_name": delegate_name,
+                    "expires_at": data.expires_at.isoformat()
+                },
+                token=token
             )
         
         return DelegationResponse.model_validate(delegation)
@@ -115,7 +179,8 @@ class DelegationService:
         data: DelegationRevoke,
         is_super_admin: bool = False,
         ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None
+        user_agent: Optional[str] = None,
+        token: Optional[str] = None
     ) -> DelegationResponse:
         """Отозвать делегирование"""
         
@@ -126,6 +191,9 @@ class DelegationService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only delegator or admin can revoke"
             )
+        
+        # Получаем делегирование до отзыва
+        delegation_before = await self.delegation_repo.get_by_id(delegation_id)
         
         # Отзываем
         delegation = await self.delegation_repo.revoke(
@@ -149,11 +217,36 @@ class DelegationService:
             user_agent=user_agent
         )
         
-        # Уведомляем
+        # ----- ОТПРАВКА УВЕДОМЛЕНИЙ ПРИ ОТЗЫВЕ -----
+        
+        # Уведомление делегату
         await ExternalService.send_notification(
-            delegation.delegate_id,
-            f"Delegation was revoked by user {user_id}"
+            user_id=delegation.delegate_id,
+            title=f"Делегирование отозвано",
+            message=(
+                f"Пользователь {delegation.delegator_name} отозвал делегирование.\n"
+                f"Причина: {data.reason or 'Не указана'}"
+            ),
+            notification_type="delegation_revoked",
+            reference_id=delegation.delegation_id,
+            reference_type="delegation",
+            token=token
         )
+        
+        # Уведомление делегатору о подтверждении отзыва
+        if delegation.delegator_id != user_id:
+            await ExternalService.send_notification(
+                user_id=delegation.delegator_id,
+                title=f"Делегирование отозвано",
+                message=(
+                    f"Делегирование для {delegation.delegate_name} было отозвано.\n"
+                    f"Причина: {data.reason or 'Не указана'}"
+                ),
+                notification_type="delegation_revoked",
+                reference_id=delegation.delegation_id,
+                reference_type="delegation",
+                token=token
+            )
         
         return DelegationResponse.model_validate(delegation)
     
@@ -204,5 +297,18 @@ class DelegationService:
                 user_id=0,  # Система
                 details={"auto_expired": True}
             )
+            
+            # Уведомление об истечении (без токена, т.к. это системное)
+            await ExternalService.send_notification(
+                user_id=delegation.delegate_id,
+                title=f"Срок делегирования истек",
+                message=(
+                    f"Срок делегирования от {delegation.delegator_name} истек."
+                ),
+                notification_type="delegation_expired",
+                reference_id=delegation.delegation_id,
+                reference_type="delegation"
+            )
+            
             count += 1
         return count

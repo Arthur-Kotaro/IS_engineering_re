@@ -235,3 +235,57 @@ async def create_notification(
     )
     
     return notification
+
+# ========== ВНУТРЕННИЙ ЭНДПОИНТ ДЛЯ СЕРВИСОВ ==========
+
+@router.post("/internal")
+async def create_notification_internal(
+    data: NotificationCreate,
+    service: NotificationService = Depends(get_notification_service)
+):
+    """
+    Внутренний эндпоинт для создания уведомлений (без проверки прав).
+    Используется только доверенными сервисами (Delegation, User, Project).
+    """
+    notification = await service.create_notification(data)
+    
+    # Отправляем SSE
+    await broadcast_notification(
+        data.user_id,
+        {
+            "notification_id": notification.notification_id,
+            "type": data.notification_type,
+            "title": data.title,
+            "message": data.message,
+            "created_at": notification.created_at.isoformat()
+        }
+    )
+    
+    return notification
+
+# ========== ВНУТРЕННИЙ ЭНДПОИНТ ДЛЯ СЕРВИСОВ ==========
+
+@router.post("/internal")
+async def create_notification_internal(
+    data: NotificationCreate,
+    service: NotificationService = Depends(get_notification_service)
+):
+    """
+    Внутренний эндпоинт для создания уведомлений (без проверки прав).
+    Используется только доверенными сервисами (Delegation, User, Project).
+    """
+    notification = await service.create_notification(data)
+    
+    # Отправляем SSE
+    await broadcast_notification(
+        data.user_id,
+        {
+            "notification_id": notification.notification_id,
+            "type": data.notification_type,
+            "title": data.title,
+            "message": data.message,
+            "created_at": notification.created_at.isoformat()
+        }
+    )
+    
+    return notification
