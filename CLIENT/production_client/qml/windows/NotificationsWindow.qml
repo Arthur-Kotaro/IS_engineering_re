@@ -3,10 +3,11 @@ import QtQuick.Controls 6.0
 import QtQuick.Layouts 6.0
 import Styles 1.0
 
-Window {
+Window
+{
     id: root
     title: "Уведомления"
-    width: 500
+    width: 1200
     height: 600
     modality: Qt.WindowModal
     flags: Qt.Dialog | Qt.WindowCloseButtonHint
@@ -15,18 +16,20 @@ Window {
     property int unreadCount: 0
     property bool loading: false
 
-    ColumnLayout {
+    ColumnLayout
+    {
         anchors.fill: parent
         anchors.margins: 10
         spacing: 10
 
-        RowLayout {
+        RowLayout
+        {
             Layout.fillWidth: true
             spacing: 10
 
             Text {
                 text: "Уведомления"
-                font.pixelSize: 18
+                font.pixelSize: 22
                 font.bold: true
                 color: Colors.text
                 Layout.fillWidth: true
@@ -34,7 +37,7 @@ Window {
 
             Text {
                 text: "Непрочитанных: " + root.unreadCount
-                font.pixelSize: 12
+                font.pixelSize: 16
                 color: Colors.textSecondary
                 visible: root.unreadCount > 0
             }
@@ -44,38 +47,43 @@ Window {
                 enabled: root.unreadCount > 0
                 onClicked: markAllAsRead()
                 flat: true
-                font.pixelSize: 12
+                font.pixelSize: 16
             }
 
             Button {
                 text: "Обновить"
                 onClicked: loadNotifications()
                 flat: true
-                font.pixelSize: 12
+                font.pixelSize: 16
             }
         }
 
-        Rectangle {
+        Rectangle
+        {
             height: 1
             Layout.fillWidth: true
             color: Colors.border
         }
 
-        ScrollView {
+        ScrollView
+        {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
             visible: !root.loading
 
-            ListView {
+            ListView
+            {
                 id: listView
                 anchors.fill: parent
                 model: root.notifications
                 spacing: 8
 
-                delegate: Rectangle {
+                delegate: Rectangle
+                {
+                    id: delegateRoot
                     width: listView.width
-                    height: expanded ? contentHeight + 30 : 50
+                    height: expanded ? contentHeight + 80 : 40
                     radius: 8
                     color: modelData.status === "unread" ? Colors.primary : Colors.surface
                     border.color: Colors.border
@@ -84,7 +92,8 @@ Window {
                     property bool expanded: false
                     property int contentHeight: 0
 
-                    ColumnLayout {
+                    ColumnLayout
+                    {
                         anchors.fill: parent
                         anchors.margins: 10
                         spacing: 5
@@ -112,33 +121,34 @@ Window {
 
                             Text {
                                 text: modelData.created_at ? formatDate(modelData.created_at) : ""
-                                font.pixelSize: 10
+                                font.pixelSize: 14
                                 color: Colors.textSecondary
                             }
                         }
 
                         Text {
+                            id: messageText
                             text: modelData.message || ""
-                            font.pixelSize: 12
+                            font.pixelSize: 16
                             color: Colors.textSecondary
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
-                            visible: parent.expanded
+                            visible: delegateRoot.expanded
                             onHeightChanged: {
-                                parent.contentHeight = height
+                                delegateRoot.contentHeight = height
                             }
                         }
 
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 10
-                            visible: parent.expanded
+                            visible: delegateRoot.expanded
 
                             Button {
-                                text: "Прочитано"
+                                text: "Пометить прочитанным"
                                 onClicked: markAsRead(modelData.notification_id)
                                 flat: true
-                                font.pixelSize: 11
+                                font.pixelSize: 14
                             }
 
                             Item {
@@ -151,8 +161,8 @@ Window {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            parent.expanded = !parent.expanded
-                            if (parent.expanded && modelData.status === "unread") {
+                            delegateRoot.expanded = !delegateRoot.expanded
+                            if (delegateRoot.expanded && modelData.status === "unread") {
                                 markAsRead(modelData.notification_id)
                             }
                         }

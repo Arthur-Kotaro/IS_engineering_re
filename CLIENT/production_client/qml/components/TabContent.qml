@@ -6,8 +6,8 @@ import Styles 1.0
 Rectangle {
     id: root
     color: Colors.background
-    width: tabsContainer ? tabsContainer.width : parent.width
-    height: tabsContainer ? tabsContainer.height : parent.height
+    anchors.fill: parent
+    visible: true
 
     property string title: "Вкладка"
     property string endpoint: ""
@@ -15,61 +15,15 @@ Rectangle {
     property string accessToken: ""
     property string tileId: ""
     property bool loading: false
+    property string callbackId: ""
 
-    Rectangle {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: 40
-        color: Colors.surface
-        border.color: Colors.border
-        border.width: 1
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 10
-            spacing: 10
-
-            Text {
-                text: root.title
-                font.pixelSize: 14
-                font.bold: true
-                color: Colors.text
-                Layout.fillWidth: true
-            }
-
-            Button {
-                text: "Обновить"
-                onClicked: loadData()
-                flat: true
-                font.pixelSize: 12
-            }
-
-            Button {
-                text: "✕"
-                flat: true
-                font.pixelSize: 14
-                onClicked: {
-                    root.destroy()
-                    var index = root.tabs.indexOf(root)
-                    if (index !== -1) {
-                        root.tabs.splice(index, 1)
-                    }
-                    if (root.tabs.length === 0) {
-                        tabsContainer.visible = false
-                        tilesGrid.visible = true
-                    }
-                }
-            }
-        }
+    function cancelRequest() {
+        loading = false
+        textArea.text = "Запрос отменен"
     }
 
     ScrollView {
-        anchors.top: parent.top
-        anchors.topMargin: 40
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
+        anchors.fill: parent
         anchors.margins: 10
         clip: true
 
@@ -86,7 +40,7 @@ Rectangle {
             }
             padding: 15
             wrapMode: Text.Wrap
-            text: loading ? "Загрузка..." : "Готов к загрузке"
+            text: "Ожидание данных..."
         }
     }
 
@@ -105,39 +59,33 @@ Rectangle {
         root.loading = true
         textArea.text = "Загрузка данных..."
 
-        var request = new XMLHttpRequest()
-        request.open(root.method, root.endpoint, true)
-        request.setRequestHeader("Authorization", "Bearer " + root.accessToken)
-        request.setRequestHeader("Content-Type", "application/json")
-
-        request.onreadystatechange = function() {
-            if (request.readyState === XMLHttpRequest.DONE) {
-                root.loading = false
-                if (request.status === 200) {
-                    try {
-                        var response = JSON.parse(request.responseText)
-                        textArea.text = JSON.stringify(response, null, 2)
-                    } catch (e) {
-                        textArea.text = "Ошибка парсинга JSON: " + e.message
-                    }
-                } else if (request.status === 401) {
-                    textArea.text = "Ошибка 401: Неавторизован. Требуется повторный вход."
-                } else {
-                    textArea.text = "Ошибка " + request.status + ": " + request.statusText
-                }
-            }
+        var url = root.endpoint
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://localhost:8080" + url
         }
 
-        request.onerror = function() {
-            root.loading = false
-            textArea.text = "Ошибка сети: не удалось подключиться к серверу"
-        }
-
-        request.send()
+        callbackId = "tab_" + tileId + "_" + Date.now()
+        widgetBridge.httpRequest(url, root.method, root.accessToken, "", callbackId)
     }
 
-    function close() {
-        root.destroy()
+    Connections {
+        target: widgetBridge
+        function onHttpResponse(id, status, data) {
+            if (id !== root.callbackId) return
+            root.loading = false
+            if (status === 200) {
+                try {
+                    var response = JSON.parse(data)
+                    textArea.text = JSON.stringify(response, null, 2)
+                } catch (e) {
+                    textArea.text = "Ошибка парсинга JSON: " + e.message
+                }
+            } else if (status === 401) {
+                textArea.text = "Ошибка 401: Неавторизован"
+            } else {
+                textArea.text = "Ошибка " + status + ": " + data
+            }
+        }
     }
 
     Component.onCompleted: {

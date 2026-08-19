@@ -24,6 +24,7 @@ Rectangle {
     signal themeToggleRequested()
     signal fullScreenToggled()
     signal notificationsRequested()
+    signal settingsRequested()
 
     RowLayout {
         anchors.fill: parent
@@ -108,7 +109,11 @@ Rectangle {
                 flat: true
                 implicitWidth: 40
                 implicitHeight: 40
-                onClicked: root.themeToggleRequested()
+                onClicked: {
+                    Colors.toggleTheme()
+                    root.isDarkTheme = Colors.isDarkTheme
+                    root.themeToggleRequested()
+                }
             }
 
             Button {
@@ -121,7 +126,15 @@ Rectangle {
             }
 
             Button {
-                id: notificationsButton
+                text: "⚙️"
+                font.pixelSize: 20
+                flat: true
+                implicitWidth: 40
+                implicitHeight: 40
+                onClicked: root.settingsRequested()
+            }
+
+            Button {
                 text: "🔔"
                 font.pixelSize: 20
                 flat: true

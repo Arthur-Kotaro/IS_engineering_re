@@ -9,11 +9,18 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QGuiApplication>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QUrl>
 
 WidgetBridge::WidgetBridge(QObject* parent)
     : QObject(parent)
+    , m_networkManager(new QNetworkAccessManager(this))
 {
     qDebug() << "WidgetBridge initialized";
+    connect(m_networkManager, &QNetworkAccessManager::finished,
+            this, &WidgetBridge::onHttpReplyFinished);
 }
 
 WidgetBridge::~WidgetBridge() {}
@@ -67,13 +74,12 @@ void WidgetBridge::loadInterfaceFromJson(const QString& jsonString)
     }
     
     if (!doc.isObject()) {
-        emit interfaceError("JSON must be an object");
+        emit interfaceError("JSON must be object");
         return;
     }
     
     m_currentInterface = doc.object();
     
-    // Ищем контейнер в QML
     QQuickItem* container = nullptr;
     auto windows = QGuiApplication::topLevelWindows();
     for (auto window : windows) {
@@ -84,11 +90,10 @@ void WidgetBridge::loadInterfaceFromJson(const QString& jsonString)
     }
     
     if (!container) {
-        emit interfaceError("Cannot find interfaceContainer in QML");
+        emit interfaceError("Cannot find interfaceContainer");
         return;
     }
     
-    // Очищаем старый контент
     for (auto child : container->childItems()) {
         child->deleteLater();
     }
@@ -105,7 +110,7 @@ void WidgetBridge::loadInterfaceFromJson(const QString& jsonString)
 void WidgetBridge::requestWidgetData(const QString& widgetId, const QJsonObject& spec)
 {
     if (!m_dataManager) {
-        qWarning() << "WidgetBridge: No DataManager set";
+        qWarning() << "WidgetBridge: No DataManager";
         return;
     }
     qDebug() << "WidgetBridge: requestWidgetData for" << widgetId;
@@ -123,10 +128,10 @@ void WidgetBridge::sendWidgetInput(const QString& widgetId, const QJsonObject& i
     
     if (input.contains("paramName") && input.contains("value")) {
         m_dataManager->setParameter(input["paramName"].toString(), input["value"].toString());
-        emit widgetInputSent(widgetId, true, "Parameter saved");
+        emit widgetInputSent(widgetId, true, "Saved");
         refreshAllWidgets();
     } else {
-        emit widgetInputSent(widgetId, false, "Missing paramName or value");
+        emit widgetInputSent(widgetId, false, "Missing param");
     }
 }
 
@@ -157,4 +162,51 @@ void WidgetBridge::refreshAllWidgets()
     if (m_renderer) {
         m_renderer->refreshAllCharts();
     }
+}
+
+void WidgetBridge::httpRequest(const QString& url, const QString& method, const QString& token, const QString& body, const QString& callbackId)
+{
+    qDebug() << "WidgetBridge: httpRequest" << method << url;
+    
+    QNetworkRequest request;
+    request.setUrl(QUrl(url));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    if (!token.isEmpty()) {
+        request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
+    }
+    
+    QNetworkReply* reply = nullptr;
+    if (method == "GET") {
+        reply = m_networkManager->get(request);
+    } else if (method == "POST") {
+        reply = m_networkManager->post(request, body.toUtf8());
+    } else if (method == "PUT") {
+        reply = m_networkManager->put(request, body.toUtf8());
+    } else if (method == "DELETE") {
+        reply = m_networkManager->deleteResource(request);
+    } else {
+        qWarning() << "Unknown HTTP method:" << method;
+        emit httpResponse(callbackId, 0, "Unknown method");
+        return;
+    }
+    
+    m_pendingRequests[reply] = callbackId;
+}
+
+void WidgetBridge::onHttpReplyFinished()
+{
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply) return;
+    
+    QString callbackId = m_pendingRequests.value(reply, "");
+    m_pendingRequests.remove(reply);
+    
+    int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    QByteArray data = reply->readAll();
+    
+    qDebug() << "WidgetBridge: httpResponse" << callbackId << "status:" << status;
+    
+    emit httpResponse(callbackId, status, QString::fromUtf8(data));
+    
+    reply->deleteLater();
 }
