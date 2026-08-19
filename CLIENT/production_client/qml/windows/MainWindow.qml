@@ -2,7 +2,9 @@ import QtQuick 6.0
 import QtQuick.Controls 6.0
 import QtQuick.Layouts 6.0
 import Styles 1.0
+import "../components" as Components
 import "../dialogs" as Dialogs
+import "../windows" as Windows
 
 Rectangle {
     id: root
@@ -11,113 +13,50 @@ Rectangle {
 
     signal logoutRequested()
     signal themeToggleRequested()
+    signal fullScreenToggled()
 
     property var tiles: []
     property var tabs: []
+    property int tabCounter: 0
 
-    // Верхняя панель
-    Rectangle {
+    Components.TopBar {
         id: topBar
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 65
-        color: Colors.surface
-        border.color: Colors.border
-        border.width: 1
-        z: 1
+        userName: mainWindowBridge ? mainWindowBridge.userName : ""
+        userEmail: mainWindowBridge ? mainWindowBridge.userEmail : ""
+        userPosition: mainWindowBridge ? mainWindowBridge.userPosition : ""
+        passwordDaysLeft: mainWindowBridge ? mainWindowBridge.passwordDaysLeft : 0
+        passwordExpired: mainWindowBridge ? mainWindowBridge.passwordExpired : false
+        unreadNotifications: 0
 
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 15
-            spacing: 10
-
-            ColumnLayout {
-                spacing: 2
-                Layout.alignment: Qt.AlignVCenter
-                Layout.fillWidth: true
-
-                Text {
-                    text: mainWindowBridge ? mainWindowBridge.userName : "Пользователь"
-                    color: Colors.text
-                    font.pixelSize: 16
-                    font.bold: true
-                }
-
-                Text {
-                    text: mainWindowBridge ? mainWindowBridge.userEmail : ""
-                    color: Colors.textSecondary
-                    font.pixelSize: 12
-                }
-            }
-
-            Item {
-                Layout.fillWidth: true
-                Layout.minimumWidth: 100
-                height: parent.height
-
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: passwordText.implicitWidth + 40
-                    height: 36
-                    radius: 18
-                    color: {
-                        if (mainWindowBridge) {
-                            var days = mainWindowBridge.passwordDaysLeft
-                            if (days > 30) return Colors.success
-                            if (days > 14) return Colors.warning
-                            return Colors.error
-                        }
-                        return Colors.border
-                    }
-                    opacity: 0.9
-
-                    Text {
-                        id: passwordText
-                        anchors.centerIn: parent
-                        text: mainWindowBridge ? "Пароль: " + mainWindowBridge.passwordDaysLeft + " дн." : "Пароль: --"
-                        color: Colors.buttonText
-                        font.pixelSize: 13
-                        font.bold: true
-                    }
-                }
-            }
-
-            RowLayout {
-                spacing: 8
-                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-
-                Button {
-                    text: "🌓"
-                    font.pixelSize: 20
-                    flat: true
-                    implicitWidth: 40
-                    implicitHeight: 40
-                    onClicked: root.themeToggleRequested()
-                }
-
-                Button {
-                    text: "🔑"
-                    font.pixelSize: 18
-                    flat: true
-                    implicitWidth: 40
-                    implicitHeight: 40
-                    onClicked: changePasswordDialog.open()
-                }
-
-                Button {
-                    text: "🚪"
-                    font.pixelSize: 18
-                    flat: true
-                    implicitWidth: 40
-                    implicitHeight: 40
-                    onClicked: {
-                        mainWindowBridge.logout()
-                        root.logoutRequested()
-                    }
-                }
-            }
+        onLogoutRequested: {
+            mainWindowBridge.logout()
+            root.logoutRequested()
         }
+
+        onPasswordChangeRequested: {
+            changePasswordDialog.open()
+        }
+
+        onThemeToggleRequested: {
+            root.themeToggleRequested()
+        }
+
+        onFullScreenToggled: {
+            root.fullScreenToggled()
+        }
+
+        onNotificationsRequested: {
+            notificationsWindow.show()
+            notificationsWindow.raise()
+            notificationsWindow.requestActivate()
+        }
+    }
+
+    Windows.NotificationsWindow {
+        id: notificationsWindow
     }
 
     Dialogs.ChangePasswordDialog {
@@ -125,67 +64,120 @@ Rectangle {
         onPasswordChanged: mainWindowBridge.checkPasswordExpiry()
     }
 
-    GridView {
+    Rectangle {
+        id: contentArea
         anchors.top: topBar.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.margins: 20
-        cellWidth: 200
-        cellHeight: 150
-        model: root.tiles
 
-        delegate: Rectangle {
-            width: 180
-            height: 120
-            radius: 12
-            color: Colors.surface
-            border.color: Colors.border
+        GridView {
+            id: tilesGrid
+            anchors.fill: parent
+            anchors.margins: 20
+            cellWidth: 200
+            cellHeight: 150
+            model: root.tiles
+            visible: root.tabs.length === 0
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 10
-                spacing: 5
+            delegate: Rectangle {
+                width: 180
+                height: 120
+                radius: 12
+                color: Colors.surface
+                border.color: Colors.border
 
-                Text {
-                    text: modelData.label || "Плитка"
-                    color: Colors.text
-                    font.pixelSize: 14
-                    font.bold: true
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                }
-
-                Rectangle {
-                    visible: modelData.badge_count > 0
-                    anchors.top: parent.top
-                    anchors.right: parent.right
-                    anchors.margins: -5
-                    width: 24
-                    height: 24
-                    radius: 12
-                    color: Colors.error
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 5
 
                     Text {
-                        anchors.centerIn: parent
-                        text: modelData.badge_count
-                        color: Colors.buttonText
-                        font.pixelSize: 11
+                        text: modelData.label || "Плитка"
+                        color: Colors.text
+                        font.pixelSize: 14
                         font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Rectangle {
+                        visible: modelData.badge_count > 0
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.margins: -5
+                        width: 24
+                        height: 24
+                        radius: 12
+                        color: Colors.error
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData.badge_count
+                            color: Colors.buttonText
+                            font.pixelSize: 11
+                            font.bold: true
+                        }
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onEntered: parent.color = Colors.buttonHover
+                    onExited: parent.color = Colors.surface
+                    onClicked: {
+                        var tile = modelData
+                        var endpoint = tile.endpoint
+                        var method = tile.method || "GET"
+                        var label = tile.label || "Вкладка"
+                        var tileId = tile.id || "tab_" + (root.tabCounter++)
+
+                        var component = Qt.createComponent("components/TabContent.qml")
+                        if (component.status === Component.Ready) {
+                            var tab = component.createObject(tabsContainer, {
+                                "title": label,
+                                "endpoint": endpoint,
+                                "method": method,
+                                "accessToken": mainWindowBridge.accessToken,
+                                "tileId": tileId
+                            })
+                            if (tab) {
+                                root.tabs.push(tab)
+                                tilesGrid.visible = false
+                                tabsContainer.visible = true
+                                tab.loadData()
+                            }
+                        } else {
+                            console.log("Failed to create TabContent:", component.errorString())
+                        }
                     }
                 }
             }
+        }
 
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onEntered: parent.color = Colors.buttonHover
-                onExited: parent.color = Colors.surface
-                onClicked: {
-                    console.log("Clicked:", modelData.label)
+        Item {
+            id: tabsContainer
+            anchors.fill: parent
+            visible: false
+            clip: true
+        }
+
+        Button {
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.margins: 10
+            text: "✕ Закрыть все"
+            visible: root.tabs.length > 0
+            onClicked: {
+                for (var i = 0; i < root.tabs.length; i++) {
+                    root.tabs[i].destroy()
                 }
+                root.tabs = []
+                tabsContainer.visible = false
+                tilesGrid.visible = true
             }
         }
     }

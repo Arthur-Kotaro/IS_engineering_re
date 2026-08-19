@@ -5,132 +5,167 @@ import Styles 1.0
 
 Rectangle {
     id: root
+    height: 65
+    color: Colors.surface
+    border.color: Colors.border
+    border.width: 1
+    z: 1
+
     property string userName: ""
     property string userEmail: ""
     property string userPosition: ""
     property int passwordDaysLeft: 0
     property bool passwordExpired: false
-    
+    property bool isDarkTheme: Colors.isDarkTheme
+    property int unreadNotifications: 0
+
     signal logoutRequested()
     signal passwordChangeRequested()
+    signal themeToggleRequested()
     signal fullScreenToggled()
-    
-    color: Colors.primary
-    radius: 0
-    
+    signal notificationsRequested()
+
     RowLayout {
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 15
-        
-        Image {
-            source: "qrc:/assets/images/icons/logo.svg"
-            width: 40
-            height: 40
-            fillMode: Image.PreserveAspectFit
-        }
-        
-        Text {
-            text: "Корпоративная ИС"
-            font.pixelSize: 18
-            font.bold: true
-            color: Colors.onPrimary
+        anchors.margins: 15
+        spacing: 10
+
+        ColumnLayout {
+            spacing: 2
+            Layout.alignment: Qt.AlignVCenter
             Layout.fillWidth: true
-        }
-        
-        Rectangle {
-            visible: !passwordExpired && passwordDaysLeft > 0 && passwordDaysLeft <= 7
-            height: 40
-            width: warningText.implicitWidth + 20
-            radius: 20
-            color: Colors.warning
-            
-            RowLayout {
-                anchors.centerIn: parent
-                spacing: 8
-                
-                Text {
-                    id: warningText
-                    text: "⚠ Пароль истекает через " + passwordDaysLeft + " дн."
-                    font.pixelSize: 12
-                    color: Colors.onWarning
-                }
+
+            Text {
+                text: root.userName ? root.userName : "Пользователь"
+                color: Colors.text
+                font.pixelSize: 16
+                font.bold: true
+            }
+
+            Text {
+                text: root.userEmail
+                color: Colors.textSecondary
+                font.pixelSize: 12
+                visible: root.userEmail !== ""
             }
         }
-        
-        Rectangle {
-            visible: passwordExpired
-            height: 40
-            width: expiredText.implicitWidth + 20
-            radius: 20
-            color: Colors.error
-            
-            RowLayout {
+
+        Item {
+            Layout.fillWidth: true
+            Layout.minimumWidth: 100
+            height: parent.height
+
+            Rectangle {
                 anchors.centerIn: parent
-                spacing: 8
-                
+                width: passwordText.implicitWidth + 40
+                height: 36
+                radius: 18
+                color: {
+                    if (root.passwordDaysLeft > 30) return Colors.success
+                    if (root.passwordDaysLeft > 14) return Colors.warning
+                    return Colors.error
+                }
+                opacity: 0.9
+                visible: root.passwordDaysLeft > 0
+
+                Text {
+                    id: passwordText
+                    anchors.centerIn: parent
+                    text: "Пароль: " + root.passwordDaysLeft + " дн."
+                    color: Colors.buttonText
+                    font.pixelSize: 13
+                    font.bold: true
+                }
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: expiredText.implicitWidth + 40
+                height: 36
+                radius: 18
+                color: Colors.error
+                opacity: 0.9
+                visible: root.passwordExpired
+
                 Text {
                     id: expiredText
-                    text: "❌ Пароль просрочен!"
-                    font.pixelSize: 12
-                    color: Colors.onError
+                    anchors.centerIn: parent
+                    text: "Пароль просрочен!"
+                    color: Colors.buttonText
+                    font.pixelSize: 13
+                    font.bold: true
                 }
             }
         }
-        
-        Rectangle {
-            width: 1
-            height: 40
-            color: Colors.divider
-            visible: userName !== ""
-        }
-        
-        ColumnLayout {
-            visible: userName !== ""
-            spacing: 2
-            
-            Text {
-                text: userName
-                font.pixelSize: 14
-                font.bold: true
-                color: Colors.onPrimary
+
+        RowLayout {
+            spacing: 8
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+
+            Button {
+                text: root.isDarkTheme ? "☀️" : "🌙"
+                font.pixelSize: 20
+                flat: true
+                implicitWidth: 40
+                implicitHeight: 40
+                onClicked: root.themeToggleRequested()
             }
-            
-            Text {
-                text: userPosition
-                font.pixelSize: 11
-                color: Colors.onPrimaryVariant
+
+            Button {
+                text: "⛶"
+                font.pixelSize: 20
+                flat: true
+                implicitWidth: 40
+                implicitHeight: 40
+                onClicked: root.fullScreenToggled()
             }
-            
-            Text {
-                text: userEmail
-                font.pixelSize: 10
-                color: Colors.onPrimaryVariant
-                opacity: 0.8
+
+            Button {
+                id: notificationsButton
+                text: "🔔"
+                font.pixelSize: 20
+                flat: true
+                implicitWidth: 40
+                implicitHeight: 40
+                onClicked: root.notificationsRequested()
+
+                Rectangle {
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.margins: -2
+                    width: 18
+                    height: 18
+                    radius: 9
+                    color: Colors.error
+                    visible: root.unreadNotifications > 0
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.unreadNotifications > 99 ? "99+" : root.unreadNotifications
+                        color: Colors.buttonText
+                        font.pixelSize: 10
+                        font.bold: true
+                    }
+                }
             }
-        }
-        
-        Button {
-            text: "Сменить пароль"
-            icon.source: "qrc:/assets/images/icons/password.svg"
-            onClicked: root.passwordChangeRequested()
-            background: Rectangle {
-                color: parent.down ? Colors.primaryDark : Colors.primaryLight
-                radius: 20
+
+            Button {
+                text: "🔑"
+                font.pixelSize: 18
+                flat: true
+                implicitWidth: 40
+                implicitHeight: 40
+                onClicked: root.passwordChangeRequested()
             }
-        }
-        
-        Button {
-            icon.source: "qrc:/assets/images/icons/fullscreen.svg"
-            onClicked: root.fullScreenToggled()
-            flat: true
-        }
-        
-        Button {
-            text: "Выйти"
-            icon.source: "qrc:/assets/images/icons/logout.svg"
-            onClicked: root.logoutRequested()
-            flat: true
+
+            Button {
+                text: "🚪"
+                font.pixelSize: 18
+                flat: true
+                implicitWidth: 40
+                implicitHeight: 40
+                onClicked: root.logoutRequested()
+            }
         }
     }
 }

@@ -18,6 +18,8 @@ ApplicationWindow {
 
     flags: Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint
 
+    property bool isFullScreen: false
+
     Component.onCompleted: {
         Colors.setDarkTheme()
     }
@@ -27,6 +29,16 @@ ApplicationWindow {
             Colors.setLightTheme()
         } else {
             Colors.setDarkTheme()
+        }
+    }
+
+    function toggleFullScreen() {
+        if (root.isFullScreen) {
+            showNormal()
+            root.isFullScreen = false
+        } else {
+            showFullScreen()
+            root.isFullScreen = true
         }
     }
 
@@ -65,6 +77,9 @@ ApplicationWindow {
             }
             onThemeToggleRequested: {
                 root.toggleTheme()
+            }
+            onFullScreenToggled: {
+                root.toggleFullScreen()
             }
         }
     }
