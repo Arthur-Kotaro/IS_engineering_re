@@ -20,7 +20,29 @@ Window {
         id: darkGroup
     }
 
+    property bool themeChanged: false
+
+    onThemeChangedChanged: {
+        if (themeChanged) {
+            updateColors()
+            themeChanged = false
+        }
+    }
+
+    function updateColors() {
+        root.color = Colors.background
+        for (var i = 0; i < radioButtons.children.length; i++) {
+            var child = radioButtons.children[i]
+            if (child.hasOwnProperty("contentItem")) {
+                if (child.contentItem) {
+                    child.contentItem.color = Colors.text
+                }
+            }
+        }
+    }
+
     Column {
+        id: radioButtons
         anchors.fill: parent
         anchors.margins: 20
         spacing: 12
@@ -46,44 +68,47 @@ Window {
         }
 
         RadioButton {
+            id: light0
             text: "Синяя"
             checked: Colors.lightScheme === 0
             ButtonGroup.group: lightGroup
             onClicked: { Colors.setLightScheme(0) }
             contentItem: Text {
-                text: parent.text
+                text: light0.text
                 color: Colors.text
-                font: parent.font
-                horizontalAlignment: Text.AlignLeft
+                font: light0.font
                 verticalAlignment: Text.AlignVCenter
+                leftPadding: 40
             }
         }
 
         RadioButton {
+            id: light1
             text: "Зеленая"
             checked: Colors.lightScheme === 1
             ButtonGroup.group: lightGroup
             onClicked: { Colors.setLightScheme(1) }
             contentItem: Text {
-                text: parent.text
+                text: light1.text
                 color: Colors.text
-                font: parent.font
-                horizontalAlignment: Text.AlignLeft
+                font: light1.font
                 verticalAlignment: Text.AlignVCenter
+                leftPadding: 40
             }
         }
 
         RadioButton {
+            id: light2
             text: "Фиолетовая"
             checked: Colors.lightScheme === 2
             ButtonGroup.group: lightGroup
             onClicked: { Colors.setLightScheme(2) }
             contentItem: Text {
-                text: parent.text
+                text: light2.text
                 color: Colors.text
-                font: parent.font
-                horizontalAlignment: Text.AlignLeft
+                font: light2.font
                 verticalAlignment: Text.AlignVCenter
+                leftPadding: 40
             }
         }
 
@@ -100,44 +125,47 @@ Window {
         }
 
         RadioButton {
+            id: dark0
             text: "Синяя"
             checked: Colors.darkScheme === 0
             ButtonGroup.group: darkGroup
             onClicked: { Colors.setDarkScheme(0) }
             contentItem: Text {
-                text: parent.text
+                text: dark0.text
                 color: Colors.text
-                font: parent.font
-                horizontalAlignment: Text.AlignLeft
+                font: dark0.font
                 verticalAlignment: Text.AlignVCenter
+                leftPadding: 40
             }
         }
 
         RadioButton {
+            id: dark1
             text: "Зеленая"
             checked: Colors.darkScheme === 1
             ButtonGroup.group: darkGroup
             onClicked: { Colors.setDarkScheme(1) }
             contentItem: Text {
-                text: parent.text
+                text: dark1.text
                 color: Colors.text
-                font: parent.font
-                horizontalAlignment: Text.AlignLeft
+                font: dark1.font
                 verticalAlignment: Text.AlignVCenter
+                leftPadding: 40
             }
         }
 
         RadioButton {
+            id: dark2
             text: "Фиолетовая"
             checked: Colors.darkScheme === 2
             ButtonGroup.group: darkGroup
             onClicked: { Colors.setDarkScheme(2) }
             contentItem: Text {
-                text: parent.text
+                text: dark2.text
                 color: Colors.text
-                font: parent.font
-                horizontalAlignment: Text.AlignLeft
+                font: dark2.font
                 verticalAlignment: Text.AlignVCenter
+                leftPadding: 40
             }
         }
 

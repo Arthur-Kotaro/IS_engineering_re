@@ -186,7 +186,7 @@ Rectangle {
                         Text {
                             anchors.centerIn: parent
                             text: "🏠 Главная"
-                            color: activeTabIndex === 0 ? Colors.buttonText : Colors.text
+                            color: Colors.text
                             font.pixelSize: 15
                             font.bold: activeTabIndex === 0
                         }
@@ -222,7 +222,7 @@ Rectangle {
                                 Text {
                                     id: tabTitle
                                     text: model.title || "Вкладка"
-                                    color: activeTabIndex === index + 1 ? Colors.buttonText : Colors.text
+                                    color: Colors.text
                                     font.pixelSize: 15
                                     font.bold: activeTabIndex === index + 1
                                     elide: Text.ElideRight
@@ -251,7 +251,7 @@ Rectangle {
                                         text: "✕"
                                         font.pixelSize: 10
                                         font.bold: true
-                                        color: closeArea.containsMouse ? Colors.buttonText : (activeTabIndex === index + 1 ? Colors.buttonText : Colors.textSecondary)
+                                        color: closeArea.containsMouse ? Colors.buttonText : Colors.textSecondary
                                     }
 
                                     MouseArea {
@@ -318,7 +318,7 @@ Rectangle {
                         height: 120
                         radius: 12
                         color: Colors.surface
-                        border.color: Colors.border
+                        border.color: Colors.button
                         border.width: 1
 
                         Behavior on color {
