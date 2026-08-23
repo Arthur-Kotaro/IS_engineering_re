@@ -105,7 +105,7 @@ Rectangle {
 
             Button {
                 text: root.isDarkTheme ? "☀️" : "🌙"
-                font.pixelSize: 20
+                font.pixelSize: 18
                 flat: true
                 implicitWidth: 40
                 implicitHeight: 40
@@ -118,7 +118,7 @@ Rectangle {
 
             Button {
                 text: "⛶"
-                font.pixelSize: 20
+                font.pixelSize: 18
                 flat: true
                 implicitWidth: 40
                 implicitHeight: 40
@@ -127,7 +127,7 @@ Rectangle {
 
             Button {
                 text: "⚙️"
-                font.pixelSize: 20
+                font.pixelSize: 18
                 flat: true
                 implicitWidth: 40
                 implicitHeight: 40
@@ -136,7 +136,7 @@ Rectangle {
 
             Button {
                 text: "🔔"
-                font.pixelSize: 20
+                font.pixelSize: 18
                 flat: true
                 implicitWidth: 40
                 implicitHeight: 40
