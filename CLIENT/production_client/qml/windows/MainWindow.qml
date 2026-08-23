@@ -31,6 +31,7 @@ Rectangle {
     }
 
     function addTab(title, endpoint, method, accessToken, tileId) {
+        console.log("addTab called:", title)
         var component = Qt.createComponent("../components/TabContent.qml")
         if (component.status === Component.Ready) {
             var tab = component.createObject(tabsContainer, {
@@ -48,6 +49,7 @@ Rectangle {
                 tilesGrid.visible = false
                 tabsContainer.visible = true
                 tab.loadData()
+                console.log("Tab added, total:", tabObjects.length)
             }
         } else {
             console.log("Failed to create TabContent:", component.errorString())
@@ -55,7 +57,11 @@ Rectangle {
     }
 
     function closeTab(index) {
-        if (index < 0 || index >= tabObjects.length) return
+        console.log("closeTab called with index:", index)
+        if (index < 0 || index >= tabObjects.length) {
+            console.log("Invalid index")
+            return
+        }
         if (tabObjects[index].loading) {
             tabObjects[index].cancelRequest()
         }
@@ -69,9 +75,11 @@ Rectangle {
         } else if (activeTabIndex > index + 1) {
             activeTabIndex = activeTabIndex - 1
         }
+        console.log("Tab closed, remaining:", tabObjects.length)
     }
 
     function switchTab(index) {
+        console.log("switchTab called:", index)
         activeTabIndex = index + 1
         tilesGrid.visible = false
         tabsContainer.visible = true
@@ -152,7 +160,7 @@ Rectangle {
             Rectangle {
                 id: tabBar
                 Layout.fillWidth: true
-                height: 36
+                height: 40
                 color: Colors.surface
                 border.color: Colors.border
                 border.width: 1
@@ -160,12 +168,12 @@ Rectangle {
                 RowLayout {
                     anchors.fill: parent
                     anchors.margins: 5
-                    spacing: 2
+                    spacing: 4
 
                     Rectangle {
                         id: tilesTab
-                        height: 28
-                        width: 100
+                        height: 30
+                        width: 120
                         radius: 4
                         color: activeTabIndex === 0 ? Colors.primary : Colors.surface
                         border.color: activeTabIndex === 0 ? Colors.button : Colors.border
@@ -175,7 +183,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: "🏠 Главная"
                             color: activeTabIndex === 0 ? Colors.buttonText : Colors.text
-                            font.pixelSize: 12
+                            font.pixelSize: 15
                             font.bold: activeTabIndex === 0
                         }
 
@@ -195,8 +203,8 @@ Rectangle {
 
                         delegate: Rectangle {
                             id: tabDelegate
-                            height: 28
-                            width: Math.max(80, tabTitle.implicitWidth + 50)
+                            height: 30
+                            width: Math.max(110, tabTitle.implicitWidth + 38)
                             radius: 4
                             color: activeTabIndex === index + 1 ? Colors.primary : Colors.surface
                             border.color: activeTabIndex === index + 1 ? Colors.button : Colors.border
@@ -204,34 +212,54 @@ Rectangle {
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.margins: 6
+                                anchors.margins: 8
                                 spacing: 4
 
                                 Text {
                                     id: tabTitle
                                     text: model.title || "Вкладка"
                                     color: activeTabIndex === index + 1 ? Colors.buttonText : Colors.text
-                                    font.pixelSize: 11
+                                    font.pixelSize: 15
+                                    font.bold: activeTabIndex === index + 1
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
+                                    verticalAlignment: Text.AlignVCenter
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.verticalCenterOffset: 0
                                 }
 
                                 Rectangle {
+                                    id: closeButton
                                     width: 16
                                     height: 16
-                                    radius: 3
-                                    color: "transparent"
+                                    radius: 2
+                                    color: closeArea.containsMouse ? Colors.error : "transparent"
+                                    z: 2
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.verticalCenterOffset: -2
+
+                                    Behavior on color {
+                                        ColorAnimation { duration: 150 }
+                                    }
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: "✕"
                                         font.pixelSize: 10
-                                        color: activeTabIndex === index + 1 ? Colors.buttonText : Colors.textSecondary
+                                        font.bold: true
+                                        color: closeArea.containsMouse ? Colors.buttonText : (activeTabIndex === index + 1 ? Colors.buttonText : Colors.textSecondary)
                                     }
 
                                     MouseArea {
-                                        anchors.fill: parent
+                                        id: closeArea
+                                        width: 16
+                                        height: 16
+                                        anchors.centerIn: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        z: 3
                                         onClicked: {
+                                            console.log("CLOSE CLICKED! index:", index)
                                             root.closeTab(index)
                                         }
                                     }
@@ -239,9 +267,22 @@ Rectangle {
                             }
 
                             MouseArea {
+                                id: tabMouseArea
                                 anchors.fill: parent
+                                z: 0
                                 onClicked: {
-                                    root.switchTab(index)
+                                    var pos = mouse.x
+                                    var btnX = closeButton.x
+                                    var btnW = closeButton.width
+                                    var centerX = btnX + btnW / 2
+                                    var halfWidth = 10
+                                    if (pos > centerX - halfWidth && pos < centerX + halfWidth || pos == centerX) {
+                                        console.log("CLOSE AREA CLICKED! index:", index, "pos:", pos, "centerX:", centerX)
+                                        root.closeTab(index)
+                                    } else {
+                                        console.log("SWITCH TAB! index:", index, "pos:", pos, "centerX:", centerX)
+                                        root.switchTab(index)
+                                    }
                                 }
                             }
                         }
