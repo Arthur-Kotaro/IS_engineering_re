@@ -28,6 +28,10 @@ Rectangle {
         Colors.toggleTheme()
         topBar.isDarkTheme = Colors.isDarkTheme
         root.color = Colors.background
+        tilesGrid.model = null
+        tilesGrid.model = root.tiles
+        tilesGrid.forceLayout()
+        tilesGrid.update()
     }
 
     function addTab(title, endpoint, method, accessToken, tileId) {

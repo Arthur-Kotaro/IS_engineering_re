@@ -11,6 +11,7 @@ Window
     height: 600
     modality: Qt.WindowModal
     flags: Qt.Dialog | Qt.WindowCloseButtonHint
+    color: Colors.background
 
     property var notifications: []
     property int unreadCount: 0
@@ -146,9 +147,19 @@ Window
 
                             Button {
                                 text: "Пометить прочитанным"
-                                onClicked: markAsRead(modelData.notification_id)
-                                flat: true
                                 font.pixelSize: 14
+                                onClicked: markAsRead(modelData.notification_id)
+                                contentItem: Text {
+                                    text: parent.text
+                                    font: parent.font
+                                    color: Colors.buttonText
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                                background: Rectangle {
+                                    color: Colors.button
+                                    radius: 4
+                                }
                             }
 
                             Item {

@@ -104,9 +104,9 @@ Rectangle {
             Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
 
             Button {
-                text: root.isDarkTheme ? "☀️" : "🌙"
+                id: themeBtn
+                text: root.isDarkTheme ? "☀" : "🌙"
                 font.pixelSize: 18
-                flat: true
                 implicitWidth: 40
                 implicitHeight: 40
                 onClicked: {
@@ -114,33 +114,85 @@ Rectangle {
                     root.isDarkTheme = Colors.isDarkTheme
                     root.themeToggleRequested()
                 }
+                background: Rectangle {
+                    color: themeBtn.hovered ? Colors.buttonHover : "transparent"
+                    border.color: Colors.button
+                    border.width: 1
+                    radius: 6
+                }
+                contentItem: Text {
+                    text: themeBtn.text
+                    font.pixelSize: 18
+                    color: Colors.text
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
 
             Button {
+                id: fullscreenBtn
                 text: "⛶"
                 font.pixelSize: 18
-                flat: true
                 implicitWidth: 40
                 implicitHeight: 40
                 onClicked: root.fullScreenToggled()
+                background: Rectangle {
+                    color: fullscreenBtn.hovered ? Colors.buttonHover : "transparent"
+                    border.color: Colors.button
+                    border.width: 1
+                    radius: 6
+                }
+                contentItem: Text {
+                    text: fullscreenBtn.text
+                    font.pixelSize: 18
+                    color: Colors.text
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
 
             Button {
-                text: "⚙️"
+                id: settingsBtn
+                text: "⚙"
                 font.pixelSize: 18
-                flat: true
                 implicitWidth: 40
                 implicitHeight: 40
                 onClicked: root.settingsRequested()
+                background: Rectangle {
+                    color: settingsBtn.hovered ? Colors.buttonHover : "transparent"
+                    border.color: Colors.button
+                    border.width: 1
+                    radius: 6
+                }
+                contentItem: Text {
+                    text: settingsBtn.text
+                    font.pixelSize: 18
+                    color: Colors.text
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
 
             Button {
+                id: notificationsBtn
                 text: "🔔"
                 font.pixelSize: 18
-                flat: true
                 implicitWidth: 40
                 implicitHeight: 40
                 onClicked: root.notificationsRequested()
+                background: Rectangle {
+                    color: notificationsBtn.hovered ? Colors.buttonHover : "transparent"
+                    border.color: Colors.button
+                    border.width: 1
+                    radius: 6
+                }
+                contentItem: Text {
+                    text: notificationsBtn.text
+                    font.pixelSize: 18
+                    color: Colors.text
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
 
                 Rectangle {
                     anchors.top: parent.top
@@ -163,21 +215,47 @@ Rectangle {
             }
 
             Button {
+                id: passwordBtn
                 text: "🔑"
                 font.pixelSize: 18
-                flat: true
                 implicitWidth: 40
                 implicitHeight: 40
                 onClicked: root.passwordChangeRequested()
+                background: Rectangle {
+                    color: passwordBtn.hovered ? Colors.buttonHover : "transparent"
+                    border.color: Colors.button
+                    border.width: 1
+                    radius: 6
+                }
+                contentItem: Text {
+                    text: passwordBtn.text
+                    font.pixelSize: 18
+                    color: Colors.text
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
 
             Button {
+                id: logoutBtn
                 text: "🚪"
                 font.pixelSize: 18
-                flat: true
                 implicitWidth: 40
                 implicitHeight: 40
                 onClicked: root.logoutRequested()
+                background: Rectangle {
+                    color: logoutBtn.hovered ? Colors.buttonHover : "transparent"
+                    border.color: Colors.button
+                    border.width: 1
+                    radius: 6
+                }
+                contentItem: Text {
+                    text: logoutBtn.text
+                    font.pixelSize: 18
+                    color: Colors.text
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
         }
     }

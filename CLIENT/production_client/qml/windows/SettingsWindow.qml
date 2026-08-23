@@ -10,6 +10,7 @@ Window {
     height: 380
     modality: Qt.WindowModal
     flags: Qt.Dialog | Qt.WindowCloseButtonHint
+    color: Colors.background
 
     ButtonGroup {
         id: lightGroup
@@ -49,6 +50,13 @@ Window {
             checked: Colors.lightScheme === 0
             ButtonGroup.group: lightGroup
             onClicked: { Colors.setLightScheme(0) }
+            contentItem: Text {
+                text: parent.text
+                color: Colors.text
+                font: parent.font
+                horizontalAlignment: Text.AlignLeft
+                verticalAlignment: Text.AlignVCenter
+            }
         }
 
         RadioButton {
@@ -56,6 +64,13 @@ Window {
             checked: Colors.lightScheme === 1
             ButtonGroup.group: lightGroup
             onClicked: { Colors.setLightScheme(1) }
+            contentItem: Text {
+                text: parent.text
+                color: Colors.text
+                font: parent.font
+                horizontalAlignment: Text.AlignLeft
+                verticalAlignment: Text.AlignVCenter
+            }
         }
 
         RadioButton {
@@ -63,6 +78,13 @@ Window {
             checked: Colors.lightScheme === 2
             ButtonGroup.group: lightGroup
             onClicked: { Colors.setLightScheme(2) }
+            contentItem: Text {
+                text: parent.text
+                color: Colors.text
+                font: parent.font
+                horizontalAlignment: Text.AlignLeft
+                verticalAlignment: Text.AlignVCenter
+            }
         }
 
         Rectangle {
@@ -82,6 +104,13 @@ Window {
             checked: Colors.darkScheme === 0
             ButtonGroup.group: darkGroup
             onClicked: { Colors.setDarkScheme(0) }
+            contentItem: Text {
+                text: parent.text
+                color: Colors.text
+                font: parent.font
+                horizontalAlignment: Text.AlignLeft
+                verticalAlignment: Text.AlignVCenter
+            }
         }
 
         RadioButton {
@@ -89,6 +118,13 @@ Window {
             checked: Colors.darkScheme === 1
             ButtonGroup.group: darkGroup
             onClicked: { Colors.setDarkScheme(1) }
+            contentItem: Text {
+                text: parent.text
+                color: Colors.text
+                font: parent.font
+                horizontalAlignment: Text.AlignLeft
+                verticalAlignment: Text.AlignVCenter
+            }
         }
 
         RadioButton {
@@ -96,6 +132,13 @@ Window {
             checked: Colors.darkScheme === 2
             ButtonGroup.group: darkGroup
             onClicked: { Colors.setDarkScheme(2) }
+            contentItem: Text {
+                text: parent.text
+                color: Colors.text
+                font: parent.font
+                horizontalAlignment: Text.AlignLeft
+                verticalAlignment: Text.AlignVCenter
+            }
         }
 
         Item {
