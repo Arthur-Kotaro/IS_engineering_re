@@ -1,0 +1,39 @@
+name: projects
+endpoint: /page/projects
+title: "Проекты"
+description: "Список проектов"
+
+sources:
+  - id: projects
+    service: project_service
+    endpoint: /api/v1/projects/list
+    method: GET
+
+ui:
+  widgets:
+    - type: Table
+      id: projects_table
+      title: "Список проектов"
+      data:
+        source: inline
+        rows: "{{sources.projects}}"
+      columns:
+        - {field: project_id, label: "ID", width: 50}
+        - {field: title, label: "Название"}
+        - {field: status, label: "Статус", type: badge}
+        - {field: created_by, label: "Создатель"}
+
+    - type: Button
+      id: create_project_btn
+      text: "Создать проект"
+      action:
+        endpoint: /api/v1/projects/create
+        method: POST
+        form:
+          fields:
+            - type: TextField
+              field: title
+              label: "Название проекта"
+            - type: TextArea
+              field: description
+              label: "Описание"

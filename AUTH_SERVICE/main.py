@@ -41,22 +41,18 @@ async def health_check():
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 async def gateway(request: Request, path: str):
-    """
-    Основной шлюз Auth Service
-    """
     query_string = request.url.query
-    full_path = f"/api/v1/{path}"
+    full_path = f"/{path}"
     if query_string:
         full_path = f"{full_path}?{query_string}"
     
-    # Проверяем публичные эндпоинты
-    # Убираем параметры для сравнения
+    logger.info(f"🔹 Gateway received: path='{path}', full_path='{full_path}'")
+    
     path_without_params = full_path.split('?')[0]
     if path_without_params in PUBLIC_ENDPOINTS:
         logger.info(f"Public endpoint: {full_path}")
         return await proxy_to_service(request, full_path, add_auth_headers=False)
     
-    # Проверяем токен
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         logger.warning(f"No Authorization header for {full_path}")
@@ -73,7 +69,6 @@ async def gateway(request: Request, path: str):
             content={"detail": "Empty token"}
         )
     
-    # Валидируем токен
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         logger.info(f"Token validated for user: {payload.get('user_id', 'unknown')}")
@@ -90,7 +85,6 @@ async def gateway(request: Request, path: str):
             content={"detail": f"Invalid token: {str(e)}"}
         )
     
-    # Проверяем черный список
     jti = payload.get("jti")
     if jti and redis_client:
         blacklist_key = f"{REDIS_BLACKLIST_PREFIX}{jti}"
@@ -101,7 +95,6 @@ async def gateway(request: Request, path: str):
                 content={"detail": "Token has been revoked"}
             )
     
-    # Извлекаем user_id и role
     user_id = payload.get("user_id")
     role = payload.get("roles", ["user"])
     
@@ -115,7 +108,6 @@ async def gateway(request: Request, path: str):
     if isinstance(role, list):
         role = role[0] if role else "user"
     
-    # Проксируем запрос с добавлением заголовков
     return await proxy_to_service(
         request, 
         full_path, 
@@ -131,21 +123,34 @@ async def proxy_to_service(
     user_id: str = None,
     role: str = None
 ):
-    """
-    Проксирование запроса в целевой микросервис
-    """
-    # Определяем целевой сервис по первому сегменту пути после /api/v1/
-    # Убираем параметры запроса для определения сервиса
+    logger.info(f"🔸 proxy_to_service: full_path='{full_path}'")
+    
     path_without_params = full_path.split('?')[0]
     parts = path_without_params.strip('/').split('/')
-    if len(parts) >= 3:
-        service_name = parts[2]  # users, projects, navigation, etc.
+    
+    logger.info(f"🔸 parts={parts}")
+    
+    if len(parts) >= 1 and parts[0] == "api":
+        if len(parts) >= 3:
+            service_name = parts[2]
+            target_path = "/" + "/".join(parts[3:]) if parts[3:] else "/"
+            target_full_path = f"/api/v1/{service_name}{target_path}"
+        else:
+            logger.error(f"Invalid path format with api prefix: {full_path}")
+            return JSONResponse(
+                status_code=404,
+                content={"detail": f"Invalid path format: {full_path}"}
+            )
     else:
-        logger.error(f"Invalid path format: {full_path}")
-        return JSONResponse(
-            status_code=404,
-            content={"detail": f"Invalid path format: {full_path}"}
-        )
+        if len(parts) >= 1:
+            service_name = parts[0]
+            target_full_path = full_path
+        else:
+            logger.error(f"Invalid path format: {full_path}")
+            return JSONResponse(
+                status_code=404,
+                content={"detail": f"Invalid path format: {full_path}"}
+            )
     
     if service_name not in SERVICE_ROUTES:
         logger.error(f"Unknown service: {service_name} for path: {full_path}")
@@ -154,8 +159,8 @@ async def proxy_to_service(
             content={"detail": f"Service not found: {service_name}"}
         )
     
-    target_url = f"{SERVICE_ROUTES[service_name]}{full_path}"
-    logger.info(f"Proxying to: {target_url}")
+    target_url = f"{SERVICE_ROUTES[service_name]}{target_full_path}"
+    logger.info(f"🔸 target_url={target_url}")
     
     headers = dict(request.headers)
     headers.pop("host", None)

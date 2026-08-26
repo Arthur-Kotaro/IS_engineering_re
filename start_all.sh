@@ -10,7 +10,7 @@
 #   -f, --full       Все сервисы + клиент
 #   -h, --help       Показать эту справку
 #
-# Инфраструктура: Auth, User, Project, Navigation, Delegation, Notification, Gateway
+# Инфраструктура: Auth, User, Project, Navigation, Delegation, Notification, UI Composer, Gateway
 # Бизнес-сервисы: PJP, Mastergraphics, PROTO
 #
 # Примеры:
@@ -45,7 +45,7 @@ show_help() {
     echo "  -f, --full       Все сервисы + клиент"
     echo "  -h, --help       Показать эту справку"
     echo ""
-    echo -e "${YELLOW}Инфраструктура:${NC} Auth, User, Project, Navigation, Delegation, Notification, Gateway"
+    echo -e "${YELLOW}Инфраструктура:${NC} Auth, User, Project, Navigation, Delegation, Notification, UI Composer, Gateway"
     echo -e "${YELLOW}Бизнес-сервисы:${NC} PJP, Mastergraphics, PROTO"
     echo ""
     echo -e "${YELLOW}Примеры:${NC}"
@@ -122,6 +122,47 @@ start_service() {
     
     cd "$service_path"
     nohup ./run.sh > "$LOG_DIR/${service_name}.log" 2>&1 &
+    local pid=$!
+    echo $pid > "$LOG_DIR/${service_name}.pid"
+    
+    sleep 2
+    
+    if ps -p $pid > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ $service_name запущен (PID: $pid)${NC}"
+        echo -e "   Лог: $LOG_DIR/${service_name}.log"
+    else
+        echo -e "${RED}❌ $service_name не запустился. Проверьте лог${NC}"
+        return 0
+    fi
+}
+
+start_ui_composer() {
+    local service_name="UI_COMPOSER_SERVICE"
+    local port=8020
+    local service_path="$PROJECT_ROOT/$service_name"
+    
+    echo -e "\n${YELLOW}▶ Запуск UI Composer Service на порту $port...${NC}"
+    
+    if [ ! -d "$service_path" ]; then
+        echo -e "${YELLOW}⚠  Директория $service_name не найдена, пропускаем${NC}"
+        return 0
+    fi
+    
+    if check_port $port; then
+        echo -e "${YELLOW}⚠  Порт $port занят. Пропускаем $service_name${NC}"
+        return 0
+    fi
+    
+    cd "$service_path"
+    
+    if [ ! -d "venv" ]; then
+        echo -e "${YELLOW}⚠  Виртуальное окружение не найдено, создаем...${NC}"
+        python3 -m venv venv
+        source venv/bin/activate
+        pip install -r requirements.txt > /dev/null 2>&1
+    fi
+    
+    nohup venv/bin/uvicorn src.main:app --host 0.0.0.0 --port $port > "$LOG_DIR/${service_name}.log" 2>&1 &
     local pid=$!
     echo $pid > "$LOG_DIR/${service_name}.pid"
     
@@ -216,13 +257,14 @@ check_health() {
 trap stop_all EXIT INT TERM
 
 # ========== ЗАПУСК ИНФРАСТРУКТУРЫ (всегда) ==========
-echo -e "\n${BLUE}🏗️  Инфраструктурные сервисы:${NC}"
+echo -e "\n${BLUE}🏗  Инфраструктурные сервисы:${NC}"
 echo "   • Auth Service (8010)"
 echo "   • User Service (8000)"
 echo "   • Project Service (8001)"
 echo "   • Navigation Service (8009)"
 echo "   • Delegation Service (8011)"
 echo "   • Notification Service (8012)"
+echo "   • UI Composer Service (8020)"
 
 start_service "AUTH_SERVICE" 8010
 start_service "USER_service" 8000
@@ -230,6 +272,7 @@ start_service "PROJECT_service" 8001
 start_service "NAVIGATION_SERVICE" 8009
 start_service "DELEGATION_SERVICE" 8011
 start_service "NOTIFICATION_SERVICE" 8012
+start_ui_composer
 
 # ========== API GATEWAY ==========
 start_gateway
@@ -248,10 +291,10 @@ fi
 
 # ========== КЛИЕНТ (только full) ==========
 if [[ "$MODE" == "full" ]]; then
-    echo -e "\n${BLUE}🖥️  Клиент:${NC}"
+    echo -e "\n${BLUE}🖥  Клиент:${NC}"
     start_client
 else
-    echo -e "\n${YELLOW}⏭️  Клиент пропущен (режим: $MODE)${NC}"
+    echo -e "\n${YELLOW}⏭  Клиент пропущен (режим: $MODE)${NC}"
 fi
 
 # ========== HEALTH CHECK ==========
@@ -264,6 +307,7 @@ check_health "Project" 8001
 check_health "Navigation" 8009
 check_health "Delegation" 8011
 check_health "Notification" 8012
+check_health "UI Composer" 8020
 check_health "Gateway" 8080
 
 if [[ "$MODE" == "business" ]] || [[ "$MODE" == "full" ]]; then
@@ -279,6 +323,7 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "\n📊 Логи: $LOG_DIR/"
 echo -e "🛑 Для остановки нажмите Ctrl+C"
 echo -e "\n🌐 API Gateway: http://localhost:8080"
+echo -e "📄 UI Composer: http://localhost:8020"
 
 if [[ "$MODE" == "default" ]]; then
     echo -e "\n${YELLOW}💡 Для запуска бизнес-сервисов:${NC}"
