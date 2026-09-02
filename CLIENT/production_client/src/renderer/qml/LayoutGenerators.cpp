@@ -35,15 +35,34 @@ QString generateGridLayout(const QJsonObject& spec)
 QString generateGroupBox(const QJsonObject& spec)
 {
     QString title = spec["title"].toString("Group");
+    QString widgetId = spec["id"].toString();
+    
     return QString(
         "GroupBox {\n"
-        "    title: \"%1\"\n"
+        "    id: groupBox_%1\n"
+        "    title: \"%2\"\n"
         "    Layout.fillWidth: true\n"
-        "    Layout.minimumHeight: 200\n"
+        "    Layout.topMargin: 8\n"
+        "    Layout.bottomMargin: 8\n"
+        "    padding: 16\n"
+        "    spacing: 8\n"
+        "    background: Rectangle {\n"
+        "        color: \"transparent\"\n"
+        "        border.color: Colors.border\n"
+        "        border.width: 1\n"
+        "        radius: 6\n"
+        "    }\n"
+        "    label: Text {\n"
+        "        text: parent.title\n"
+        "        color: Colors.text\n"
+        "        font.pixelSize: 14\n"
+        "        font.bold: true\n"
+        "        padding: 4\n"
+        "    }\n"
         "    ColumnLayout {\n"
         "        anchors.fill: parent\n"
         "        spacing: 8\n"
         "    }\n"
         "}\n"
-    ).arg(title);
+    ).arg(widgetId).arg(title);
 }
