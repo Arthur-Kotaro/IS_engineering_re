@@ -44,7 +44,8 @@ Rectangle {
                 "method": method,
                 "accessToken": accessToken,
                 "tileId": tileId,
-                "visible": true
+                "visible": true,
+                "renderer": renderer
             })
             if (tab) {
                 tabsModel.append({"title": title})

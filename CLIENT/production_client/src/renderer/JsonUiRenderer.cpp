@@ -83,16 +83,13 @@ void JsonUiRenderer::repaintCharts(QQuickItem* item)
 {
     if (!item) return;
     
-    // Ищем все Canvas внутри и вызываем requestPaint()
     auto children = item->childItems();
     for (QQuickItem* child : children) {
         if (child) {
-            // Проверяем, является ли элемент Canvas
             if (child->inherits("QQuickCanvasItem")) {
                 qDebug() << "Repainting Canvas:" << child->objectName();
                 QMetaObject::invokeMethod(child, "requestPaint", Qt::QueuedConnection);
             }
-            // Рекурсивно обходим вложенные элементы
             repaintCharts(child);
         }
     }
@@ -238,7 +235,6 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
     
     scheduleHeightUpdate(layoutItem);
     
-    // Через небольшую задержку принудительно перерисовываем все диаграммы
     QTimer::singleShot(200, this, [this]() {
         refreshAllCharts();
     });
@@ -273,15 +269,28 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
             qDebug() << "      WARNING: no 'height' field";
         }
 
-        if (spec.contains("widgets") && spec["widgets"].isArray()) {
+        bool hasChildren = spec.contains("widgets") && spec["widgets"].isArray();
+        bool hasFields = false;
+        
+        if (spec.contains("data") && spec["data"].isObject()) {
+            QJsonObject dataObj = spec["data"].toObject();
+            if (dataObj.contains("fields") && dataObj["fields"].isArray()) {
+                hasFields = true;
+            }
+        }
+        
+        if (hasChildren) {
             qDebug() << "      widgets count=" << spec["widgets"].toArray().size();
         }
+        if (hasFields) {
+            qDebug() << "      fields count in data";
+        }
 
-        bool isLayout = (type == "QVBoxLayout" || type == "QHBoxLayout" || 
-                         type == "QGridLayout" || type == "QGroupBox");
+        bool isContainer = (type == "Card" || type == "Form" || type == "QGroupBox" ||
+                            type == "QVBoxLayout" || type == "QHBoxLayout" || type == "QGridLayout");
 
-        if (isLayout) {
-            qDebug() << "      This is a LAYOUT container";
+        if (isContainer) {
+            qDebug() << "      This is a CONTAINER widget";
         }
 
         QObject* widget = m_factory->create(type, spec, parentLayout);
@@ -293,30 +302,132 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                 emit widgetCreated(id, widget);
             }
 
-            if (isLayout && spec.contains("widgets") && spec["widgets"].isArray()) {
-                int childCount = spec["widgets"].toArray().size();
-                qDebug() << "      Layout detected, rendering" << childCount << "children";
-                QQuickItem* containerItem = qobject_cast<QQuickItem*>(widget);
-                if (containerItem) {
-                    qDebug() << "      ContainerItem width=" << containerItem->width() << "height=" << containerItem->height();
-
-                    QQuickItem* innerLayout = findInnerLayout(containerItem, 0);
-
-                    if (innerLayout) {
-                        qDebug() << "      Found inner Layout:" << innerLayout->metaObject()->className();
-                        renderWidgets(spec["widgets"].toArray(), innerLayout);
-                        updateLayout(innerLayout);
-                    } else {
-                        qDebug() << "      WARNING: No inner layout found, using containerItem directly";
-                        renderWidgets(spec["widgets"].toArray(), containerItem);
-                        updateLayout(containerItem);
-                    }
-                } else {
-                    qDebug() << "      WARNING: widget is not QQuickItem, cannot render children";
+            QQuickItem* containerItem = qobject_cast<QQuickItem*>(widget);
+            QQuickItem* targetParent = containerItem;
+            
+            if (containerItem) {
+                QQuickItem* innerLayout = findInnerLayout(containerItem, 0);
+                if (innerLayout) {
+                    targetParent = innerLayout;
+                    qDebug() << "      Found inner layout for children";
                 }
             }
 
-            if (!isLayout && spec.contains("data") && spec["data"].isObject()) {
+            // Обработка дочерних виджетов (widgets)
+            if (hasChildren && targetParent) {
+                int childCount = spec["widgets"].toArray().size();
+                qDebug() << "      Container has" << childCount << "child widgets";
+                renderWidgets(spec["widgets"].toArray(), targetParent);
+                updateLayout(targetParent);
+            }
+
+            // Обработка полей (fields) из data для Card
+            if (hasFields && (type == "Card" || type == "QGroupBox")) {
+                QJsonObject dataObj = spec["data"].toObject();
+                QJsonArray fields = dataObj["fields"].toArray();
+                qDebug() << "      Card has" << fields.size() << "fields";
+                
+                if (targetParent) {
+                    for (int j = 0; j < fields.size(); ++j) {
+                        QJsonObject field = fields[j].toObject();
+                        QString label = field["label"].toString();
+                        QString value = field["value"].toString();
+                        QString fieldId = id + "_field_" + QString::number(j);
+                        
+                        qDebug() << "        Field[" << j << "] label=" << label << "value=" << value;
+                        
+                        QJsonObject fieldSpec;
+                        fieldSpec["type"] = "QLabel";
+                        fieldSpec["id"] = fieldId;
+                        fieldSpec["text"] = label + ": " + value;
+                        
+                        QObject* fieldWidget = m_factory->create("QLabel", fieldSpec, targetParent);
+                        if (fieldWidget) {
+                            QQuickItem* fieldItem = qobject_cast<QQuickItem*>(fieldWidget);
+                            if (fieldItem) {
+                                fieldItem->setParentItem(targetParent);
+                                qDebug() << "        Field widget created: " << fieldId;
+                            }
+                        }
+                    }
+                    updateLayout(targetParent);
+                }
+            }
+
+            // Обработка полей (fields) для Form
+            if (type == "Form" && spec.contains("fields") && spec["fields"].isArray()) {
+                QJsonArray fields = spec["fields"].toArray();
+                qDebug() << "      Form has" << fields.size() << "fields";
+                
+                if (targetParent) {
+                    for (int j = 0; j < fields.size(); ++j) {
+                        QJsonObject field = fields[j].toObject();
+                        QString fieldType = field["type"].toString();
+                        QString fieldId = id + "_field_" + QString::number(j);
+                        
+                        qDebug() << "        Field[" << j << "] type=" << fieldType << " field=" << field["field"].toString();
+                        
+                        QJsonObject fieldSpec;
+                        fieldSpec["id"] = fieldId;
+                        fieldSpec["label"] = field["label"].toString();
+                        fieldSpec["field"] = field["field"].toString();
+                        fieldSpec["placeholder"] = field["placeholder"].toString();
+                        fieldSpec["required"] = field["required"].toBool(false);
+                        
+                        QString widgetType;
+                        if (fieldType == "EmailField") {
+                            widgetType = "EmailField";
+                        } else if (fieldType == "PasswordField") {
+                            widgetType = "PasswordField";
+                        } else if (fieldType == "SelectField") {
+                            widgetType = "SelectField";
+                            fieldSpec["source"] = field["source"].toString();
+                            fieldSpec["value_field"] = field["value_field"].toString();
+                            fieldSpec["label_field"] = field["label_field"].toString();
+                        } else if (fieldType == "MultiSelectField") {
+                            widgetType = "MultiSelectField";
+                            fieldSpec["source"] = field["source"].toString();
+                            fieldSpec["value_field"] = field["value_field"].toString();
+                            fieldSpec["label_field"] = field["label_field"].toString();
+                        } else {
+                            widgetType = "TextField";
+                        }
+                        
+                        QObject* fieldWidget = m_factory->create(widgetType, fieldSpec, targetParent);
+                        if (fieldWidget) {
+                            QQuickItem* fieldItem = qobject_cast<QQuickItem*>(fieldWidget);
+                            if (fieldItem) {
+                                fieldItem->setParentItem(targetParent);
+                                qDebug() << "        Field widget created: " << fieldId;
+                            }
+                        }
+                    }
+                    updateLayout(targetParent);
+                }
+            }
+
+            // Кнопка Submit для Form
+            if (type == "Form" && spec.contains("submit_endpoint") && targetParent) {
+                QString submitEndpoint = spec["submit_endpoint"].toString();
+                QString submitMethod = spec["submit_method"].toString("POST");
+                
+                QJsonObject buttonSpec;
+                buttonSpec["type"] = "QPushButton";
+                buttonSpec["id"] = id + "_submit";
+                buttonSpec["text"] = spec["submit_text"].toString("Создать");
+                
+                QObject* submitButton = m_factory->create("QPushButton", buttonSpec, targetParent);
+                if (submitButton) {
+                    QQuickItem* buttonItem = qobject_cast<QQuickItem*>(submitButton);
+                    if (buttonItem) {
+                        buttonItem->setParentItem(targetParent);
+                        qDebug() << "      Submit button created for Form: " << id;
+                    }
+                }
+                updateLayout(targetParent);
+            }
+
+            if (!isContainer && spec.contains("data") && spec["data"].isObject()) {
                 QJsonObject dataSpec = spec["data"].toObject();
                 qDebug() << "      Data source detected, requesting data";
                 m_dataManager->requestData(id, dataSpec);
@@ -358,7 +469,6 @@ void JsonUiRenderer::onDataReady(const QString& widgetId, const QJsonDocument& d
     qDebug() << "DATA READY for widget:" << widgetId << "data size=" << data.toJson().size();
     if (m_lastLayout) {
         scheduleHeightUpdate(m_lastLayout);
-        // Принудительно перерисовываем все диаграммы после загрузки данных
         QTimer::singleShot(100, this, [this]() {
             refreshAllCharts();
         });
@@ -377,4 +487,12 @@ void JsonUiRenderer::onDataError(const QString& widgetId, const QString& error,
 void JsonUiRenderer::onDataProgress(const QString& widgetId, int percent)
 {
     qDebug() << "DATA PROGRESS for widget:" << widgetId << percent << "%";
+}
+
+void JsonUiRenderer::setDataManager(DataManager* dataManager)
+{
+    if (m_dataManager != dataManager) {
+        m_dataManager = dataManager;
+        qDebug() << "JsonUiRenderer: DataManager set";
+    }
 }

@@ -11,6 +11,7 @@
 #include "src/qml_bridge/MainWindowBridge.h"
 #include "src/qml_bridge/NotificationBridge.h"
 #include "src/qml_bridge/WidgetBridge.h"
+#include "src/renderer/JsonUiRenderer.h"
 
 int main(int argc, char *argv[])
 {
@@ -49,6 +50,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("mainWindowBridge", &mainWindowBridge);
     engine.rootContext()->setContextProperty("notificationBridge", &notificationBridge);
     engine.rootContext()->setContextProperty("widgetBridge", &widgetBridge);
+    engine.rootContext()->setContextProperty("renderer", core.renderer());
     
     // Загружаем QML
     QString qmlPath = QCoreApplication::applicationDirPath() + "/qml/main.qml";

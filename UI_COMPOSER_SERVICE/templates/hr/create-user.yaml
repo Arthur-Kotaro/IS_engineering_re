@@ -1,0 +1,57 @@
+name: hr_create_user
+endpoint: /page/hr/create-user
+title: "Создание пользователя"
+description: "Создание нового пользователя в системе"
+
+sources:
+  - id: departments
+    service: user_service
+    endpoint: /api/v1/admin/departments
+    method: GET
+  - id: roles
+    service: user_service
+    endpoint: /api/v1/admin/roles
+    method: GET
+
+ui:
+  widgets:
+    - type: Form
+      id: create_user_form
+      title: "Новый пользователь"
+      submit_endpoint: /api/v1/hr/users
+      submit_method: POST
+      fields:
+        - type: TextField
+          field: user_name
+          label: "Логин"
+          required: true
+        - type: TextField
+          field: full_name
+          label: "ФИО"
+          required: true
+        - type: EmailField
+          field: email
+          label: "Email"
+          required: true
+        - type: PasswordField
+          field: password
+          label: "Пароль"
+          required: true
+        - type: SelectField
+          field: dept_code
+          label: "Отдел"
+          source: departments
+          value_field: dept_code
+          label_field: dept_name
+        - type: MultiSelectField
+          field: role_ids
+          label: "Роли"
+          source: roles
+          value_field: role_id
+          label_field: role_title
+        - type: TextField
+          field: phone_work
+          label: "Рабочий телефон"
+        - type: TextField
+          field: phone_mobile
+          label: "Мобильный телефон"

@@ -20,7 +20,7 @@ WidgetBridge::WidgetBridge(QObject* parent)
 {
     qDebug() << "WidgetBridge initialized";
     connect(m_networkManager, &QNetworkAccessManager::finished,
-            this, &WidgetBridge::onHttpReplyFinished);
+            this, &WidgetBridge::onNetworkReplyFinished);
 }
 
 WidgetBridge::~WidgetBridge() {}
@@ -29,7 +29,6 @@ void WidgetBridge::setDataManager(DataManager* dataManager)
 {
     if (m_dataManager != dataManager) {
         m_dataManager = dataManager;
-        emit dataManagerChanged();
         qDebug() << "WidgetBridge: DataManager set";
     }
 }
@@ -38,7 +37,6 @@ void WidgetBridge::setRenderer(JsonUiRenderer* renderer)
 {
     if (m_renderer != renderer) {
         m_renderer = renderer;
-        emit rendererChanged();
         qDebug() << "WidgetBridge: Renderer set";
         if (m_renderer && m_dataManager) {
             m_renderer->setDataManager(m_dataManager);
@@ -49,13 +47,13 @@ void WidgetBridge::setRenderer(JsonUiRenderer* renderer)
 void WidgetBridge::loadInterface(const QString& jsonPath)
 {
     qDebug() << "WidgetBridge: loadInterface from" << jsonPath;
-    
+
     QFile file(jsonPath);
     if (!file.open(QIODevice::ReadOnly)) {
         emit interfaceError("Cannot open file: " + jsonPath);
         return;
     }
-    
+
     QByteArray data = file.readAll();
     file.close();
     loadInterfaceFromJson(QString::fromUtf8(data));
@@ -64,22 +62,22 @@ void WidgetBridge::loadInterface(const QString& jsonPath)
 void WidgetBridge::loadInterfaceFromJson(const QString& jsonString)
 {
     qDebug() << "WidgetBridge: loadInterfaceFromJson";
-    
+
     QJsonParseError parseError;
     QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8(), &parseError);
-    
+
     if (parseError.error != QJsonParseError::NoError) {
         emit interfaceError("JSON parse error: " + parseError.errorString());
         return;
     }
-    
+
     if (!doc.isObject()) {
         emit interfaceError("JSON must be object");
         return;
     }
-    
+
     m_currentInterface = doc.object();
-    
+
     QQuickItem* container = nullptr;
     auto windows = QGuiApplication::topLevelWindows();
     for (auto window : windows) {
@@ -88,16 +86,16 @@ void WidgetBridge::loadInterfaceFromJson(const QString& jsonString)
             if (container) break;
         }
     }
-    
+
     if (!container) {
         emit interfaceError("Cannot find interfaceContainer");
         return;
     }
-    
+
     for (auto child : container->childItems()) {
         child->deleteLater();
     }
-    
+
     if (m_renderer) {
         m_renderer->render(m_currentInterface, container);
         QString title = m_currentInterface["title"].toString("Интерфейс");
@@ -125,7 +123,7 @@ void WidgetBridge::sendWidgetInput(const QString& widgetId, const QJsonObject& i
     }
 
     qDebug() << "WidgetBridge: sendWidgetInput for" << widgetId;
-    
+
     if (input.contains("paramName") && input.contains("value")) {
         m_dataManager->setParameter(input["paramName"].toString(), input["value"].toString());
         emit widgetInputSent(widgetId, true, "Saved");
@@ -166,15 +164,15 @@ void WidgetBridge::refreshAllWidgets()
 
 void WidgetBridge::httpRequest(const QString& url, const QString& method, const QString& token, const QString& body, const QString& callbackId)
 {
-    qDebug() << "WidgetBridge: httpRequest" << method << url;
-    
+    qDebug() << "WidgetBridge: httpRequest" << method << url << "callbackId:" << callbackId;
+
     QNetworkRequest request;
     request.setUrl(QUrl(url));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     if (!token.isEmpty()) {
         request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
     }
-    
+
     QNetworkReply* reply = nullptr;
     if (method == "GET") {
         reply = m_networkManager->get(request);
@@ -189,24 +187,45 @@ void WidgetBridge::httpRequest(const QString& url, const QString& method, const 
         emit httpResponse(callbackId, 0, "Unknown method");
         return;
     }
-    
-    m_pendingRequests[reply] = callbackId;
+
+    if (reply) {
+        m_pendingRequests[reply] = callbackId;
+        qDebug() << "WidgetBridge: request sent, callbackId stored:" << callbackId << "reply:" << reply;
+    } else {
+        qDebug() << "WidgetBridge: ERROR - reply is null!";
+        emit httpResponse(callbackId, 0, "Failed to send request");
+    }
 }
 
-void WidgetBridge::onHttpReplyFinished()
+void WidgetBridge::onNetworkReplyFinished(QNetworkReply* reply)
 {
-    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    if (!reply) return;
-    
+    if (!reply) {
+        qDebug() << "WidgetBridge: onNetworkReplyFinished - reply is null!";
+        return;
+    }
+
     QString callbackId = m_pendingRequests.value(reply, "");
     m_pendingRequests.remove(reply);
-    
+
     int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     QByteArray data = reply->readAll();
-    
-    qDebug() << "WidgetBridge: httpResponse" << callbackId << "status:" << status;
-    
+
+    qDebug() << "WidgetBridge: onNetworkReplyFinished - callbackId:" << callbackId << "status:" << status;
+    qDebug() << "WidgetBridge: response data size:" << data.size();
+    if (data.size() > 0) {
+        qDebug() << "WidgetBridge: response data preview:" << QString(data.left(200));
+    }
+
     emit httpResponse(callbackId, status, QString::fromUtf8(data));
-    
+
     reply->deleteLater();
+}
+
+void WidgetBridge::renderPage(const QJsonObject& uiData, QQuickItem* container)
+{
+    if (m_renderer && container) {
+        m_renderer->render(uiData, container);
+    } else {
+        qWarning() << "WidgetBridge: Cannot render - renderer or container is null";
+    }
 }

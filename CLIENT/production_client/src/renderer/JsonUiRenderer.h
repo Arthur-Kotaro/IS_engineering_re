@@ -18,19 +18,19 @@ public:
     explicit JsonUiRenderer(QQmlEngine* engine, QObject* parent = nullptr);
     ~JsonUiRenderer();
 
-    void render(const QJsonObject& root, QQuickItem* container);
-    QObject* findWidget(const QString& id) const;
-    void updateWidgetData(const QString& id, const QJsonObject& data);
-    int widgetCount() const { return m_widgets.size(); }
-    void clearWidgets();
-    void updateLayout(QQuickItem* layout);
-    Q_INVOKABLE int getContentHeight(QQuickItem* item);
-    Q_INVOKABLE void refreshContentHeight();
+    Q_INVOKABLE void render(const QJsonObject& root, QQuickItem* container);
+    Q_INVOKABLE void updateWidgetData(const QString& id, const QJsonObject& data);
     Q_INVOKABLE void refreshAllCharts();
+    Q_INVOKABLE void refreshContentHeight();
+    Q_INVOKABLE int getContentHeight(QQuickItem* item);
+    Q_INVOKABLE int widgetCount() const { return m_widgets.size(); }
 
-    // Метод для установки DataManager
-    void setDataManager(DataManager* dataManager) { m_dataManager = dataManager; }
+    void setDataManager(DataManager* dataManager);
     DataManager* dataManager() const { return m_dataManager; }
+
+    QObject* findWidget(const QString& id) const;
+    void clearWidgets();
+    void updateLayout(QQuickItem* item);
 
 signals:
     void widgetCreated(const QString& id, QObject* widget);
@@ -58,5 +58,3 @@ private:
 };
 
 #endif // JSONUIRENDERER_H
-
-Q_DECLARE_METATYPE(JsonUiRenderer*)

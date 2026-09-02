@@ -40,6 +40,14 @@ extern QString generateBarChart(const QJsonObject&);
 extern QString generateBarCompareChart(const QJsonObject&);
 extern QString generateLineChart(const QJsonObject&);
 
+// HR виджеты
+extern QString generateTextField(const QJsonObject&);
+extern QString generateSearchField(const QJsonObject&);
+extern QString generateEmailField(const QJsonObject&);
+extern QString generatePasswordField(const QJsonObject&);
+extern QString generateSelectField(const QJsonObject&);
+extern QString generateMultiSelectField(const QJsonObject&);
+
 QmlObjectFactory::QmlObjectFactory(QQmlEngine* engine, QObject* parent)
     : QObject(parent)
     , m_engine(engine)
@@ -100,6 +108,24 @@ void QmlObjectFactory::registerBuiltInTypes()
     // ============================================================
     m_qmlGenerators["QTableWidget"] = [](const QJsonObject& spec) { return generateTableWidget(spec); };
 
+    // ============================================================
+    // АЛИАСЫ ДЛЯ УДОБСТВА
+    // ============================================================
+    m_qmlGenerators["Card"] = [](const QJsonObject& spec) { return generateGroupBox(spec); };
+    m_qmlGenerators["Form"] = [](const QJsonObject& spec) { return generateGroupBox(spec); };
+    m_qmlGenerators["Button"] = [](const QJsonObject& spec) { return generatePushButton(spec); };
+    m_qmlGenerators["ProgressBar"] = [](const QJsonObject& spec) { return generateProgressBar(spec); };
+
+    // ============================================================
+    // HR ВИДЖЕТЫ
+    // ============================================================
+    m_qmlGenerators["TextField"] = [](const QJsonObject& spec) { return generateTextField(spec); };
+    m_qmlGenerators["SearchField"] = [](const QJsonObject& spec) { return generateSearchField(spec); };
+    m_qmlGenerators["EmailField"] = [](const QJsonObject& spec) { return generateEmailField(spec); };
+    m_qmlGenerators["PasswordField"] = [](const QJsonObject& spec) { return generatePasswordField(spec); };
+    m_qmlGenerators["SelectField"] = [](const QJsonObject& spec) { return generateSelectField(spec); };
+    m_qmlGenerators["MultiSelectField"] = [](const QJsonObject& spec) { return generateMultiSelectField(spec); };
+
     qDebug() << "  All widget types registered. Total:" << m_qmlGenerators.size();
 }
 
@@ -121,6 +147,7 @@ QObject* QmlObjectFactory::create(const QString& type, const QJsonObject& spec, 
         "import QtQuick 6.0\n"
         "import QtQuick.Controls 6.0\n"
         "import QtQuick.Layouts 6.0\n"
+        "import Styles 1.0\n"
         "%1\n"
     ).arg(qmlCode);
 

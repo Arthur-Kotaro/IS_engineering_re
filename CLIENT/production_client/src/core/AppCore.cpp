@@ -5,6 +5,7 @@
 #include "userserviceclient/AuthService.h"
 #include "userserviceclient/TokenManager.h"
 #include <QQmlEngine>
+#include <QQmlContext>
 #include <QDebug>
 
 // Статические экземпляры
@@ -44,6 +45,12 @@ void AppCore::init()
     // Создаем JsonUiRenderer
     m_renderer = new JsonUiRenderer(m_engine, this);
     m_renderer->setDataManager(m_dataManager);
+
+    // Передаем renderer в QML контекст
+    if (m_engine) {
+        m_engine->rootContext()->setContextProperty("renderer", m_renderer);
+        qDebug() << "AppCore: renderer set to QML context";
+    }
 
     qDebug() << "AppCore: Initialized with Gateway on localhost:8080";
     qDebug() << "AppCore: DataManager and Renderer created";

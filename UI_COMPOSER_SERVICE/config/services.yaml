@@ -1,19 +1,16 @@
 services:
   user_service:
-    url: http://localhost:8080
-    timeout: 5
+    url: http://localhost:8000
+    timeout: 10
   project_service:
-    url: http://localhost:8080
+    url: http://localhost:8001
     timeout: 5
   navigation_service:
-    url: http://localhost:8080
+    url: http://localhost:8009
     timeout: 5
   delegation_service:
-    url: http://localhost:8080
+    url: http://localhost:8011
     timeout: 5
   notification_service:
-    url: http://localhost:8080
+    url: http://localhost:8012
     timeout: 5
-
-gateway:
-  url: http://localhost:8080

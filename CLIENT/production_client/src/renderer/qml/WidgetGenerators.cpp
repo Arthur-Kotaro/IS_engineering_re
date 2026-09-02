@@ -5,7 +5,7 @@
 QString generateLabel(const QJsonObject& spec)
 {
     QString text = spec["text"].toString("Label");
-    QString color = spec["properties"].toObject()["color"].toString("#ffffff");
+    QString color = spec["properties"].toObject()["color"].toString("Colors.text");
     int fontSize = spec["properties"].toObject()["font.pixelSize"].toInt(14);
     bool bold = spec["properties"].toObject()["font.bold"].toBool(false);
     QString alignment = spec["properties"].toObject()["alignment"].toString("left");
@@ -17,7 +17,7 @@ QString generateLabel(const QJsonObject& spec)
     return QString(
         "Text {\n"
         "    text: \"%1\"\n"
-        "    color: \"%2\"\n"
+        "    color: %2\n"
         "    font.pixelSize: %3\n"
         "    font.bold: %4\n"
         "    horizontalAlignment: %5\n"
@@ -78,6 +78,18 @@ QString generateComboBox(const QJsonObject& spec)
         "    model: %2\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 36\n"
+        "    background: Rectangle {\n"
+        "        color: Colors.surface\n"
+        "        border.color: Colors.border\n"
+        "        border.width: 1\n"
+        "        radius: 4\n"
+        "    }\n"
+        "    contentItem: Text {\n"
+        "        text: combo_%1.displayText\n"
+        "        color: Colors.text\n"
+        "        font.pixelSize: 14\n"
+        "        verticalAlignment: Text.AlignVCenter\n"
+        "    }\n"
         "    onCurrentTextChanged: {\n"
         "        if (widgetBridge) {\n"
         "            var input = {\n"
@@ -101,8 +113,17 @@ QString generateLineEdit(const QJsonObject& spec)
         "TextField {\n"
         "    id: lineEdit_%1\n"
         "    placeholderText: \"%2\"\n"
+        "    placeholderTextColor: Colors.textSecondary\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 36\n"
+        "    color: Colors.text\n"
+        "    selectionColor: Colors.primary\n"
+        "    background: Rectangle {\n"
+        "        color: Colors.surface\n"
+        "        border.color: Colors.border\n"
+        "        border.width: 1\n"
+        "        radius: 4\n"
+        "    }\n"
         "    onTextChanged: {\n"
         "        if (widgetBridge) {\n"
         "            var input = {\n"
@@ -197,6 +218,18 @@ QString generateDateEdit(const QJsonObject& spec)
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 36\n"
         "    editable: true\n"
+        "    background: Rectangle {\n"
+        "        color: Colors.surface\n"
+        "        border.color: Colors.border\n"
+        "        border.width: 1\n"
+        "        radius: 4\n"
+        "    }\n"
+        "    contentItem: Text {\n"
+        "        text: date_%1.displayText\n"
+        "        color: Colors.text\n"
+        "        font.pixelSize: 14\n"
+        "        verticalAlignment: Text.AlignVCenter\n"
+        "    }\n"
         "    onCurrentTextChanged: {\n"
         "        if (widgetBridge) {\n"
         "            var input = {\n"
@@ -223,6 +256,18 @@ QString generateDateTimeEdit(const QJsonObject& spec)
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 36\n"
         "    editable: true\n"
+        "    background: Rectangle {\n"
+        "        color: Colors.surface\n"
+        "        border.color: Colors.border\n"
+        "        border.width: 1\n"
+        "        radius: 4\n"
+        "    }\n"
+        "    contentItem: Text {\n"
+        "        text: datetime_%1.displayText\n"
+        "        color: Colors.text\n"
+        "        font.pixelSize: 14\n"
+        "        verticalAlignment: Text.AlignVCenter\n"
+        "    }\n"
         "    onCurrentTextChanged: {\n"
         "        if (widgetBridge) {\n"
         "            var input = {\n"
@@ -247,7 +292,7 @@ QString generateCalendarWidget(const QJsonObject& spec)
         "    Text {\n"
         "        anchors.centerIn: parent\n"
         "        text: \"Календарь\"\n"
-        "        color: \"#888\"\n"
+        "        color: Colors.textSecondary\n"
         "        font.pixelSize: 16\n"
         "    }\n"
         "}\n"
@@ -262,8 +307,17 @@ QString generateTextEdit(const QJsonObject& spec)
         "TextArea {\n"
         "    id: textArea_%1\n"
         "    placeholderText: \"Введите текст...\"\n"
+        "    placeholderTextColor: Colors.textSecondary\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 100\n"
+        "    color: Colors.text\n"
+        "    selectionColor: Colors.primary\n"
+        "    background: Rectangle {\n"
+        "        color: Colors.surface\n"
+        "        border.color: Colors.border\n"
+        "        border.width: 1\n"
+        "        radius: 4\n"
+        "    }\n"
         "    onTextChanged: {\n"
         "        if (widgetBridge) {\n"
         "            var input = {\n"
@@ -339,16 +393,16 @@ QString generateListWidget(const QJsonObject& spec)
 {
     return QString(
         "Rectangle {\n"
-        "    color: \"transparent\"\n"
+        "    color: Colors.surface\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 150\n"
-        "    border.color: \"#444\"\n"
+        "    border.color: Colors.border\n"
         "    border.width: 1\n"
         "    radius: 4\n"
         "    Text {\n"
         "        anchors.centerIn: parent\n"
         "        text: \"Список\"\n"
-        "        color: \"#888\"\n"
+        "        color: Colors.textSecondary\n"
         "        font.pixelSize: 14\n"
         "    }\n"
         "}\n"
@@ -359,16 +413,16 @@ QString generateTreeWidget(const QJsonObject& spec)
 {
     return QString(
         "Rectangle {\n"
-        "    color: \"transparent\"\n"
+        "    color: Colors.surface\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 150\n"
-        "    border.color: \"#444\"\n"
+        "    border.color: Colors.border\n"
         "    border.width: 1\n"
         "    radius: 4\n"
         "    Text {\n"
         "        anchors.centerIn: parent\n"
         "        text: \"Дерево\"\n"
-        "        color: \"#888\"\n"
+        "        color: Colors.textSecondary\n"
         "        font.pixelSize: 14\n"
         "    }\n"
         "}\n"
@@ -381,7 +435,7 @@ QString generateFrame(const QJsonObject& spec)
         "Rectangle {\n"
         "    height: 2\n"
         "    Layout.fillWidth: true\n"
-        "    color: \"#444\"\n"
+        "    color: Colors.border\n"
         "    Layout.margins: 5\n"
         "}\n"
     );
@@ -425,10 +479,10 @@ QString generateTabWidget(const QJsonObject& spec)
         "        currentIndex: tabBar.currentIndex\n"
         "        Layout.fillWidth: true\n"
         "        Layout.fillHeight: true\n"
-        "        Rectangle { color: \"transparent\"\n"
-        "            Text { anchors.centerIn: parent; text: \"Содержимое 1\"; color: \"#888\" } }\n"
-        "        Rectangle { color: \"transparent\"\n"
-        "            Text { anchors.centerIn: parent; text: \"Содержимое 2\"; color: \"#888\" } }\n"
+        "        Rectangle { color: Colors.surface\n"
+        "            Text { anchors.centerIn: parent; text: \"Содержимое 1\"; color: Colors.text } }\n"
+        "        Rectangle { color: Colors.surface\n"
+        "            Text { anchors.centerIn: parent; text: \"Содержимое 2\"; color: Colors.text } }\n"
         "    }\n"
         "}\n"
     );
@@ -440,10 +494,10 @@ QString generateStackedWidget(const QJsonObject& spec)
         "StackLayout {\n"
         "    Layout.fillWidth: true\n"
         "    Layout.fillHeight: true\n"
-        "    Rectangle { color: \"transparent\"\n"
-        "        Text { anchors.centerIn: parent; text: \"Страница 1\"; color: \"#888\" } }\n"
-        "    Rectangle { color: \"transparent\"\n"
-        "        Text { anchors.centerIn: parent; text: \"Страница 2\"; color: \"#888\" } }\n"
+        "    Rectangle { color: Colors.surface\n"
+        "        Text { anchors.centerIn: parent; text: \"Страница 1\"; color: Colors.text } }\n"
+        "    Rectangle { color: Colors.surface\n"
+        "        Text { anchors.centerIn: parent; text: \"Страница 2\"; color: Colors.text } }\n"
         "}\n"
     );
 }
@@ -471,4 +525,347 @@ QString generateToolButton(const QJsonObject& spec)
         "    }\n"
         "}\n"
     ).arg(text).arg(widgetId);
+}
+
+// ============================================================
+// HR ВИДЖЕТЫ
+// ============================================================
+
+QString generateTextField(const QJsonObject& spec)
+{
+    QString label = spec["label"].toString("");
+    QString placeholder = spec["placeholder"].toString("Введите текст...");
+    bool required = spec["required"].toBool(false);
+    QString widgetId = spec["id"].toString();
+    
+    QString labelPart;
+    if (!label.isEmpty()) {
+        labelPart = QString(
+            "Text {\n"
+            "    text: \"%1\"%2\n"
+            "    color: Colors.text\n"
+            "    font.pixelSize: 14\n"
+            "    Layout.fillWidth: true\n"
+            "}\n"
+        ).arg(label).arg(required ? " *" : "");
+    }
+    
+    return QString(
+        "ColumnLayout {\n"
+        "    Layout.fillWidth: true\n"
+        "    spacing: 4\n"
+        "%1"
+        "    TextField {\n"
+        "        id: textField_%2\n"
+        "        placeholderText: \"%3\"\n"
+        "        placeholderTextColor: Colors.textSecondary\n"
+        "        Layout.fillWidth: true\n"
+        "        Layout.preferredHeight: 36\n"
+        "        color: Colors.text\n"
+        "        selectionColor: Colors.primary\n"
+        "        focus: true\n"
+        "        activeFocusOnTab: true\n"
+        "        cursorVisible: true\n"
+        "        cursorDelegate: Rectangle {\n"
+        "            width: 2\n"
+        "            height: parent.height * 0.7\n"
+        "            color: Colors.primary\n"
+        "            anchors.verticalCenter: parent.verticalCenter\n"
+        "        }\n"
+        "        background: Rectangle {\n"
+        "            color: Colors.surface\n"
+        "            border.color: Colors.border\n"
+        "            border.width: 1\n"
+        "            radius: 4\n"
+        "        }\n"
+        "        onTextChanged: {\n"
+        "            if (widgetBridge) {\n"
+        "                var input = {\n"
+        "                    'type': 'text',\n"
+        "                    'value': text,\n"
+        "                    'paramName': '%2'\n"
+        "                }\n"
+        "                widgetBridge.sendWidgetInput('%2', input)\n"
+        "            }\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+    ).arg(labelPart).arg(widgetId).arg(placeholder);
+}
+
+QString generateSearchField(const QJsonObject& spec)
+{
+    QString placeholder = spec["placeholder"].toString("Поиск...");
+    int minLength = spec["min_length"].toInt(0);
+    QString widgetId = spec["id"].toString();
+    
+    return QString(
+        "TextField {\n"
+        "    id: searchField_%1\n"
+        "    placeholderText: \"🔍 %2\"\n"
+        "    placeholderTextColor: Colors.textSecondary\n"
+        "    Layout.fillWidth: true\n"
+        "    Layout.preferredHeight: 36\n"
+        "    color: Colors.text\n"
+        "    selectionColor: Colors.primary\n"
+        "    focus: true\n"
+        "    activeFocusOnTab: true\n"
+        "    cursorVisible: true\n"
+        "    cursorDelegate: Rectangle {\n"
+        "            width: 2\n"
+        "            height: parent.height * 0.7\n"
+        "            color: Colors.primary\n"
+        "            anchors.verticalCenter: parent.verticalCenter\n"
+        "        }\n"
+        "    background: Rectangle {\n"
+        "        color: Colors.surface\n"
+        "        border.color: Colors.border\n"
+        "        border.width: 1\n"
+        "        radius: 4\n"
+        "    }\n"
+        "    onTextChanged: {\n"
+        "        if (widgetBridge && text.length >= %3) {\n"
+        "            var input = {\n"
+        "                'type': 'search',\n"
+        "                'value': text,\n"
+        "                'paramName': '%1'\n"
+        "            }\n"
+        "            widgetBridge.sendWidgetInput('%1', input)\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+    ).arg(widgetId).arg(placeholder).arg(minLength);
+}
+
+QString generateEmailField(const QJsonObject& spec)
+{
+    QString label = spec["label"].toString("");
+    QString placeholder = spec["placeholder"].toString("email@example.com");
+    bool required = spec["required"].toBool(false);
+    QString widgetId = spec["id"].toString();
+    
+    QString labelPart;
+    if (!label.isEmpty()) {
+        labelPart = QString(
+            "Text {\n"
+            "    text: \"%1\"%2\n"
+            "    color: Colors.text\n"
+            "    font.pixelSize: 14\n"
+            "    Layout.fillWidth: true\n"
+            "}\n"
+        ).arg(label).arg(required ? " *" : "");
+    }
+    
+    return QString(
+        "ColumnLayout {\n"
+        "    Layout.fillWidth: true\n"
+        "    spacing: 4\n"
+        "%1"
+        "    TextField {\n"
+        "        id: emailField_%2\n"
+        "        placeholderText: \"%3\"\n"
+        "        placeholderTextColor: Colors.textSecondary\n"
+        "        Layout.fillWidth: true\n"
+        "        Layout.preferredHeight: 36\n"
+        "        color: Colors.text\n"
+        "        selectionColor: Colors.primary\n"
+        "        focus: true\n"
+        "        activeFocusOnTab: true\n"
+        "        cursorVisible: true\n"
+        "        cursorDelegate: Rectangle {\n"
+        "            width: 2\n"
+        "            height: parent.height * 0.7\n"
+        "            color: Colors.primary\n"
+        "            anchors.verticalCenter: parent.verticalCenter\n"
+        "        }\n"
+        "        inputMethodHints: Qt.ImhEmailCharactersOnly\n"
+        "        background: Rectangle {\n"
+        "            color: Colors.surface\n"
+        "            border.color: Colors.border\n"
+        "            border.width: 1\n"
+        "            radius: 4\n"
+        "        }\n"
+        "        onTextChanged: {\n"
+        "            if (widgetBridge) {\n"
+        "                var input = {\n"
+        "                    'type': 'email',\n"
+        "                    'value': text,\n"
+        "                    'paramName': '%2'\n"
+        "                }\n"
+        "                widgetBridge.sendWidgetInput('%2', input)\n"
+        "            }\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+    ).arg(labelPart).arg(widgetId).arg(placeholder);
+}
+
+QString generatePasswordField(const QJsonObject& spec)
+{
+    QString label = spec["label"].toString("");
+    QString placeholder = spec["placeholder"].toString("Введите пароль...");
+    bool required = spec["required"].toBool(false);
+    QString widgetId = spec["id"].toString();
+    
+    QString labelPart;
+    if (!label.isEmpty()) {
+        labelPart = QString(
+            "Text {\n"
+            "    text: \"%1\"%2\n"
+            "    color: Colors.text\n"
+            "    font.pixelSize: 14\n"
+            "    Layout.fillWidth: true\n"
+            "}\n"
+        ).arg(label).arg(required ? " *" : "");
+    }
+    
+    return QString(
+        "ColumnLayout {\n"
+        "    Layout.fillWidth: true\n"
+        "    spacing: 4\n"
+        "%1"
+        "    TextField {\n"
+        "        id: passwordField_%2\n"
+        "        placeholderText: \"%3\"\n"
+        "        placeholderTextColor: Colors.textSecondary\n"
+        "        Layout.fillWidth: true\n"
+        "        Layout.preferredHeight: 36\n"
+        "        color: Colors.text\n"
+        "        selectionColor: Colors.primary\n"
+        "        focus: true\n"
+        "        activeFocusOnTab: true\n"
+        "        cursorVisible: true\n"
+        "        cursorDelegate: Rectangle {\n"
+        "            width: 2\n"
+        "            height: parent.height * 0.7\n"
+        "            color: Colors.primary\n"
+        "            anchors.verticalCenter: parent.verticalCenter\n"
+        "        }\n"
+        "        echoMode: TextInput.Password\n"
+        "        background: Rectangle {\n"
+        "            color: Colors.surface\n"
+        "            border.color: Colors.border\n"
+        "            border.width: 1\n"
+        "            radius: 4\n"
+        "        }\n"
+        "        onTextChanged: {\n"
+        "            if (widgetBridge) {\n"
+        "                var input = {\n"
+        "                    'type': 'password',\n"
+        "                    'value': text,\n"
+        "                    'paramName': '%2'\n"
+        "                }\n"
+        "                widgetBridge.sendWidgetInput('%2', input)\n"
+        "            }\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+    ).arg(labelPart).arg(widgetId).arg(placeholder);
+}
+
+QString generateSelectField(const QJsonObject& spec)
+{
+    QString label = spec["label"].toString("");
+    bool required = spec["required"].toBool(false);
+    QString widgetId = spec["id"].toString();
+    
+    QString labelPart;
+    if (!label.isEmpty()) {
+        labelPart = QString(
+            "Text {\n"
+            "    text: \"%1\"%2\n"
+            "    color: Colors.text\n"
+            "    font.pixelSize: 14\n"
+            "    Layout.fillWidth: true\n"
+            "}\n"
+        ).arg(label).arg(required ? " *" : "");
+    }
+    
+    return QString(
+        "ColumnLayout {\n"
+        "    Layout.fillWidth: true\n"
+        "    spacing: 4\n"
+        "%1"
+        "    ComboBox {\n"
+        "        id: combo_%2\n"
+        "        model: [\"Выберите вариант...\"]\n"
+        "        Layout.fillWidth: true\n"
+        "        Layout.preferredHeight: 36\n"
+        "        background: Rectangle {\n"
+        "            color: Colors.surface\n"
+        "            border.color: Colors.border\n"
+        "            border.width: 1\n"
+        "            radius: 4\n"
+        "        }\n"
+        "        contentItem: Text {\n"
+        "            text: combo_%2.displayText\n"
+        "            color: Colors.text\n"
+        "            font.pixelSize: 14\n"
+        "            verticalAlignment: Text.AlignVCenter\n"
+        "        }\n"
+        "        onCurrentTextChanged: {\n"
+        "            if (widgetBridge && currentIndex > 0) {\n"
+        "                var input = {\n"
+        "                    'type': 'select',\n"
+        "                    'value': currentText,\n"
+        "                    'paramName': '%2'\n"
+        "                }\n"
+        "                widgetBridge.sendWidgetInput('%2', input)\n"
+        "            }\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+    ).arg(labelPart).arg(widgetId);
+}
+
+QString generateMultiSelectField(const QJsonObject& spec)
+{
+    QString label = spec["label"].toString("");
+    bool required = spec["required"].toBool(false);
+    QString widgetId = spec["id"].toString();
+    
+    QString labelPart;
+    if (!label.isEmpty()) {
+        labelPart = QString(
+            "Text {\n"
+            "    text: \"%1\"%2\n"
+            "    color: Colors.text\n"
+            "    font.pixelSize: 14\n"
+            "    Layout.fillWidth: true\n"
+            "}\n"
+        ).arg(label).arg(required ? " *" : "");
+    }
+    
+    return QString(
+        "ColumnLayout {\n"
+        "    Layout.fillWidth: true\n"
+        "    spacing: 4\n"
+        "%1"
+        "    ListView {\n"
+        "        id: listView_%2\n"
+        "        Layout.fillWidth: true\n"
+        "        Layout.preferredHeight: 100\n"
+        "        model: [\"Выберите варианты...\"]\n"
+        "        delegate: Rectangle {\n"
+        "            width: parent.width\n"
+        "            height: 30\n"
+        "            color: Colors.surface\n"
+        "            border.color: Colors.border\n"
+        "            border.width: 1\n"
+        "            radius: 4\n"
+        "            Text {\n"
+        "                anchors.centerIn: parent\n"
+        "                text: modelData\n"
+        "                color: Colors.text\n"
+        "            }\n"
+        "        }\n"
+        "        background: Rectangle {\n"
+        "            color: Colors.surface\n"
+        "            border.color: Colors.border\n"
+        "            border.width: 1\n"
+        "            radius: 4\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+    ).arg(labelPart).arg(widgetId);
 }
