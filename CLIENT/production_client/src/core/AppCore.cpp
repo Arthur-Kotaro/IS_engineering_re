@@ -6,6 +6,8 @@
 #include "userserviceclient/TokenManager.h"
 #include <QQmlEngine>
 #include <QQmlContext>
+#include <QGuiApplication>
+#include <QFont>
 #include <QDebug>
 
 // Статические экземпляры
@@ -29,24 +31,18 @@ void AppCore::init()
 {
     qDebug() << "AppCore: Initializing...";
 
-    // Создаем ApiClient с Gateway (порт 8080)
     s_apiClient = std::make_shared<UsersService::ApiClient>();
     s_apiClient->setServerUrl("localhost", 8080);
 
-    // Создаем TokenManager
     s_tokenManager = std::make_shared<UsersService::TokenManager>();
 
-    // Создаем AuthService
     s_authService = std::make_shared<UsersService::AuthService>(s_apiClient);
 
-    // Создаем DataManager (использует ApiClient через common)
     m_dataManager = new DataManager(this);
     
-    // Создаем JsonUiRenderer
     m_renderer = new JsonUiRenderer(m_engine, this);
     m_renderer->setDataManager(m_dataManager);
 
-    // Передаем renderer в QML контекст
     if (m_engine) {
         m_engine->rootContext()->setContextProperty("renderer", m_renderer);
         qDebug() << "AppCore: renderer set to QML context";
@@ -69,4 +65,20 @@ std::shared_ptr<UsersService::ApiClient> AppCore::apiClient()
 std::shared_ptr<UsersService::TokenManager> AppCore::tokenManager()
 {
     return s_tokenManager;
+}
+
+void AppCore::applyFontSize(int fontSize)
+{
+    if (!m_engine) return;
+    
+    QFont defaultFont = QGuiApplication::font();
+    defaultFont.setPixelSize(fontSize);
+    QGuiApplication::setFont(defaultFont);
+    
+    if (m_renderer) {
+        m_renderer->refreshAllCharts();
+        m_renderer->refreshContentHeight();
+    }
+    
+    qDebug() << "AppCore: Font size applied:" << fontSize;
 }

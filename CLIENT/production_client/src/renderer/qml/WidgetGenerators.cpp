@@ -388,7 +388,7 @@ QString generateSpinBox(const QJsonObject& spec)
     ).arg(widgetId).arg(min).arg(max).arg(value);
 }
 
-// Заглушки для сложных виджетов (без ввода)
+// Заглушки для сложных виджетов
 QString generateListWidget(const QJsonObject& spec)
 {
     return QString(
@@ -612,11 +612,11 @@ QString generateSearchField(const QJsonObject& spec)
         "    activeFocusOnTab: true\n"
         "    cursorVisible: true\n"
         "    cursorDelegate: Rectangle {\n"
-        "            width: 2\n"
-        "            height: parent.height * 0.7\n"
-        "            color: Colors.primary\n"
-        "            anchors.verticalCenter: parent.verticalCenter\n"
-        "        }\n"
+        "        width: 2\n"
+        "        height: parent.height * 0.7\n"
+        "        color: Colors.primary\n"
+        "        anchors.verticalCenter: parent.verticalCenter\n"
+        "    }\n"
         "    background: Rectangle {\n"
         "        color: Colors.surface\n"
         "        border.color: Colors.border\n"

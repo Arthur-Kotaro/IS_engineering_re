@@ -4,21 +4,68 @@ import QtQuick.Layouts 6.0
 import Styles 1.0
 
 Rectangle {
-    id: root
+    id: authPage
     anchors.fill: parent
-    color: Colors.background
+    color: Colors.background  // binding — обновляется автоматически
 
-    signal loginSuccess()
+    property bool isLoading: false
+    property string errorMessage: ""
+    property bool showPassword: false
+
+    function doLogin() {
+        if (isLoading) return
+        
+        var email = loginField.text.trim()
+        var password = passwordField.text
+        
+        if (email.length === 0) {
+            errorMessage = "Введите email"
+            return
+        }
+        if (password.length === 0) {
+            errorMessage = "Введите пароль"
+            return
+        }
+        
+        errorMessage = ""
+        isLoading = true
+        
+        authBridge.attemptLogin(email, password)
+    }
+
+    Component.onCompleted: {
+        loginField.forceActiveFocus()
+    }
+
+    Connections {
+        target: authBridge
+        function onLoginSuccess() {
+            isLoading = false
+            errorMessage = ""
+        }
+        function onLoginFailed(message) {
+            isLoading = false
+            errorMessage = message
+        }
+    }
 
     ColumnLayout {
         anchors.centerIn: parent
-        width: 350
-        spacing: 15
+        width: parent.width - 60
+        spacing: 20
+
+        Image {
+            source: "qrc:/assets/images/logo.svg"
+            Layout.alignment: Qt.AlignHCenter
+            Layout.preferredWidth: 120
+            Layout.preferredHeight: 120
+            fillMode: Image.PreserveAspectFit
+        }
 
         Text {
-            text: "Engineering :re"
+            text: "Engineering:re"
             color: Colors.text
-            font.pixelSize: 28
+            font.pixelSize: 24
             font.bold: true
             Layout.alignment: Qt.AlignHCenter
         }
@@ -32,128 +79,122 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            height: 320
-            radius: 12
-            color: Colors.surface
-            border.color: Colors.border
+            height: 1
+            color: Colors.border
+        }
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 20
-                spacing: 15
-
-                TextField {
-                    id: emailField
-                    Layout.fillWidth: true
-                    placeholderText: "Email"
-                    color: Colors.text
-                    background: Rectangle {
-                        color: Colors.background
-                        border.color: Colors.border
-                        radius: 6
-                    }
-                }
-
-                // Поле пароля с кнопкой показа/скрытия
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 48
-                    color: Colors.background
-                    border.color: Colors.border
-                    radius: 6
-
-                    RowLayout {
-                        anchors.fill: parent
-                        spacing: 0
-
-                        TextField {
-                            id: passwordField
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            placeholderText: "Пароль"
-                            echoMode: passwordVisible ? TextField.Normal : TextField.Password
-                            color: Colors.text
-                            background: Rectangle {
-                                color: "transparent"
-                            }
-                            leftPadding: 12
-                            onAccepted: performLogin()
-                        }
-
-                        Button {
-                            id: togglePasswordButton
-                            Layout.preferredWidth: 48
-                            Layout.fillHeight: true
-                            text: passwordVisible ? "🙈" : "👁️"
-                            font.pixelSize: 18
-                            flat: true
-                            onClicked: {
-                                passwordVisible = !passwordVisible
-                            }
-                            background: Rectangle {
-                                color: "transparent"
-                            }
-                        }
-                    }
-                }
-
-                Button {
-                    text: "Войти"
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 40
-                    onClicked: performLogin()
-                    background: Rectangle {
-                        color: Colors.button
-                        radius: 6
-                    }
-                    contentItem: Text {
-                        text: parent.text
-                        color: Colors.buttonText
-                        font.pixelSize: 14
-                        font.bold: true
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                }
-
-                Text {
-                    id: errorText
-                    visible: false
-                    color: Colors.error
-                    font.pixelSize: 12
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                BusyIndicator {
-                    id: loginBusy
-                    running: false
-                    Layout.alignment: Qt.AlignHCenter
-                    visible: running
+        TextField {
+            id: loginField
+            Layout.fillWidth: true
+            Layout.preferredHeight: 40
+            placeholderText: "Email"
+            placeholderTextColor: Colors.textSecondary
+            color: Colors.text
+            selectionColor: Colors.primary
+            background: Rectangle {
+                color: Colors.surface
+                border.color: Colors.border
+                border.width: 1
+                radius: 4
+            }
+            onAccepted: {
+                if (text.length > 0 && passwordField.text.length > 0) {
+                    doLogin()
                 }
             }
         }
-    }
 
-    property bool passwordVisible: false
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 0
 
-    function performLogin() {
-        loginBusy.running = true
-        errorText.visible = false
-        authBridge.attemptLogin(emailField.text, passwordField.text)
-    }
+            TextField {
+                id: passwordField
+                Layout.fillWidth: true
+                Layout.preferredHeight: 40
+                placeholderText: "Пароль"
+                placeholderTextColor: Colors.textSecondary
+                color: Colors.text
+                selectionColor: Colors.primary
+                echoMode: authPage.showPassword ? TextInput.Normal : TextInput.Password
+                background: Rectangle {
+                    color: Colors.surface
+                    border.color: Colors.border
+                    border.width: 1
+                    radius: 4
+                }
+                onAccepted: {
+                    if (loginField.text.length > 0 && text.length > 0) {
+                        doLogin()
+                    }
+                }
+            }
 
-    Connections {
-        target: authBridge
-        function onLoginSuccess() {
-            loginBusy.running = false
-            root.loginSuccess()
+            Button {
+                Layout.preferredWidth: 40
+                Layout.preferredHeight: 40
+                text: authPage.showPassword ? "👁️" : "👁️‍🗨️"
+                flat: true
+                onClicked: {
+                    authPage.showPassword = !authPage.showPassword
+                }
+                background: Rectangle {
+                    color: "transparent"
+                    radius: 4
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: Colors.textSecondary
+                    font.pixelSize: 18
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
         }
-        function onLoginFailed(message) {
-            loginBusy.running = false
-            errorText.text = message
-            errorText.visible = true
+
+        Text {
+            id: errorText
+            Layout.fillWidth: true
+            text: errorMessage
+            color: Colors.error
+            font.pixelSize: 12
+            wrapMode: Text.WordWrap
+            visible: errorMessage.length > 0
+        }
+
+        Button {
+            id: loginButton
+            Layout.fillWidth: true
+            Layout.preferredHeight: 40
+            text: isLoading ? "Вход..." : "Войти"
+            enabled: !isLoading
+            onClicked: doLogin()
+            contentItem: Text {
+                text: parent.text
+                color: "white"
+                font.pixelSize: 14
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+            background: Rectangle {
+                color: "#2196F3"
+                radius: 6
+            }
+        }
+
+        BusyIndicator {
+            Layout.alignment: Qt.AlignHCenter
+            running: isLoading
+            visible: isLoading
+        }
+
+        Text {
+            text: "Версия 1.0.0"
+            color: Colors.textSecondary
+            font.pixelSize: 10
+            Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: 10
         }
     }
 }
