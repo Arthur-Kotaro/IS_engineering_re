@@ -1,9 +1,9 @@
 import os
 import logging
-from fastapi import FastAPI, HTTPException, Header, Query, Request
+from fastapi import FastAPI, HTTPException, Header, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional
-from urllib.parse import urlparse, parse_qs
+from typing import Optional, Dict, Any
+from urllib.parse import urlencode
 
 from src.template_loader import TemplateLoader
 from src.data_aggregator import DataAggregator
@@ -41,6 +41,14 @@ async def shutdown():
 async def health():
     return {"status": "ok"}
 
+@app.get("/pages")
+async def list_pages():
+    pages = []
+    for f in os.listdir("templates"):
+        if f.endswith(".yaml"):
+            pages.append(f.replace(".yaml", ""))
+    return {"pages": pages}
+
 @app.get("/page/{full_path:path}")
 async def get_page(
     full_path: str,
@@ -59,8 +67,18 @@ async def get_page(
         raise HTTPException(status_code=401, detail="Authorization header required")
     
     token = authorization.replace("Bearer ", "")
+    
+    # Получаем параметры запроса
     query_params = dict(request.query_params)
     logger.info(f"Query params: {query_params}")
+    
+    # Для поиска пользователей передаём параметры в data_aggregator
+    if full_path == "hr/search-user" and "search_query" in query_params:
+        # Передаём search_query как параметр для DataAggregator
+        query_params_for_fetch = {"search_query": query_params.get("search_query")}
+        logger.info(f"Search query: {query_params_for_fetch}")
+    else:
+        query_params_for_fetch = query_params
     
     try:
         logger.info(f"Attempting to load template: {full_path}")
@@ -75,18 +93,10 @@ async def get_page(
     
     logger.info(f"Fetching data for: {full_path}, sources: {[s.id for s in template.sources]}, user_id: {x_user_id}")
     
-    data = await data_aggregator.fetch_all(template.sources, x_user_id, token, query_params)
+    data = await data_aggregator.fetch_all(template.sources, x_user_id, token, query_params_for_fetch)
     logger.info(f"Data fetched: {list(data.keys())}")
     
     ui = ui_builder.build(template, data)
     logger.info(f"UI built: {ui['title']}")
     
     return ui
-
-@app.get("/pages")
-async def list_pages():
-    pages = []
-    for f in os.listdir("templates"):
-        if f.endswith(".yaml"):
-            pages.append(f.replace(".yaml", ""))
-    return {"pages": pages}

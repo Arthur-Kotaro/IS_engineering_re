@@ -8,7 +8,7 @@ from typing import Dict, Optional
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 import os
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse, parse_qs
 
 load_dotenv()
 
@@ -90,17 +90,20 @@ async def is_token_blacklisted(jti: str) -> bool:
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy(request: Request, path: str):
     logger.info(f"=== PROXY: {request.method} {path} ===")
+    logger.info(f"=== FULL URL: {request.url} ===")
+    logger.info(f"=== QUERY PARAMS: {dict(request.query_params)} ===")
     
-    path_parts = path.split("/")
+    # Убираем параметры запроса из пути
+    clean_path = path.split("?")[0] if "?" in path else path
+    path_parts = clean_path.split("/")
     first_part = path_parts[0] if path_parts else ""
     
     # Для /page/* используем UI Composer
     if first_part == "page" or first_part == "pages":
         target_base = PAGE_ROUTES.get("page")
         logger.info(f"Route to UI Composer: {target_base}")
-        target_url = f"{target_base}/{path}"
+        target_url = f"{target_base}/{clean_path}"
         
-        # Добавляем параметры
         query_params = dict(request.query_params)
         if query_params:
             target_url = f"{target_url}?{urlencode(query_params)}"
@@ -111,7 +114,6 @@ async def proxy(request: Request, path: str):
         headers.pop("host", None)
         headers.pop("content-length", None)
         
-        # Проверяем токен для страниц тоже
         auth_header = request.headers.get("Authorization")
         if auth_header:
             token = auth_header.replace("Bearer ", "").strip()

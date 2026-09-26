@@ -55,7 +55,7 @@ QString generateGroupBox(const QJsonObject& spec)
         "    label: Text {\n"
         "        text: parent.title\n"
         "        color: Colors.text\n"
-        "        font.pixelSize: 14\n"
+        "        font.pixelSize: GlobalSettings.fontSize\n"
         "        font.bold: true\n"
         "        padding: 4\n"
         "    }\n"

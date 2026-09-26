@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/Styles">
+        <file>../../qml/styles/Colors.qml</file>
+        <file>../../qml/styles/GlobalSettings.qml</file>
+    </qresource>
+</RCC>

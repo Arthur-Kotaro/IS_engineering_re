@@ -20,16 +20,40 @@ ApplicationWindow {
 
     property bool isFullScreen: false
 
+    function applyThemeFromConfig() {
+        if (!configManager) return
+        
+        if (configManager.theme === "dark") {
+            Colors.isDarkTheme = true
+            var darkIdx = configManager.darkScheme === "blue" ? 0 : configManager.darkScheme === "green" ? 1 : 2
+            Colors.darkScheme = darkIdx
+        } else {
+            Colors.isDarkTheme = false
+            var lightIdx = configManager.lightScheme === "blue" ? 0 : configManager.lightScheme === "green" ? 1 : 2
+            Colors.lightScheme = lightIdx
+        }
+        Colors.updateColors()
+        
+        GlobalSettings.setFontSize(configManager.fontSize)
+    }
+
     Component.onCompleted: {
-        Colors.setDarkTheme()
+        applyThemeFromConfig()
     }
 
     function toggleTheme() {
         if (Colors.isDarkTheme) {
-            Colors.setLightTheme()
+            Colors.isDarkTheme = false
+            var lightIdx = configManager.lightScheme === "blue" ? 0 : configManager.lightScheme === "green" ? 1 : 2
+            Colors.lightScheme = lightIdx
+            configManager.setTheme("light")
         } else {
-            Colors.setDarkTheme()
+            Colors.isDarkTheme = true
+            var darkIdx = configManager.darkScheme === "blue" ? 0 : configManager.darkScheme === "green" ? 1 : 2
+            Colors.darkScheme = darkIdx
+            configManager.setTheme("dark")
         }
+        Colors.updateColors()
     }
 
     function toggleFullScreen() {

@@ -3,6 +3,7 @@ import asyncio
 import os
 import logging
 from typing import Dict, Any, List, Optional
+from urllib.parse import urlencode
 
 from src.models import SourceConfig
 
@@ -34,7 +35,6 @@ class DataAggregator:
         url = f"{service_url}{source.endpoint}"
         headers = {"X-User-ID": user_id}
         
-        # Если эндпоинт начинается с /internal - добавляем X-Internal-Key
         if source.endpoint.startswith("/internal"):
             headers["X-Internal-Key"] = self.internal_key
             logger.info(f"🔑 Using internal key for: {url}")
@@ -42,22 +42,41 @@ class DataAggregator:
             headers["Authorization"] = f"Bearer {token}"
             logger.info(f"🔐 Using JWT for: {url}")
         
-        # Добавляем параметры запроса
+        # Собираем параметры
         params = {}
+        
+        # Сначала параметры из source.params
         if source.params:
-            params.update(source.params)
+            # Подставляем значения из query_params в шаблоны source.params
+            for key, value in source.params.items():
+                if isinstance(value, str) and value.startswith("{{") and value.endswith("}}"):
+                    placeholder = value[2:-2].strip()
+                    if query_params and placeholder in query_params:
+                        params[key] = query_params[placeholder]
+                    else:
+                        params[key] = value
+                else:
+                    params[key] = value
+        
+        # Затем параметры из query_params
         if query_params:
-            # Подставляем значения из query_params в шаблоны
             for key, value in query_params.items():
                 if isinstance(value, list):
                     params[key] = value[0]
                 else:
                     params[key] = value
         
-        logger.info(f"📡 Fetching: {url} with params: {params}")
+        # URL-encode параметры
+        if params:
+            encoded_params = urlencode(params, encoding='utf-8')
+            url_with_params = f"{url}?{encoded_params}"
+            logger.info(f"📡 Fetching: {url_with_params}")
+        else:
+            url_with_params = url
+            logger.info(f"📡 Fetching: {url}")
         
         try:
-            response = await self.client.get(url, headers=headers, params=params)
+            response = await self.client.get(url_with_params, headers=headers)
             response.raise_for_status()
             logger.info(f"✅ Fetched: {url} -> status {response.status_code}")
             return response.json()

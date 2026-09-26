@@ -8,9 +8,14 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Network Qml Quick QuickControls2)
 
+# Common library
+add_subdirectory(../common common_build)
+
+# Путь к common
 set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
 set(COMMON_INCLUDE ${COMMON_DIR}/include)
 
+# ========== БИБЛИОТЕКА РЕНДЕРИНГА ==========
 set(RENDERER_SOURCES
     src/renderer/JsonUiRenderer.cpp
     src/renderer/QmlObjectFactory.cpp
@@ -29,35 +34,28 @@ set(RENDERER_HEADERS
     src/core/DataManager.h
 )
 
-add_library(RendererLib STATIC
-    ${RENDERER_SOURCES}
-    ${RENDERER_HEADERS}
-)
-
+add_library(RendererLib STATIC ${RENDERER_SOURCES} ${RENDERER_HEADERS})
 target_include_directories(RendererLib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer/qml
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
 )
+target_link_libraries(RendererLib PUBLIC Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Network)
 
-target_link_libraries(RendererLib
-    PUBLIC
-        Qt6::Core
-        Qt6::Qml
-        Qt6::Quick
-        Qt6::QuickControls2
-        Qt6::Network
-)
-
+# ========== QML РЕСУРСЫ ==========
 set(QML_FILES
     qml/main.qml
     qml/windows/AuthWindow.qml
     qml/windows/MainWindow.qml
     qml/windows/SplashScreen.qml
+    qml/windows/SettingsWindow.qml
+    qml/windows/NotificationsWindow.qml
     qml/components/WidgetLoader.qml
     qml/components/ToastNotification.qml
+    qml/components/LoadingSpinner.qml
     qml/components/TabContent.qml
+    qml/components/TopBar.qml
     qml/dialogs/ChangePasswordDialog.qml
     qml/dialogs/ConfirmDialog.qml
     qml/dialogs/ErrorDialog.qml
@@ -65,6 +63,7 @@ set(QML_FILES
     qml/styles/Colors.qml
     qml/styles/Typography.qml
     qml/styles/Button.qml
+    qml/styles/GlobalSettings.qml
     qml/utils/DateUtils.qml
     qml/utils/StringUtils.qml
     qml/utils/Validators.qml
@@ -82,6 +81,7 @@ qt_add_qml_module(ProductionClient
     QML_FILES ${QML_FILES}
 )
 
+# ========== ОСНОВНОЙ КЛИЕНТ ==========
 add_executable(ProductionClientApp
     main.cpp
     src/qml_bridge/AuthBridge.cpp
@@ -113,6 +113,7 @@ target_include_directories(ProductionClientApp PRIVATE
     ${COMMON_INCLUDE}
 )
 
+# ========== ИНСТРУМЕНТ ПРЕВЬЮ (ТОЛЬКО ДЛЯ РАЗРАБОТКИ) ==========
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_subdirectory(tools/renderer_preview)
 endif()

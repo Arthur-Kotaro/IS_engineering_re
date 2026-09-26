@@ -21,7 +21,6 @@ from sse_starlette.sse import EventSourceResponse
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["Notifications"])
 
-# Хранилище активных SSE соединений
 active_connections: dict[int, list[asyncio.Queue]] = {}
 
 
@@ -31,8 +30,30 @@ async def get_notification_service(db: AsyncSession = Depends(get_db)) -> Notifi
     return NotificationService(notification_repo, email_service)
 
 
-async def get_current_user_id(request: Request) -> int:
-    """Получить ID текущего пользователя из заголовка X-User-ID"""
+async def get_user_id_from_token(request: Request) -> int:
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        raise HTTPException(401, "Authorization header required")
+    
+    token = auth_header.replace("Bearer ", "").strip()
+    
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+        user_id = payload.get("user_id")
+        if user_id is None:
+            raise HTTPException(401, "Invalid token: missing user_id")
+        return user_id
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+
+
+async def get_user_id_internal(request: Request) -> int:
     user_id = request.headers.get("X-User-ID")
     if not user_id:
         raise HTTPException(401, "Missing X-User-ID header")
@@ -42,250 +63,113 @@ async def get_current_user_id(request: Request) -> int:
         raise HTTPException(401, "Invalid X-User-ID format")
 
 
-async def get_token(request: Request) -> Optional[str]:
-    """Получить токен из заголовка Authorization"""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        return None
-    return auth_header.replace("Bearer ", "").strip()
+@router.get("", response_model=NotificationListResponse)
+async def get_notifications(
+    request: Request,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    status_filter: Optional[str] = None,
+    user_id: int = Depends(get_user_id_from_token),
+    service: NotificationService = Depends(get_notification_service)
+):
+    """Получить список уведомлений пользователя"""
+    return await service.get_user_notifications(user_id, offset, limit, only_unread=(status_filter == "unread"))
 
 
-async def get_is_super_admin(request: Request) -> bool:
-    """Проверить, является ли пользователь супер-админом"""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        return False
-    token = auth_header.replace("Bearer ", "").strip()
-    try:
-        payload = jwt.decode(token, options={"verify_signature": False})
-        return payload.get("is_super_admin", False)
-    except Exception:
-        return False
+@router.get("/unread", response_model=List[NotificationResponse])
+async def get_unread_notifications(
+    request: Request,
+    user_id: int = Depends(get_user_id_from_token),
+    service: NotificationService = Depends(get_notification_service)
+):
+    """Получить все непрочитанные уведомления пользователя"""
+    return await service.get_unread(user_id)
 
 
-# ========== SSE (Server-Sent Events) ==========
+@router.get("/unread/count", response_model=NotificationUnreadResponse)
+async def get_unread_count(
+    request: Request,
+    user_id: int = Depends(get_user_id_from_token),
+    service: NotificationService = Depends(get_notification_service)
+):
+    """Получить количество непрочитанных уведомлений"""
+    count = await service.get_unread_count(user_id)
+    return NotificationUnreadResponse(unread_count=count)
+
+
+@router.post("/read")
+async def mark_as_read(
+    request: MarkReadRequest,
+    user_id: int = Depends(get_user_id_from_token),
+    service: NotificationService = Depends(get_notification_service)
+):
+    """Отметить уведомления как прочитанные"""
+    await service.mark_as_read(request.notification_ids, user_id)
+    return {"message": "Notifications marked as read"}
+
+
+@router.post("/read/all")
+async def mark_all_as_read(
+    user_id: int = Depends(get_user_id_from_token),
+    service: NotificationService = Depends(get_notification_service)
+):
+    """Отметить все уведомления как прочитанные"""
+    await service.mark_all_as_read(user_id)
+    return {"message": "All notifications marked as read"}
+
+
+@router.post("/internal")
+async def create_notification_internal(
+    notification: NotificationCreate,
+    user_id: int = Depends(get_user_id_internal),
+    service: NotificationService = Depends(get_notification_service)
+):
+    """Внутренний эндпоинт для создания уведомлений (используется другими сервисами)"""
+    created = await service.create_notification(notification)
+    return created
+
 
 @router.get("/stream")
-async def notifications_stream(
+async def stream_notifications(
     request: Request,
-    current_user_id: int = Depends(get_current_user_id)
+    user_id: int = Depends(get_user_id_from_token)
 ):
-    """
-    Server-Sent Events поток для получения уведомлений в реальном времени.
-    Клиент подписывается на события и получает их мгновенно.
+    """SSE поток уведомлений для пользователя"""
     
-    Для клиента:
-    1. Открыть SSE соединение: GET /api/v1/notifications/stream
-    2. При получении события обновить бэйдж
-    3. При отключении — автоматически переподключиться
-    """
+    if user_id not in active_connections:
+        active_connections[user_id] = []
+    
+    queue = asyncio.Queue()
+    active_connections[user_id].append(queue)
+    
     async def event_generator():
-        queue = asyncio.Queue()
-        
-        if current_user_id not in active_connections:
-            active_connections[current_user_id] = []
-        active_connections[current_user_id].append(queue)
-        
         try:
-            # Отправляем приветственное событие
-            yield {
-                "event": "connected",
-                "data": json.dumps({
-                    "status": "connected",
-                    "user_id": current_user_id
-                })
-            }
-            
             while True:
+                if await request.is_disconnected():
+                    break
+                
                 try:
-                    # Ждем новое уведомление с таймаутом (heartbeat)
                     notification = await asyncio.wait_for(queue.get(), timeout=30.0)
                     yield {
                         "event": "notification",
-                        "data": notification
+                        "data": json.dumps(notification)
                     }
                 except asyncio.TimeoutError:
-                    # Heartbeat для поддержания соединения
                     yield {
                         "event": "ping",
-                        "data": json.dumps({"type": "ping"})
+                        "data": ""
                     }
-        except asyncio.CancelledError:
-            # Клиент отключился
-            pass
         finally:
-            if current_user_id in active_connections:
-                active_connections[current_user_id].remove(queue)
-                if not active_connections[current_user_id]:
-                    del active_connections[current_user_id]
+            if user_id in active_connections:
+                active_connections[user_id].remove(queue)
+                if not active_connections[user_id]:
+                    del active_connections[user_id]
     
     return EventSourceResponse(event_generator())
 
 
-async def broadcast_notification(user_id: int, notification_data: dict):
-    """Отправить уведомление всем активным SSE клиентам пользователя"""
+async def send_notification_to_user(user_id: int, notification_data: dict):
+    """Отправить уведомление в SSE поток пользователя"""
     if user_id in active_connections:
-        message = json.dumps(notification_data)
         for queue in active_connections[user_id]:
-            try:
-                await queue.put(message)
-            except Exception:
-                pass
-
-
-# ========== API для клиента ==========
-
-@router.get("/unread/count", response_model=NotificationUnreadResponse)
-async def get_unread_count(
-    current_user_id: int = Depends(get_current_user_id),
-    service: NotificationService = Depends(get_notification_service)
-):
-    """
-    Получить количество непрочитанных уведомлений.
-    Используется для отображения бэйджа в TopBar.
-    """
-    count = await service.get_unread_count(current_user_id)
-    return NotificationUnreadResponse(unread_count=count)
-
-
-@router.get("/unread", response_model=NotificationListResponse)
-async def get_unread_notifications(
-    limit: int = Query(50, ge=1, le=500),
-    current_user_id: int = Depends(get_current_user_id),
-    service: NotificationService = Depends(get_notification_service)
-):
-    """
-    Получить непрочитанные уведомления (для окна уведомлений).
-    """
-    return await service.get_user_notifications(
-        current_user_id, 
-        skip=0, 
-        limit=limit, 
-        only_unread=True
-    )
-
-
-@router.get("/", response_model=NotificationListResponse)
-async def get_notifications(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=500),
-    only_unread: bool = Query(False),
-    current_user_id: int = Depends(get_current_user_id),
-    service: NotificationService = Depends(get_notification_service)
-):
-    """
-    Получить список уведомлений с пагинацией.
-    Используется для окна уведомлений с историей.
-    """
-    return await service.get_user_notifications(
-        current_user_id, 
-        skip, 
-        limit, 
-        only_unread
-    )
-
-
-@router.post("/read")
-async def mark_notifications_read(
-    request: MarkReadRequest,
-    current_user_id: int = Depends(get_current_user_id),
-    service: NotificationService = Depends(get_notification_service)
-):
-    """Отметить выбранные уведомления как прочитанные"""
-    count = await service.mark_as_read(request.notification_ids, current_user_id)
-    return {"marked_count": count, "message": f"{count} notifications marked as read"}
-
-
-@router.post("/read/all")
-async def mark_all_read(
-    current_user_id: int = Depends(get_current_user_id),
-    service: NotificationService = Depends(get_notification_service)
-):
-    """Отметить все уведомления как прочитанные"""
-    count = await service.mark_all_as_read(current_user_id)
-    return {"marked_count": count, "message": f"{count} notifications marked as read"}
-
-
-# ========== Административные эндпоинты ==========
-
-@router.post("/")
-async def create_notification(
-    data: NotificationCreate,
-    is_super_admin: bool = Depends(get_is_super_admin),
-    service: NotificationService = Depends(get_notification_service)
-):
-    """
-    Создать уведомление (только для супер-админа или внутреннего использования).
-    """
-    if not is_super_admin:
-        raise HTTPException(403, "Only super admin can create notifications")
-    
-    notification = await service.create_notification(data)
-    
-    # Отправляем SSE
-    await broadcast_notification(
-        data.user_id,
-        {
-            "notification_id": notification.notification_id,
-            "type": data.notification_type,
-            "title": data.title,
-            "message": data.message,
-            "created_at": notification.created_at.isoformat()
-        }
-    )
-    
-    return notification
-
-# ========== ВНУТРЕННИЙ ЭНДПОИНТ ДЛЯ СЕРВИСОВ ==========
-
-@router.post("/internal")
-async def create_notification_internal(
-    data: NotificationCreate,
-    service: NotificationService = Depends(get_notification_service)
-):
-    """
-    Внутренний эндпоинт для создания уведомлений (без проверки прав).
-    Используется только доверенными сервисами (Delegation, User, Project).
-    """
-    notification = await service.create_notification(data)
-    
-    # Отправляем SSE
-    await broadcast_notification(
-        data.user_id,
-        {
-            "notification_id": notification.notification_id,
-            "type": data.notification_type,
-            "title": data.title,
-            "message": data.message,
-            "created_at": notification.created_at.isoformat()
-        }
-    )
-    
-    return notification
-
-# ========== ВНУТРЕННИЙ ЭНДПОИНТ ДЛЯ СЕРВИСОВ ==========
-
-@router.post("/internal")
-async def create_notification_internal(
-    data: NotificationCreate,
-    service: NotificationService = Depends(get_notification_service)
-):
-    """
-    Внутренний эндпоинт для создания уведомлений (без проверки прав).
-    Используется только доверенными сервисами (Delegation, User, Project).
-    """
-    notification = await service.create_notification(data)
-    
-    # Отправляем SSE
-    await broadcast_notification(
-        data.user_id,
-        {
-            "notification_id": notification.notification_id,
-            "type": data.notification_type,
-            "title": data.title,
-            "message": data.message,
-            "created_at": notification.created_at.isoformat()
-        }
-    )
-    
-    return notification
+            await queue.put(notification_data)
