@@ -313,7 +313,6 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                 }
             }
 
-            // Обработка дочерних виджетов (widgets)
             if (hasChildren && targetParent) {
                 int childCount = spec["widgets"].toArray().size();
                 qDebug() << "      Container has" << childCount << "child widgets";
@@ -321,7 +320,6 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                 updateLayout(targetParent);
             }
 
-            // Обработка полей (fields) из data для Card
             if (hasFields && (type == "Card" || type == "QGroupBox")) {
                 QJsonObject dataObj = spec["data"].toObject();
                 QJsonArray fields = dataObj["fields"].toArray();
@@ -354,7 +352,6 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                 }
             }
 
-            // Обработка полей (fields) для Form
             if (type == "Form" && spec.contains("fields") && spec["fields"].isArray()) {
                 QJsonArray fields = spec["fields"].toArray();
                 qDebug() << "      Form has" << fields.size() << "fields";
@@ -406,7 +403,6 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                 }
             }
 
-            // Кнопка Submit для Form
             if (type == "Form" && spec.contains("submit_endpoint") && targetParent) {
                 QString submitEndpoint = spec["submit_endpoint"].toString();
                 QString submitMethod = spec["submit_method"].toString("POST");
@@ -494,5 +490,21 @@ void JsonUiRenderer::setDataManager(DataManager* dataManager)
     if (m_dataManager != dataManager) {
         m_dataManager = dataManager;
         qDebug() << "JsonUiRenderer: DataManager set";
+    }
+}
+
+void JsonUiRenderer::refreshAllWidgets()
+{
+    if (m_lastLayout) {
+        QList<QQuickItem*> items = m_lastLayout->childItems();
+        for (QQuickItem* item : items) {
+            if (item) {
+                item->polish();
+                item->update();
+            }
+        }
+        m_lastLayout->polish();
+        m_lastLayout->update();
+        scheduleHeightUpdate(m_lastLayout);
     }
 }

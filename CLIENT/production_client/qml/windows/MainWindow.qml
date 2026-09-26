@@ -44,7 +44,8 @@ Rectangle {
                 "method": method,
                 "accessToken": accessToken,
                 "tileId": tileId,
-                "visible": true
+                "visible": true,
+                "renderer": renderer
             })
             if (tab) {
                 tabsModel.append({"title": title})
@@ -187,7 +188,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: "🏠 Главная"
                             color: Colors.text
-                            font.pixelSize: GlobalSettings.fontSize + 2
+                            font.pixelSize: 15
                             font.bold: activeTabIndex === 0
                         }
 
@@ -223,7 +224,7 @@ Rectangle {
                                     id: tabTitle
                                     text: model.title || "Вкладка"
                                     color: Colors.text
-                                    font.pixelSize: GlobalSettings.fontSize
+                                    font.pixelSize: 15
                                     font.bold: activeTabIndex === index + 1
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
@@ -249,7 +250,7 @@ Rectangle {
                                     Text {
                                         anchors.centerIn: parent
                                         text: "✕"
-                                        font.pixelSize: GlobalSettings.fontSize - 4
+                                        font.pixelSize: 10
                                         font.bold: true
                                         color: closeArea.containsMouse ? Colors.buttonText : Colors.textSecondary
                                     }
@@ -333,7 +334,7 @@ Rectangle {
                             Text {
                                 text: modelData.label || "Плитка"
                                 color: Colors.text
-                                font.pixelSize: GlobalSettings.fontSize + 2
+                                font.pixelSize: 14
                                 font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
                                 Layout.fillWidth: true
@@ -354,7 +355,7 @@ Rectangle {
                                     anchors.centerIn: parent
                                     text: modelData.badge_count
                                     color: Colors.buttonText
-                                    font.pixelSize: GlobalSettings.fontSize - 4
+                                    font.pixelSize: 11
                                     font.bold: true
                                 }
                             }

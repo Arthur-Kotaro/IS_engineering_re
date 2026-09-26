@@ -33,21 +33,17 @@ ApplicationWindow {
             Colors.lightScheme = lightIdx
         }
         Colors.updateColors()
-        
-        GlobalSettings.setFontSize(configManager.fontSize)
-    }
-
-    Component.onCompleted: {
-        applyThemeFromConfig()
     }
 
     function toggleTheme() {
         if (Colors.isDarkTheme) {
+            // Переключаем на светлую тему с сохранённой схемой
             Colors.isDarkTheme = false
             var lightIdx = configManager.lightScheme === "blue" ? 0 : configManager.lightScheme === "green" ? 1 : 2
             Colors.lightScheme = lightIdx
             configManager.setTheme("light")
         } else {
+            // Переключаем на тёмную тему с сохранённой схемой
             Colors.isDarkTheme = true
             var darkIdx = configManager.darkScheme === "blue" ? 0 : configManager.darkScheme === "green" ? 1 : 2
             Colors.darkScheme = darkIdx
@@ -66,6 +62,10 @@ ApplicationWindow {
         }
     }
 
+    Component.onCompleted: {
+        applyThemeFromConfig()
+    }
+
     StackView {
         id: stackView
         anchors.fill: parent
@@ -75,14 +75,20 @@ ApplicationWindow {
     Component {
         id: authWindowComponent
         Windows.AuthWindow {
-            onLoginSuccess: {
-                root.minimumWidth = 800
-                root.maximumWidth = 16384
-                root.minimumHeight = 600
-                root.maximumHeight = 16384
-                root.width = 1024
-                root.height = 768
-                stackView.replace(mainWindowComponent)
+            Connections {
+                target: authBridge
+                function onLoginSuccess() {
+                    root.minimumWidth = 800
+                    root.maximumWidth = 16384
+                    root.minimumHeight = 600
+                    root.maximumHeight = 16384
+                    root.width = 1024
+                    root.height = 768
+                    stackView.replace(mainWindowComponent)
+                }
+                function onLoginFailed(message) {
+                    // Обработка ошибки уже в AuthWindow
+                }
             }
         }
     }

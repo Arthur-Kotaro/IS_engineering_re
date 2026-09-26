@@ -120,6 +120,20 @@ QtObject {
         }
     }
 
+    function setDarkSchemeValue(index) {
+        darkScheme = index
+        if (isDarkTheme) {
+            updateColors()
+        }
+    }
+
+    function setLightSchemeValue(index) {
+        lightScheme = index
+        if (!isDarkTheme) {
+            updateColors()
+        }
+    }
+
     function updateColors() {
         if (isDarkTheme) {
             if (darkScheme === 0) {

@@ -20,17 +20,18 @@ int main(int argc, char *argv[])
     app.setOrganizationName("Engineering");
     app.setApplicationName("EngineeringRE");
     
+    // 1. Загружаем конфиг ДО создания engine
     ConfigManager* config = ConfigManager::instance();
     
+    // 2. Применяем шрифт к приложению
     QFont defaultFont = app.font();
     defaultFont.setPixelSize(config->fontSize());
     app.setFont(defaultFont);
     
+    // 3. Создаём engine после применения настроек
     QQmlApplicationEngine engine;
     
     qmlRegisterType<WidgetBridge>("ProductionClient", 1, 0, "WidgetBridge");
-    qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/Colors.qml"), "Styles", 1, 0, "Colors");
-    qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/GlobalSettings.qml"), "Styles", 1, 0, "GlobalSettings");
     
     AppCore core(&engine);
     core.init();
@@ -45,6 +46,10 @@ int main(int argc, char *argv[])
     widgetBridge.setDataManager(core.dataManager());
     widgetBridge.setRenderer(core.renderer());
     
+    // 4. Регистрируем Colors как синглтон
+    qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/Colors.qml"), "Styles", 1, 0, "Colors");
+    
+    // 5. Передаём config в QML контекст
     engine.rootContext()->setContextProperty("appCore", &core);
     engine.rootContext()->setContextProperty("authBridge", &authBridge);
     engine.rootContext()->setContextProperty("mainWindowBridge", &mainWindowBridge);
@@ -53,7 +58,20 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("renderer", core.renderer());
     engine.rootContext()->setContextProperty("configManager", config);
     
-    engine.load(QUrl("qrc:/ProductionClient/qml/main.qml"));
+    // 6. Загружаем QML
+    QString qmlPath = QCoreApplication::applicationDirPath() + "/qml/main.qml";
+    if (!QFile::exists(qmlPath)) {
+        qmlPath = QDir::currentPath() + "/qml/main.qml";
+    }
+    if (!QFile::exists(qmlPath)) {
+        qmlPath = QString("%1/../production_client/qml/main.qml")
+            .arg(QCoreApplication::applicationDirPath());
+    }
+    
+    qDebug() << "Loading QML from:" << qmlPath;
+    
+    QUrl url = QUrl::fromLocalFile(qmlPath);
+    engine.load(url);
     
     return app.exec();
 }

@@ -8,8 +8,6 @@
 #include <QTimer>
 
 #include "PreviewBridge.h"
-#include "src/qml_bridge/WidgetBridge.h"
-#include "src/core/ConfigManager.h"
 
 int main(int argc, char *argv[])
 {
@@ -18,15 +16,6 @@ int main(int argc, char *argv[])
     app.setApplicationName("RendererPreview");
 
     QQmlApplicationEngine engine;
-
-    qmlRegisterType<WidgetBridge>("ProductionClient", 1, 0, "WidgetBridge");
-    
-    // Регистрируем Colors как синглтон из файловой системы
-    QString colorsPath = "/home/kotaro/code/IS_RE_engineering/CLIENT/production_client/qml/styles/Colors.qml";
-    qmlRegisterSingletonType(QUrl::fromLocalFile(colorsPath), "Styles", 1, 0, "Colors");
-    
-    QString globalSettingsPath = "/home/kotaro/code/IS_RE_engineering/CLIENT/production_client/qml/styles/GlobalSettings.qml";
-    qmlRegisterSingletonType(QUrl::fromLocalFile(globalSettingsPath), "Styles", 1, 0, "GlobalSettings");
 
     PreviewBridge previewBridge(&engine);
     engine.rootContext()->setContextProperty("previewBridge", &previewBridge);

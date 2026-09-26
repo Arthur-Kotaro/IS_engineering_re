@@ -69,7 +69,7 @@ std::shared_ptr<UsersService::TokenManager> AppCore::tokenManager()
 
 void AppCore::applyFontSize(int fontSize)
 {
-    qDebug() << "AppCore: applyFontSize called with" << fontSize;
+    if (!m_engine) return;
     
     QFont defaultFont = QGuiApplication::font();
     defaultFont.setPixelSize(fontSize);

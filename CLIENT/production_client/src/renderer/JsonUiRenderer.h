@@ -22,8 +22,8 @@ public:
     Q_INVOKABLE void updateWidgetData(const QString& id, const QJsonObject& data);
     Q_INVOKABLE void refreshAllCharts();
     Q_INVOKABLE void refreshContentHeight();
+    Q_INVOKABLE void refreshAllWidgets();
     Q_INVOKABLE int getContentHeight(QQuickItem* item);
-    Q_INVOKABLE int widgetCount() const { return m_widgets.size(); }
 
     void setDataManager(DataManager* dataManager);
     DataManager* dataManager() const { return m_dataManager; }
