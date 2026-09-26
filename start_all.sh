@@ -1,5 +1,6 @@
 #!/bin/bash
-# start_all.sh — Запуск микросервисов с поддержкой ключей командной строки
+
+# start_all.sh — Запуск микросервисов
 #
 # Использование:
 #   ./start_all.sh [OPTION]
@@ -10,8 +11,9 @@
 #   -f, --full       Все сервисы + клиент
 #   -h, --help       Показать эту справку
 #
-# Инфраструктура: Auth, User, Project, Navigation, Delegation, Notification, UI Composer, Gateway
-# Бизнес-сервисы: PJP, Mastergraphics, PROTO
+# Инфраструктура: User, Project, Navigation, Auth, Delegation, Notification, UI Composer
+# Gateway:        Nginx (системный, /etc/nginx/)
+# Бизнес-сервисы: PJP, MG, PROTO
 #
 # Примеры:
 #   ./start_all.sh -d          # Инфраструктура
@@ -178,13 +180,13 @@ start_ui_composer() {
 }
 
 start_gateway() {
-    echo -e "\n${YELLOW}▶ Запуск API Gateway (nginx)...${NC}"
+    echo -e "\n${YELLOW}▶ Перезагрузка Nginx Gateway...${NC}"
     
     if sudo nginx -t 2>/dev/null; then
         if sudo systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null; then
-            echo -e "${GREEN}✅ API Gateway перезапущен (порт 8080)${NC}"
+            echo -e "${GREEN}✅ Nginx Gateway перезагружен (порт 8080)${NC}"
         else
-            echo -e "${RED}❌ Не удалось перезапустить nginx${NC}"
+            echo -e "${RED}❌ Не удалось перезагрузить nginx${NC}"
             return 0
         fi
     else

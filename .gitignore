@@ -136,3 +136,25 @@ coverage.xml
 *.old
 *.orig
 *.rej
+
+# Nginx backups
+infra/nginx/backup-*
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual envs
+venv/
+.venv/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

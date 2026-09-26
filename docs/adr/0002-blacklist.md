@@ -66,3 +66,18 @@ JWT access-токены имеют TTL 15–30 минут. При logout или 
 
 ## Ссылки
 - ADR-0001: Gateway на nginx + auth_request
+
+## Использование системного Redis
+
+Решение: используется системный Redis Manjaro (`systemctl start redis`).
+
+- Пакет: `redis` (Manjaro).
+- Сервис: `redis.service` (systemd).
+- Порт: 6379, bind на 127.0.0.1.
+- Конфиг: `/etc/redis/redis.conf`.
+- Пароль: не задан (локальная сеть, доступ только с localhost).
+- Persistence: RDB (по умолчанию).
+- Данные: `/var/lib/redis/`.
+
+Свой инстанс Redis в `infra/redis/` не создаётся.
+Управление: `systemctl {start|stop|restart|status} redis`.
