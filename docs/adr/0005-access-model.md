@@ -1,48 +1,96 @@
 # ADR-0005: Модель прав на проект
 
 ## Статус
-Proposed
+Accepted
 
 ## Дата
 2026-09-26
 
 ## Контекст
 
-Права на проект сейчас декоративны: ProjectMember.role — строка, _check_owner — только created_by.
+Project Service — источник прав на проект. Права проверяются при действиях над проектом и его мастерграфиком.
 
-## Решение
+## Модель
 
-Project Service — единственный источник прав на проект.
+### Роли в проекте
 
-Композиция:
+- `owner` — владелец (создатель).
+- `manager` — управляющий.
+- `editor` — редактор.
+- `viewer` — наблюдатель.
 
-    effective_permission(user, project, action) =
-        direct_permission(user, project, action)
-        OR subordinate_permission(user, project, action)
-        OR delegated_permission(user, project, action)
+Роль в проекте — **одна** для пользователя. Не может быть одновременно editor и viewer.
 
-- Direct: project_members с явными правами.
-- Subordinate: начальник действует от имени подчинённого (через иерархию из User).
-- Delegated: через активную делегацию из Delegation.
+### Права (permissions)
 
-## Формат прав
+- `view_project`
+- `edit_project`
+- `edit_mastergraphic`
+- `manage_members`
+- `delete_project`
 
-Вариант 1 (проще): project_role = owner | manager | editor | viewer. Из роли выводятся права.
+### Соответствие ролей и прав
 
-Вариант 2 (гибче): явные флаги can_view, can_edit_mastergraphic, can_edit_project, can_manage_members.
+| Роль | view_project | edit_project | edit_mastergraphic | manage_members | delete_project |
+|---|---|---|---|---|---|
+| owner | ✅ | ✅ | ✅ | ✅ | ✅ |
+| manager | ✅ | ✅ | ✅ | ✅ | ❌ |
+| editor | ✅ | ❌ | ✅ | ❌ | ❌ |
+| viewer | ✅ | ❌ | ❌ | ❌ | ❌ |
 
-Решение: начать с варианта 1, перейти на 2 при необходимости.
+## Композиция прав
 
-## Источник иерархии
+effective_permission(user, project, permission) =
+direct_permission(user, project, permission)
+OR subordinate_permission(user, project, permission)
+OR delegated_permission(user, project, permission)
 
-User Service, кэш в Project Service.
 
-## Действие от имени
+- **Direct:** `project_members(user_id, project_id, role)` и `permission in role.permissions`.
+- **Subordinate:** начальник действует от имени подчинённого (1 уровень). Для каждого подчинённого `S` проверяется `direct_permission(S, project, permission)`.
+- **Delegated:** для каждой активной делегации, где user = `delegate_id`, проверяется `direct_permission(delegator_id, project, permission)`.
 
-Аудит: acting_user_id + on_behalf_of.
+## Ответ на проверку
 
-## Что должен уметь Project Service
+json
+{
+  "has_access": true,
+  "reason": "direct" | "subordinate_access" | "delegation" | "none",
+  "role": "owner",
+  "via_user_id": 101,
+  "project_status": "active"
+}
 
-- GET /internal/projects/list-with-access?user_id=&permission=
-- GET /internal/projects/{id}/check-access?user_id=&permission=
-- Внутри — запросы к User (иерархия) и Delegation (делегации).
+via_user_id — подчинённый или делегатор, от имени которого действует пользователь. При direct — null.
+
+Эндпоинты
+
+Публичные (через X-User-ID):
+
+· GET /api/v1/projects/list-with-access?permission=
+· GET /api/v1/projects/{id}/check-access?user_id=&permission=
+
+Внутренние:
+
+· GET /internal/projects/list-with-access?user_id=&permission=
+· GET /internal/projects/{id}/check-access?user_id=&permission=
+
+Источник иерархии
+
+User Service, эндпоинт GET /api/v1/users/{id}/subordinates.
+Кэш в Project Service — TTL 30 сек (в будущем).
+
+Источник делегаций
+
+Delegation Service, эндпоинт GET /api/v1/delegations/active/{delegate_id}.
+Запрос выполняется Project Service'ом напрямую (не через nginx, не через gateway).
+
+Аудит
+
+При действии через подчинённого или делегацию, сервисы, использующие права (MG, Project), сохраняют:
+
+· actor_id — реальный действующий пользователь (X-Impersonated-By или X-User-ID).
+· acting_as_id — донор (X-User-ID).
+· access_reason — direct | subordinate_access | delegation.
+· via_user_id — подчинённый или делегатор.
+

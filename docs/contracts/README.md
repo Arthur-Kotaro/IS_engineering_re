@@ -1,41 +1,41 @@
 # Контракты сервисов
 
-## Формат обмена
+## Общие правила
+
 - HTTP/1.1, JSON.
-- Заголовки — см. ADR-0008.
+- Заголовки — см. ADR-0008 и request-flows.md.
+- Аутентификация: `Authorization: Bearer <jwt>`.
+- Внутренние эндпоинты: `X-Internal-Key`.
+- Идентичность: `X-User-ID`, `X-User-Role` (ставит nginx).
+- Имперсонация: `X-Impersonated-By`, `X-Impersonation-Id`.
 
-## Аутентификация
-- POST /api/v1/auth/login → {access_token, refresh_token, token_type, requires_password_change}
-- POST /api/v1/auth/refresh → {access_token, refresh_token}
-- POST /api/v1/auth/logout → {message}
-- POST /internal/auth/verify — заголовки или 401
+## HTTP-коды
 
-## Пользователи
-- GET /api/v1/users/me → UserResponse
-- GET /api/v1/users/{id} → UserResponse
-- GET /api/v1/hr/users/search?query= → List[UserResponse]
-- GET /internal/users/{id}/subordinates → List[{user_id, user_name}]
+- 200 — успех.
+- 201 — создано.
+- 204 — удалено (без тела).
+- 400 — неверные данные.
+- 401 — не авторизован.
+- 403 — нет прав.
+- 404 — не найдено.
+- 409 — конфликт.
+- 500 — внутренняя ошибка.
 
-## Проекты
-- GET /api/v1/projects/list → List[ProjectResponse]
-- GET /api/v1/projects/{id} → ProjectDetailResponse
-- GET /internal/projects/list-with-access?user_id=&permission= → List[ProjectResponse]
+## Формат ошибки
 
-## Делегации
-- POST /api/v1/delegations/direct → DelegationResponse
-- POST /api/v1/delegations/temporary → DelegationResponse
-- GET /api/v1/delegations/for-user/{user_id} → List[DelegationResponse]
-- GET /internal/delegations/check?delegate_id=&donor_id= → {has_delegation: bool}
-
-## UI Composer
-- GET /page/{path} → {title, widgets, context: {session_id, current_step}}
-- POST /workflow/event → тот же формат
-
-## Ошибки
+```json
 {
   "detail": "string",
   "error_type": "string | null",
   "context": {}
 }
+```
 
-HTTP-коды: 200, 400, 401, 403, 404, 409, 500.
+Документы по сервисам
+
+· auth.md — Auth Service.
+· user.md — User Service.
+· project.md — Project Service.
+· delegation.md — Delegation Service.
+· notification.md — Notification Service.
+· ui_composer.md — UI Composer Service.
