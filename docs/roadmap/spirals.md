@@ -21,6 +21,10 @@
 - [x] **Спираль 5.** Workflow.
   Завершена 2026-09-26.
   WorkflowLoader, SessionService, UIBuilder, DataAggregator, `/workflow/event`, `/workflow/back`, `/workflow/close`, HR workflow, ADR-0007.
+  
+  - [x] **Спираль 6.5.** Секреты. Завершена 2026-10-04.
+    Корневой .env, dual env_file, секреты вынесены из кода, локальные .env очищены.
+    Alembic — отложен.
 
 - [x] **Спираль 6.** Документация.
   Завершена 2026-09-26.
