@@ -1,0 +1,24 @@
+name: hr_search_results
+title: "Результаты поиска"
+endpoint: /page/hr/search-results
+
+sources: []
+
+ui:
+  widgets:
+    - type: Card
+      title: "Найдено"
+      widgets:
+        - type: Table
+          id: users_table
+          data:
+            source: "{{search_results}}"
+            columns:
+              - { label: "ID", field: "user_id" }
+              - { label: "Логин", field: "user_name" }
+              - { label: "ФИО", field: "full_name" }
+              - { label: "Email", field: "email" }
+              - { label: "Статус", field: "status" }
+        - type: Button
+          id: back_btn
+          text: "Назад"

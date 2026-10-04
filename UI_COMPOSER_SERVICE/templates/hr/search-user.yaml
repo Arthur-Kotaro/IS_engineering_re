@@ -1,56 +1,18 @@
 name: hr_search_user
-endpoint: /page/hr/search-user
 title: "Поиск пользователей"
-description: "Поиск и управление пользователями"
+endpoint: /page/hr/search-user
 
 sources: []
 
 ui:
   widgets:
     - type: Card
-      id: search_card
-      title: "Поиск пользователей"
+      title: "Поиск"
       widgets:
         - type: SearchField
           id: search_input
-          placeholder: "Введите ФИО, логин или email..."
-          min_length: 3
+          placeholder: "Введите ФИО, логин или email"
+          min_length: 2
         - type: Button
           id: search_btn
           text: "Найти"
-          action:
-            endpoint: /api/v1/hr/users/search
-            method: GET
-            params:
-              query: "{{search_input}}"
-    - type: Card
-      id: results_card
-      title: "Результаты поиска"
-      visible: false
-      data:
-        source: search_results
-        widget: Table
-        columns:
-          - label: "ID"
-            field: "user_id"
-          - label: "ФИО"
-            field: "full_name"
-          - label: "Логин"
-            field: "user_name"
-          - label: "Email"
-            field: "email"
-          - label: "Роли"
-            field: "roles"
-            type: badges
-          - label: "Действия"
-            type: actions
-            actions:
-              - label: "Редактировать"
-                endpoint: "/page/hr/edit-user/{{user_id}}"
-                method: GET
-              - label: "Заблокировать"
-                endpoint: "/api/v1/hr/users/{{user_id}}/block"
-                method: POST
-              - label: "Разблокировать"
-                endpoint: "/api/v1/hr/users/{{user_id}}/unblock"
-                method: POST

@@ -24,6 +24,8 @@ public:
     JsonUiRenderer* renderer() const { return m_renderer; }
 
 public slots:
+    Q_INVOKABLE void sendWorkflowEvent(const QString& sessionId, const QString& widgetId,
+                                   const QString& eventType, const QJsonObject& data, const QString& accessToken);
     void setDataManager(DataManager* dataManager);
     void setRenderer(JsonUiRenderer* renderer);
 

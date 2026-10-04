@@ -7,7 +7,6 @@ from app.schemas.delegation import (
     DelegationResponse,
     DelegationRevoke,
     DelegationListResponse,
-    DelegationCheckResponse
 )
 from app.services.delegation_service import DelegationService
 from app.services.validation_service import ValidationService
@@ -29,213 +28,131 @@ async def get_delegation_service(db: AsyncSession = Depends(get_db)) -> Delegati
     return DelegationService(delegation_repo, history_repo, validation_service)
 
 
-async def get_current_user_id(request: Request) -> int:
-    """Получить ID текущего пользователя из заголовка X-User-ID"""
-    user_id = request.headers.get("X-User-ID")
-    if not user_id:
-        raise HTTPException(401, "Missing X-User-ID header")
+def _get_header_user_id(request: Request) -> int:
+    uid = request.headers.get("X-User-ID")
+    if not uid:
+        raise HTTPException(401, "Missing X-User-ID")
     try:
-        return int(user_id)
+        return int(uid)
     except ValueError:
-        raise HTTPException(401, "Invalid X-User-ID format")
+        raise HTTPException(401, "Invalid X-User-ID")
 
 
-async def get_token(request: Request) -> Optional[str]:
-    """Получить токен из заголовка Authorization"""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
+def _get_token(request: Request) -> Optional[str]:
+    auth = request.headers.get("Authorization")
+    if not auth:
         return None
-    return auth_header.replace("Bearer ", "").strip()
+    return auth.removeprefix("Bearer ").strip()
 
 
-async def get_is_super_admin(request: Request) -> bool:
-    """Проверить, является ли пользователь супер-админом"""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        return False
-    token = auth_header.replace("Bearer ", "").strip()
-    try:
-        payload = jwt.decode(token, options={"verify_signature": False})
-        return payload.get("is_super_admin", False)
-    except Exception:
-        return False
+def _is_super_admin(request: Request) -> bool:
+    role = request.headers.get("X-User-Role", "")
+    return "super_admin" in role.split(",")
 
 
-@router.post("/direct", response_model=DelegationResponse)
-async def create_direct_delegation(
+@router.post("", response_model=DelegationResponse)
+async def create_delegation(
     data: DelegationCreate,
     request: Request,
-    current_user_id: int = Depends(get_current_user_id),
-    token: Optional[str] = Depends(get_token),
-    service: DelegationService = Depends(get_delegation_service)
+    service: DelegationService = Depends(get_delegation_service),
 ):
-    """
-    Прямое делегирование: руководитель → подчиненный
-    
-    Используется когда руководитель на больничном/в отпуске.
-    Подчиненный временно получает все полномочия руководителя.
-    """
-    if data.delegator_id != current_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only delegate your own permissions"
-        )
-    
+    current_user_id = _get_header_user_id(request)
+    if _is_super_admin(request) is False and data.delegator_id != current_user_id and data.delegation_type == "direct":
+        raise HTTPException(403, "You can only delegate your own permissions")
+
+    data.initiator_id = current_user_id
+
     return await service.create_delegation(
         data,
         created_by=current_user_id,
-        token=token,
-        ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
-    )
-
-
-@router.post("/reverse", response_model=DelegationResponse)
-async def create_reverse_delegation(
-    data: DelegationCreate,
-    request: Request,
-    current_user_id: int = Depends(get_current_user_id),
-    token: Optional[str] = Depends(get_token),
-    service: DelegationService = Depends(get_delegation_service)
-):
-    """
-    Обратное делегирование: руководитель → подчиненный
-    
-    Руководитель входит от своего имени, но с полномочиями подчиненного.
-    Используется для решения задач, с которыми подчиненный не справляется.
-    """
-    if data.delegator_id != current_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only delegate your own permissions"
-        )
-    
-    return await service.create_delegation(
-        data,
-        created_by=current_user_id,
-        token=token,
-        ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
-    )
-
-
-@router.post("/temporary", response_model=DelegationResponse)
-async def create_temporary_delegation(
-    data: DelegationCreate,
-    request: Request,
-    current_user_id: int = Depends(get_current_user_id),
-    token: Optional[str] = Depends(get_token),
-    service: DelegationService = Depends(get_delegation_service)
-):
-    """
-    Временное делегирование: руководитель → другой подчиненный
-    
-    Используется когда основной подчиненный временно отсутствует.
-    Полномочия отсутствующего сотрудника передаются другому подчиненному.
-    """
-    if data.delegator_id != current_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only delegate your own permissions"
-        )
-    
-    return await service.create_delegation(
-        data,
-        created_by=current_user_id,
-        token=token,
-        ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
+        token=_get_token(request),
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
     )
 
 
 @router.get("/active/me", response_model=List[DelegationResponse])
-async def get_my_active_delegations(
-    current_user_id: int = Depends(get_current_user_id),
-    service: DelegationService = Depends(get_delegation_service)
+async def get_my_active(
+    request: Request,
+    service: DelegationService = Depends(get_delegation_service),
 ):
-    """Получить все активные делегирования текущего пользователя"""
-    return await service.get_active_delegations(current_user_id)
+    user_id = _get_header_user_id(request)
+    return await service.get_active_for_user(user_id)
+
+
+@router.get("/active/as-delegator", response_model=List[DelegationResponse])
+async def get_active_as_delegator(
+    request: Request,
+    service: DelegationService = Depends(get_delegation_service),
+):
+    user_id = _get_header_user_id(request)
+    return await service.get_active_as_delegator(user_id)
 
 
 @router.get("/active/{user_id}", response_model=List[DelegationResponse])
-async def get_user_active_delegations(
+async def get_user_active(
     user_id: int,
-    current_user_id: int = Depends(get_current_user_id),
-    is_super_admin: bool = Depends(get_is_super_admin),
-    service: DelegationService = Depends(get_delegation_service)
+    request: Request,
+    service: DelegationService = Depends(get_delegation_service),
 ):
-    """Получить активные делегирования пользователя (только для админов)"""
-    if user_id != current_user_id and not is_super_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only view your own delegations"
-        )
-    return await service.get_active_delegations(user_id)
+    current_user_id = _get_header_user_id(request)
+    if user_id != current_user_id and not _is_super_admin(request):
+        raise HTTPException(403, "Forbidden")
+    return await service.get_active_for_user(user_id)
 
 
-@router.get("/check/{user_id}", response_model=dict)
-async def check_user_delegation(
-    user_id: int,
-    service: DelegationService = Depends(get_delegation_service)
+@router.get("/check", response_model=dict)
+async def check_delegation(
+    delegate_id: int = Query(...),
+    delegator_id: int = Query(...),
+    service: DelegationService = Depends(get_delegation_service),
 ):
-    """Проверить, есть ли у пользователя активное делегирование"""
-    return await service.check_delegation_for_user(user_id)
+    return await service.check_active(delegate_id, delegator_id)
 
 
 @router.get("/", response_model=DelegationListResponse)
-async def get_all_delegations(
+async def get_all(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    request: Request = None,
     service: DelegationService = Depends(get_delegation_service),
-    is_super_admin: bool = Depends(get_is_super_admin)
 ):
-    """Получить все делегирования (только для супер-админов)"""
-    if not is_super_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only super admin can view all delegations"
-        )
-    delegations = await service.delegation_repo.get_all(skip, limit)
-    total = len(delegations)
+    if not _is_super_admin(request):
+        raise HTTPException(403, "Only super admin can view all delegations")
+    items = await service.delegation_repo.get_all(skip, limit)
     return DelegationListResponse(
-        total=total,
-        delegations=[DelegationResponse.model_validate(d) for d in delegations]
+        total=len(items),
+        delegations=[DelegationResponse.model_validate(d) for d in items],
     )
 
 
-@router.delete("/{delegation_id}", response_model=DelegationResponse)
+@router.post("/{delegation_id}/revoke", response_model=DelegationResponse)
 async def revoke_delegation(
     delegation_id: int,
     data: Optional[DelegationRevoke] = None,
     request: Request = None,
-    current_user_id: int = Depends(get_current_user_id),
-    is_super_admin: bool = Depends(get_is_super_admin),
-    service: DelegationService = Depends(get_delegation_service)
+    service: DelegationService = Depends(get_delegation_service),
 ):
-    """Отозвать делегирование (только создатель или супер-админ)"""
+    user_id = _get_header_user_id(request)
     return await service.revoke_delegation(
         delegation_id,
-        user_id=current_user_id,
+        user_id=user_id,
         data=data or DelegationRevoke(),
-        is_super_admin=is_super_admin,
-        ip_address=request.client.host if request else None,
-        user_agent=request.headers.get("user-agent") if request else None
+        is_super_admin=_is_super_admin(request),
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
     )
 
 
 @router.get("/history/{user_id}")
-async def get_delegation_history(
+async def get_history(
     user_id: int,
     limit: int = Query(50, ge=1, le=500),
-    current_user_id: int = Depends(get_current_user_id),
-    is_super_admin: bool = Depends(get_is_super_admin),
-    service: DelegationService = Depends(get_delegation_service)
+    request: Request = None,
+    service: DelegationService = Depends(get_delegation_service),
 ):
-    """Получить историю делегирований пользователя"""
-    if user_id != current_user_id and not is_super_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only view your own history"
-        )
+    current_user_id = _get_header_user_id(request)
+    if user_id != current_user_id and not _is_super_admin(request):
+        raise HTTPException(403, "Forbidden")
     history = await service.history_repo.get_by_user(user_id, limit)
     return {"user_id": user_id, "history": history}

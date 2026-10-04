@@ -16,6 +16,8 @@ Rectangle {
     property string tileId: ""
     property bool loading: false
     property string callbackId: ""
+    property string sessionId: ""
+    property string currentStep: ""
 
     function cancelRequest() {
         loading = false
@@ -61,7 +63,6 @@ Rectangle {
         }
 
         root.loading = true
-        debugText.text = "Загрузка данных..."
         debugText.visible = false
 
         var url = root.endpoint
@@ -74,41 +75,68 @@ Rectangle {
         widgetBridge.httpRequest(url, root.method, root.accessToken, "", callbackId)
     }
 
+    function sendWorkflowEvent(widgetId, eventType, data) {
+        if (!root.sessionId) {
+            console.log("No session_id — cannot send workflow event")
+            return
+        }
+        var payload = {
+            "session_id": root.sessionId,
+            "widget_id": widgetId,
+            "event_type": eventType,
+            "data": data || {}
+        }
+        var cbId = "wf_event_" + Date.now()
+        widgetBridge.httpRequest(
+            "http://localhost:8080/workflow/event",
+            "POST",
+            root.accessToken,
+            JSON.stringify(payload),
+            cbId
+        )
+    }
+
     Connections {
         target: widgetBridge
         function onHttpResponse(id, status, data) {
-            if (id !== root.callbackId) return
-            root.loading = false
-
-            console.log("TabContent: onHttpResponse", id, status)
-
-            if (status === 200) {
-                try {
-                    var response = JSON.parse(data)
-                    console.log("TabContent: response keys:", Object.keys(response))
-                    console.log("TabContent: has widgets?", response.widgets ? response.widgets.length : 0)
-
-                    if (response.widgets && response.widgets.length > 0) {
-                        console.log("TabContent: Rendering UI...")
-                        debugText.visible = false
-                        widgetBridge.renderPage(response, uiContainer)
-                        console.log("TabContent: UI rendered for:", root.title)
-                    } else {
-                        console.log("TabContent: No widgets, showing raw JSON")
-                        debugText.text = JSON.stringify(response, null, 2)
+            if (id === root.callbackId) {
+                root.loading = false
+                if (status === 200) {
+                    try {
+                        var response = JSON.parse(data)
+                        if (response.context) {
+                            root.sessionId = response.context.session_id || ""
+                            root.currentStep = response.context.current_step || ""
+                        }
+                        if (response.widgets && response.widgets.length > 0) {
+                            debugText.visible = false
+                            widgetBridge.renderPage(response, uiContainer)
+                        } else {
+                            debugText.text = JSON.stringify(response, null, 2)
+                            debugText.visible = true
+                        }
+                    } catch (e) {
+                        debugText.text = "Ошибка парсинга JSON: " + e.message
                         debugText.visible = true
                     }
-                } catch (e) {
-                    console.log("TabContent: JSON parse error:", e.message)
-                    debugText.text = "Ошибка парсинга JSON: " + e.message
+                } else {
+                    debugText.text = "Ошибка " + status + ": " + data
                     debugText.visible = true
                 }
-            } else if (status === 401) {
-                debugText.text = "Ошибка 401: " + data
-                debugText.visible = true
-            } else {
-                debugText.text = "Ошибка " + status + ": " + data
-                debugText.visible = true
+            } else if (id.indexOf("wf_event_") === 0) {
+                root.loading = false
+                if (status === 200) {
+                    try {
+                        var resp = JSON.parse(data)
+                        if (resp.context) {
+                            root.sessionId = resp.context.session_id || root.sessionId
+                            root.currentStep = resp.context.current_step || ""
+                        }
+                        widgetBridge.renderPage(resp, uiContainer)
+                    } catch (e) {
+                        console.log("workflow event parse error:", e)
+                    }
+                }
             }
         }
     }

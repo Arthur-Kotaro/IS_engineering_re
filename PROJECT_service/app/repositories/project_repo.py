@@ -1,6 +1,6 @@
 # app/repositories/project_repo.py
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_
+from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import selectinload
 from typing import Optional, List
 from app.models.project import Project, ProjectStatus
@@ -11,96 +11,106 @@ class ProjectRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(self, title: str, description: Optional[str], created_by: int, status: ProjectStatus = ProjectStatus.DRAFT) -> Project:
-        project = Project(
-            title=title,
-            description=description,
-            created_by=created_by,
-            status=status
-        )
-        self.db.add(project)
+    async def create(self, title, description, created_by, status=ProjectStatus.DRAFT) -> Project:
+        p = Project(title=title, description=description, created_by=created_by, status=status)
+        self.db.add(p)
         await self.db.commit()
-        await self.db.refresh(project)
-        return project
+        await self.db.refresh(p)
+        return p
 
-    async def get_by_id(self, project_id: int) -> Optional[Project]:
-        result = await self.db.execute(
-            select(Project)
-            .where(Project.project_id == project_id)
-        )
+    async def get_by_id(self, project_id: int, with_members: bool = False) -> Optional[Project]:
+        stmt = select(Project).where(Project.project_id == project_id)
+        if with_members:
+            stmt = stmt.options(selectinload(Project.members))
+        result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_all(self, skip: int = 0, limit: int = 100, status: Optional[ProjectStatus] = None) -> List[Project]:
-        query = select(Project)
+    async def get_all(self, skip=0, limit=100, status=None) -> List[Project]:
+        stmt = select(Project)
         if status:
-            query = query.where(Project.status == status)
-        query = query.offset(skip).limit(limit)
-        result = await self.db.execute(query)
+            stmt = stmt.where(Project.status == status)
+        stmt = stmt.order_by(Project.created_at.desc()).offset(skip).limit(limit)
+        result = await self.db.execute(stmt)
         return result.scalars().all()
 
-    async def update(self, project_id: int, **kwargs) -> Optional[Project]:
-        project = await self.get_by_id(project_id)
-        if not project:
+    async def update(self, project_id, **kwargs) -> Optional[Project]:
+        p = await self.get_by_id(project_id)
+        if not p:
             return None
-        for key, value in kwargs.items():
-            if hasattr(project, key) and value is not None:
-                setattr(project, key, value)
+        for k, v in kwargs.items():
+            if hasattr(p, k) and v is not None:
+                setattr(p, k, v)
         await self.db.commit()
-        await self.db.refresh(project)
-        return project
+        await self.db.refresh(p)
+        return p
 
-    async def delete(self, project_id: int) -> bool:
-        project = await self.get_by_id(project_id)
-        if not project:
+    async def delete(self, project_id) -> bool:
+        p = await self.get_by_id(project_id)
+        if not p:
             return False
-        await self.db.delete(project)
+        await self.db.delete(p)
         await self.db.commit()
         return True
 
-    async def add_member(self, project_id: int, user_id: int, role: str = "member") -> Optional[ProjectMember]:
-        existing = await self.db.execute(
+    async def get_member(self, project_id: int, user_id: int) -> Optional[ProjectMember]:
+        result = await self.db.execute(
             select(ProjectMember).where(
-                and_(
-                    ProjectMember.project_id == project_id,
-                    ProjectMember.user_id == user_id
-                )
+                and_(ProjectMember.project_id == project_id, ProjectMember.user_id == user_id)
             )
         )
-        if existing.scalar_one_or_none():
-            return None
-        member = ProjectMember(project_id=project_id, user_id=user_id, role=role)
-        self.db.add(member)
-        await self.db.commit()
-        await self.db.refresh(member)
-        return member
+        return result.scalar_one_or_none()
 
-    async def remove_member(self, project_id: int, user_id: int) -> bool:
+    async def list_members(self, project_id: int) -> List[ProjectMember]:
+        result = await self.db.execute(
+            select(ProjectMember).where(ProjectMember.project_id == project_id)
+        )
+        return result.scalars().all()
+
+    async def add_member(self, project_id, user_id, role) -> Optional[ProjectMember]:
+        existing = await self.get_member(project_id, user_id)
+        if existing:
+            return None
+        m = ProjectMember(project_id=project_id, user_id=user_id, role=role)
+        self.db.add(m)
+        await self.db.commit()
+        await self.db.refresh(m)
+        return m
+
+    async def remove_member(self, project_id, user_id) -> bool:
         result = await self.db.execute(
             delete(ProjectMember).where(
-                and_(
-                    ProjectMember.project_id == project_id,
-                    ProjectMember.user_id == user_id
-                )
+                and_(ProjectMember.project_id == project_id, ProjectMember.user_id == user_id)
             )
         )
         await self.db.commit()
         return result.rowcount > 0
 
-    async def get_member(self, project_id: int, user_id: int) -> Optional[ProjectMember]:
-        result = await self.db.execute(
-            select(ProjectMember).where(
-                and_(
-                    ProjectMember.project_id == project_id,
-                    ProjectMember.user_id == user_id
-                )
-            )
-        )
-        return result.scalar_one_or_none()
+    async def update_member_role(self, project_id, user_id, role) -> bool:
+        m = await self.get_member(project_id, user_id)
+        if not m:
+            return False
+        m.role = role
+        await self.db.commit()
+        return True
 
-    async def get_user_projects(self, user_id: int) -> List[Project]:
+    async def list_projects_for_member(self, user_id: int) -> List[Project]:
         result = await self.db.execute(
-            select(Project)
-            .join(ProjectMember)
-            .where(ProjectMember.user_id == user_id)
+            select(Project).join(ProjectMember).where(ProjectMember.user_id == user_id)
+        )
+        return result.scalars().all()
+
+    async def list_members_for_user_projects(self, user_id: int) -> List[ProjectMember]:
+        """Все записи memberships для проектов, где пользователь — участник."""
+        subq = select(ProjectMember.project_id).where(ProjectMember.user_id == user_id)
+        result = await self.db.execute(
+            select(ProjectMember).where(ProjectMember.project_id.in_(subq))
+        )
+        return result.scalars().all()
+
+    async def list_memberships_by_user_ids(self, user_ids: List[int]) -> List[ProjectMember]:
+        if not user_ids:
+            return []
+        result = await self.db.execute(
+            select(ProjectMember).where(ProjectMember.user_id.in_(user_ids))
         )
         return result.scalars().all()

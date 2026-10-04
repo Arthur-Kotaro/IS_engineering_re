@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QDateTime>
 #include <QDebug>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -228,4 +229,25 @@ void WidgetBridge::renderPage(const QJsonObject& uiData, QQuickItem* container)
     } else {
         qWarning() << "WidgetBridge: Cannot render - renderer or container is null";
     }
+}
+
+void WidgetBridge::sendWorkflowEvent(const QString& sessionId, const QString& widgetId,
+                                     const QString& eventType, const QJsonObject& data,
+                                     const QString& accessToken)
+{
+    QJsonObject payload;
+    payload["session_id"] = sessionId;
+    payload["widget_id"] = widgetId;
+    payload["event_type"] = eventType;
+    payload["data"] = data;
+
+    QNetworkRequest request(QUrl("http://localhost:8080/workflow/event"));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    if (!accessToken.isEmpty()) {
+        request.setRawHeader("Authorization", ("Bearer " + accessToken).toUtf8());
+    }
+
+    QString cbId = "wf_" + widgetId + "_" + QString::number(QDateTime::currentMSecsSinceEpoch());
+    QNetworkReply* reply = m_networkManager->post(request, QJsonDocument(payload).toJson());
+    m_pendingRequests[reply] = cbId;
 }

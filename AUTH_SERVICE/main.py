@@ -51,10 +51,11 @@ def _blacklist_key(jti: str) -> str:
     return f"blacklist:{jti}"
 
 
-@app.api_route(
-    "/verify",
-    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-)
+def _impersonation_key(impersonation_id: str) -> str:
+    return f"impersonation:{impersonation_id}"
+
+
+@app.api_route("/verify", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def verify(request: Request):
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
@@ -82,7 +83,17 @@ async def verify(request: Request):
         except HTTPException:
             raise
         except Exception as e:
-            logger.warning(f"Redis unavailable, fail-open: {e}")
+            logger.warning(f"Redis unavailable (blacklist), fail-open: {e}")
+
+    impersonation_id = payload.get("impersonation_id")
+    if impersonation_id:
+        try:
+            if not await redis_client.exists(_impersonation_key(impersonation_id)):
+                raise HTTPException(401, "Impersonation session closed")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Redis unavailable (impersonation), fail-open: {e}")
 
     user_id = payload.get("user_id")
     if user_id is None:
@@ -98,6 +109,8 @@ async def verify(request: Request):
     }
     if impersonated_by is not None:
         headers["X-Impersonated-By"] = str(impersonated_by)
+    if impersonation_id:
+        headers["X-Impersonation-Id"] = str(impersonation_id)
 
     return Response(status_code=200, headers=headers)
 

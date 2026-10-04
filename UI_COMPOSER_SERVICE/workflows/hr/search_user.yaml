@@ -1,0 +1,32 @@
+name: hr_search_user
+initial_endpoint: /page/hr/search-user
+initial_step: search
+
+steps:
+  search:
+    type: navigation
+    template: hr/search-user
+    title: "Поиск пользователей"
+    on_event:
+      - widget: search_btn
+        event_type: click
+        service:
+          name: user_service
+          endpoint: /api/v1/hr/users/search
+          method: GET
+          params:
+            query: "{{search_input}}"
+        on_success:
+          next_step: results
+          data:
+            search_results: "{{result}}"
+
+  results:
+    type: navigation
+    template: hr/search-results
+    title: "Результаты поиска"
+    on_event:
+      - widget: back_btn
+        event_type: click
+        on_success:
+          next_step: search

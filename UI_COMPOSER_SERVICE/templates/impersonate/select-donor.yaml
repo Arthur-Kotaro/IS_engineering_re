@@ -1,0 +1,48 @@
+name: impersonate_select_donor
+title: "Войти как ..."
+endpoint: /page/impersonate
+
+sources:
+  - id: delegation_donors
+    service: delegation_service
+    endpoint: /api/v1/delegations/active/me
+    method: GET
+  - id: subordinate_donors
+    service: user_service
+    endpoint: /api/v1/users/__me__/subordinates
+    method: GET
+
+ui:
+  widgets:
+    - type: Card
+      title: "Выберите пользователя, от имени которого хотите работать"
+      widgets:
+        - type: Label
+          id: label_delegations
+          text: "Временные делегирования"
+        - type: Table
+          id: delegation_donors_table
+          data:
+            source: "{{delegation_donors}}"
+            columns:
+              - { label: "Пользователь", field: "delegator_name" }
+              - { label: "Тип", field: "delegation_type" }
+              - { label: "Действует до", field: "expires_at" }
+        - type: Label
+          id: no_delegations_label
+          text: "Временных делегирований нет"
+          visible: "{{no_delegations}}"
+        - type: Label
+          id: label_subordinates
+          text: "Мои подчинённые"
+        - type: Table
+          id: subordinate_donors_table
+          data:
+            source: "{{subordinate_donors}}"
+            columns:
+              - { label: "ФИО", field: "full_name" }
+              - { label: "Логин", field: "user_name" }
+        - type: Label
+          id: no_subordinates_label
+          text: "Подчинённых нет"
+          visible: "{{no_subordinates}}"

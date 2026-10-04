@@ -1,121 +1,125 @@
 # app/api/v1/projects.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from typing import List, Optional
 from app.database import get_db
 from app.schemas.project import (
-    ProjectCreate, ProjectUpdate, ProjectStatusUpdate,
-    ProjectResponse, ProjectDetailResponse, ProjectMemberCreate,
-    ProjectMemberResponse, CheckAccessResponse
+    ProjectCreate, ProjectUpdate,
+    ProjectResponse, ProjectDetailResponse,
+    ProjectMemberCreate, ProjectMemberResponse,
+    CheckAccessResponse,
 )
 from app.services.project_service import ProjectService
-from app.models.project import ProjectStatus
-from app.dependencies import get_current_user_id
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
-async def get_project_service(db: AsyncSession = Depends(get_db)) -> ProjectService:
-    return ProjectService(db)
 
-# ============================================================
-# СПЕЦИФИЧНЫЕ МАРШРУТЫ (без параметров) - ПЕРВЫЕ
-# ============================================================
+def _user_id(request: Request) -> int:
+    uid = request.headers.get("X-User-ID")
+    if not uid:
+        raise HTTPException(401, "Missing X-User-ID")
+    return int(uid)
+
+
+def _token(request: Request) -> Optional[str]:
+    auth = request.headers.get("Authorization")
+    if not auth:
+        return None
+    return auth.removeprefix("Bearer ").strip()
+
 
 @router.get("/list", response_model=List[ProjectResponse])
-async def get_projects(
+async def list_projects(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
-    status: Optional[ProjectStatus] = None,
-    user_id: Optional[int] = Query(None, description="ID пользователя для фильтрации"),
-    service: ProjectService = Depends(get_project_service)
+    status_filter: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
 ):
-    """Получить список проектов."""
-    return await service.get_projects(skip, limit, status, user_id)
+    return await ProjectService(db).list_projects(skip, limit, status_filter)
 
-@router.post("/create", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post("/create", response_model=ProjectResponse, status_code=201)
 async def create_project(
     data: ProjectCreate,
-    current_user_id: int = Depends(get_current_user_id),
-    service: ProjectService = Depends(get_project_service)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
-    """Создать новый проект."""
-    return await service.create_project(data, current_user_id)
+    return await ProjectService(db).create_project(data, _user_id(request))
 
-# ============================================================
-# МАРШРУТЫ С ПАРАМЕТРАМИ
-# ============================================================
+
+@router.get("/list-with-access", response_model=List[ProjectResponse])
+async def list_with_access(
+    permission: str = Query("view_project"),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    uid = _user_id(request)
+    return await ProjectService(db).list_with_access(uid, permission, _token(request))
+
 
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
-async def get_project(
-    project_id: int,
-    service: ProjectService = Depends(get_project_service)
-):
-    project = await service.get_project(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return project
+async def get_project(project_id: int, db: AsyncSession = Depends(get_db)):
+    p = await ProjectService(db).get_project(project_id)
+    if not p:
+        raise HTTPException(404, "Project not found")
+    return p
+
 
 @router.put("/{project_id}", response_model=ProjectResponse)
 async def update_project(
     project_id: int,
     data: ProjectUpdate,
-    current_user_id: int = Depends(get_current_user_id),
-    service: ProjectService = Depends(get_project_service)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
-    project = await service.update_project(project_id, data, current_user_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found or not owner")
-    return project
+    return await ProjectService(db).update_project(project_id, data, _user_id(request))
+
 
 @router.patch("/{project_id}/status", response_model=ProjectResponse)
 async def update_project_status(
     project_id: int,
-    data: ProjectStatusUpdate,
-    current_user_id: int = Depends(get_current_user_id),
-    service: ProjectService = Depends(get_project_service)
+    status_value: str = Query(..., alias="status"),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
 ):
-    project = await service.update_project_status(project_id, data.status, current_user_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found or not owner")
-    return project
+    return await ProjectService(db).update_status(project_id, status_value, _user_id(request))
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+
+@router.delete("/{project_id}", status_code=204)
 async def delete_project(
     project_id: int,
-    current_user_id: int = Depends(get_current_user_id),
-    service: ProjectService = Depends(get_project_service)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
-    deleted = await service.delete_project(project_id, current_user_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Project not found or not owner")
+    await ProjectService(db).delete_project(project_id, _user_id(request))
+
 
 @router.post("/{project_id}/members", response_model=ProjectMemberResponse)
 async def add_member(
     project_id: int,
     data: ProjectMemberCreate,
-    current_user_id: int = Depends(get_current_user_id),
-    service: ProjectService = Depends(get_project_service)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
-    member = await service.add_member(project_id, data.user_id, data.role, current_user_id)
-    if not member:
-        raise HTTPException(status_code=400, detail="User already in project or not owner")
-    return member
+    return await ProjectService(db).add_member(project_id, data, _user_id(request))
 
-@router.delete("/{project_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+
+@router.delete("/{project_id}/members/{user_id}", status_code=204)
 async def remove_member(
     project_id: int,
     user_id: int,
-    current_user_id: int = Depends(get_current_user_id),
-    service: ProjectService = Depends(get_project_service)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
-    removed = await service.remove_member(project_id, user_id, current_user_id)
-    if not removed:
-        raise HTTPException(status_code=404, detail="Member not found or not owner")
+    await ProjectService(db).remove_member(project_id, user_id, _user_id(request))
+
 
 @router.get("/{project_id}/check-access", response_model=CheckAccessResponse)
 async def check_access(
     project_id: int,
-    user_id: int = Query(..., description="ID пользователя для проверки"),
-    service: ProjectService = Depends(get_project_service)
+    user_id: int = Query(...),
+    permission: str = Query("view_project"),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
 ):
-    return await service.check_access(project_id, user_id)
+    return await ProjectService(db).check_access(project_id, user_id, permission, _token(request))

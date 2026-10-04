@@ -1,16 +1,14 @@
 # app/schemas/rule.py
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
 
 
 class DelegationRuleCreate(BaseModel):
-    role: str
+    role: str = Field(..., min_length=1, max_length=50)
     can_delegate: bool = False
-    max_delegations: int = 1
-    max_duration_days: int = 30
+    max_delegations: int = Field(1, ge=0)
+    max_duration_days: int = Field(30, ge=0)
     requires_approval: bool = False
     direct_allowed: bool = True
-    reverse_allowed: bool = False
     temporary_allowed: bool = True
 
 
@@ -22,8 +20,7 @@ class DelegationRuleResponse(BaseModel):
     max_duration_days: int
     requires_approval: bool
     direct_allowed: bool
-    reverse_allowed: bool
     temporary_allowed: bool
-    
+
     class Config:
         from_attributes = True

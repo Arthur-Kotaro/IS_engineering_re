@@ -1,12 +1,11 @@
 # app/models/project.py
-from sqlalchemy import Column, Integer, String, Text, DateTime, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Text, DateTime, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
-import enum
 
 
-class ProjectStatus(str, enum.Enum):
+class ProjectStatus(str):
     DRAFT = "draft"
     ACTIVE = "active"
     SUSPENDED = "suspended"
@@ -20,12 +19,16 @@ class Project(Base):
     project_id = Column(Integer, primary_key=True, autoincrement=True)
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(SQLEnum(ProjectStatus), nullable=False, default=ProjectStatus.DRAFT)
-    created_by = Column(Integer, nullable=False)  # ID пользователя из User Service
+    status = Column(String(20), nullable=False, default=ProjectStatus.DRAFT, index=True)
+    created_by = Column(Integer, nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("idx_projects_status", "status"),
+    )
 
     def __repr__(self):
         return f"<Project(id={self.project_id}, title='{self.title}', status='{self.status}')>"

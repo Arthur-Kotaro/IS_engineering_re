@@ -1,26 +1,26 @@
+# src/ui_builder.py
 import re
+import copy
 import logging
 from typing import Dict, Any, List
 from src.models import Template
 
 logger = logging.getLogger(__name__)
 
+
 class UIBuilder:
     def __init__(self):
-        self._placeholder_pattern = re.compile(r'\{\{\s*([^}]+)\s*\}\}')
-    
+        self._placeholder_pattern = re.compile(r"\{\{\s*([^}]+)\s*\}\}")
+
     def build(self, template: Template, data: Dict[str, Any]) -> Dict[str, Any]:
-        logger.info(f"Building UI with data keys: {list(data.keys())}")
-        ui = template.ui.copy()
-        
-        if 'widgets' in ui:
-            ui['widgets'] = self._render_widgets(ui['widgets'], data)
-        
+        ui = copy.deepcopy(template.ui)
+        widgets = ui.get("widgets", [])
+        rendered = self._render_widgets(widgets, data)
         return {
             "title": template.title,
-            "widgets": ui.get('widgets', [])
+            "widgets": rendered,
         }
-    
+
     def _render_widgets(self, widgets: List[Dict], data: Dict[str, Any]) -> List[Dict]:
         result = []
         for widget in widgets:
@@ -28,51 +28,83 @@ class UIBuilder:
             if rendered:
                 result.append(rendered)
         return result
-    
+
     def _render_widget(self, widget: Dict, data: Dict[str, Any]) -> Dict:
-        if 'visible' in widget:
-            visible = self._resolve_placeholder(widget['visible'], data)
-            if not visible:
+        w = copy.deepcopy(widget)
+
+        if "visible" in w:
+            visible = self._resolve_placeholder(w["visible"], data)
+            if not self._is_truthy(visible):
                 return None
-        
-        result = widget.copy()
-        
-        if 'data' in result and 'rows' in result['data']:
-            rows = self._resolve_placeholder(result['data']['rows'], data)
-            result['data']['rows'] = rows
-        
-        if 'fields' in result.get('data', {}):
-            fields = result['data']['fields']
-            for field in fields:
-                if 'value' in field:
-                    logger.info(f"Resolving field: {field['value']}")
-                    resolved = self._resolve_placeholder(field['value'], data)
-                    logger.info(f"Resolved to: {resolved}")
-                    field['value'] = resolved
-        
-        if 'widgets' in result:
-            result['widgets'] = self._render_widgets(result['widgets'], data)
-        
-        return result
-    
+
+        if "data" in w and isinstance(w["data"], dict):
+            if "rows" in w["data"]:
+                w["data"]["rows"] = self._resolve_placeholder(w["data"]["rows"], data)
+            if "source" in w["data"]:
+                source_key = w["data"]["source"]
+                if isinstance(source_key, str) and source_key.startswith("{{") and source_key.endswith("}}"):
+                    w["data"]["rows"] = self._resolve_placeholder(source_key, data)
+            if "fields" in w["data"] and isinstance(w["data"]["fields"], list):
+                for field in w["data"]["fields"]:
+                    if "value" in field:
+                        field["value"] = self._resolve_placeholder(field["value"], data)
+
+        if "widgets" in w and isinstance(w["widgets"], list):
+            w["widgets"] = self._render_widgets(w["widgets"], data)
+
+        return w
+
     def _resolve_placeholder(self, value: Any, data: Dict[str, Any]) -> Any:
         if isinstance(value, str):
-            matches = self._placeholder_pattern.findall(value)
-            for match in matches:
-                parts = match.strip().split('.')
-                current = data
-                for part in parts:
-                    if isinstance(current, dict):
-                        current = current.get(part)
-                    else:
-                        current = None
-                        break
-                if current is not None:
-                    value = value.replace(f'{{{{{match}}}}}', str(current))
-                    logger.info(f"Replaced {match} with {current}")
-            return value
-        elif isinstance(value, list):
-            return [self._resolve_placeholder(item, data) for item in value]
-        elif isinstance(value, dict):
+            return self._resolve_string(value, data)
+        if isinstance(value, list):
+            return [self._resolve_placeholder(x, data) for x in value]
+        if isinstance(value, dict):
             return {k: self._resolve_placeholder(v, data) for k, v in value.items()}
         return value
+
+    def _resolve_string(self, value: str, data: Dict[str, Any]) -> Any:
+        matches = self._placeholder_pattern.findall(value)
+        if not matches:
+            return value
+
+        if len(matches) == 1 and value.strip() == "{{" + matches[0] + "}}":
+            return self._lookup(matches[0].strip(), data)
+
+        def repl(m):
+            key = m.group(1).strip()
+            resolved = self._lookup(key, data)
+            return "" if resolved is None else str(resolved)
+
+        return self._placeholder_pattern.sub(repl, value)
+
+    def _lookup(self, path: str, data: Dict[str, Any]) -> Any:
+        parts = path.split(".")
+        current = data
+        for part in parts:
+            if isinstance(current, dict):
+                current = current.get(part)
+            elif isinstance(current, list):
+                try:
+                    idx = int(part)
+                    current = current[idx] if 0 <= idx < len(current) else None
+                except (ValueError, IndexError):
+                    current = None
+            else:
+                return None
+            if current is None:
+                return None
+        return current
+
+    def _is_truthy(self, value: Any) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() not in ("", "false", "0", "none", "null")
+        if isinstance(value, (int, float)):
+            return value != 0
+        if isinstance(value, (list, dict)):
+            return len(value) > 0
+        return bool(value)
