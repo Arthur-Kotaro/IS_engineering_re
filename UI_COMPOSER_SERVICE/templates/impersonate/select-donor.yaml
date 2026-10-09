@@ -29,10 +29,6 @@ ui:
               - { label: "Тип", field: "delegation_type" }
               - { label: "Действует до", field: "expires_at" }
         - type: Label
-          id: no_delegations_label
-          text: "Временных делегирований нет"
-          visible: "{{no_delegations}}"
-        - type: Label
           id: label_subordinates
           text: "Мои подчинённые"
         - type: Table
@@ -42,7 +38,3 @@ ui:
             columns:
               - { label: "ФИО", field: "full_name" }
               - { label: "Логин", field: "user_name" }
-        - type: Label
-          id: no_subordinates_label
-          text: "Подчинённых нет"
-          visible: "{{no_subordinates}}"

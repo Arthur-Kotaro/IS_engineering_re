@@ -101,8 +101,10 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         userName: mainWindowBridge ? mainWindowBridge.userName : ""
+        userFullName: mainWindowBridge ? mainWindowBridge.userFullName : ""
         userEmail: mainWindowBridge ? mainWindowBridge.userEmail : ""
         userPosition: mainWindowBridge ? mainWindowBridge.userPosition : ""
+        userDept: mainWindowBridge ? mainWindowBridge.userDept : ""
         passwordDaysLeft: mainWindowBridge ? mainWindowBridge.passwordDaysLeft : 0
         passwordExpired: mainWindowBridge ? mainWindowBridge.passwordExpired : false
         unreadNotifications: 0

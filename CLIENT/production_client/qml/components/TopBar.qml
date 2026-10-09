@@ -12,8 +12,10 @@ Rectangle {
     z: 1
 
     property string userName: ""
+    property string userFullName: ""
     property string userEmail: ""
     property string userPosition: ""
+    property string userDept: ""
     property int passwordDaysLeft: 0
     property bool passwordExpired: false
     property bool isDarkTheme: Colors.isDarkTheme
@@ -37,17 +39,22 @@ Rectangle {
             Layout.fillWidth: true
 
             Text {
-                text: root.userName ? root.userName : "Пользователь"
+                text: root.userFullName ? root.userFullName : (root.userName ? root.userName : "Пользователь")
                 color: Colors.text
                 font.pixelSize: 16
                 font.bold: true
             }
 
             Text {
-                text: root.userEmail
+                text: {
+                    var parts = [];
+                    if (root.userPosition) parts.push(root.userPosition);
+                    if (root.userDept) parts.push(root.userDept);
+                    return parts.join(" • ");
+                }
                 color: Colors.textSecondary
                 font.pixelSize: 12
-                visible: root.userEmail !== ""
+                visible: text !== ""
             }
         }
 

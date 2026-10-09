@@ -10,43 +10,60 @@
 namespace UsersService {
 
 struct USERSERVICECLIENT_EXPORT UserProfile {
-    // Основная информация
+    // Идентификация
     int userId = 0;
     QString userName;
     QString email;
+
+    // ФИО
+    QString lastName;
+    QString firstName;
+    QString middleName;
+
+    // Пол, дата рождения
     QString gender;
     QDateTime birthDate;
+
+    // Должность
+    int positionId = 0;
+    QString positionCode;
+    QString positionNameRu;
+
+    // Подразделение
+    QString deptId;
     QString deptCode;
+    QString deptNameRu;
+
+    // Контакты
     QString phoneWork;
     QString phoneMobile;
-    
+
     // Статус
-    QString status;           // "active", "blocked", "deleted"
+    QString status;
     bool isBlocked = false;
     bool isDeleted = false;
     QString blockedReason;
     QDateTime blockedExpiresAt;
     QDateTime deletedAt;
-    
-    // Даты
+
+    // Аудит
     QDateTime createdAt;
     QDateTime updatedAt;
     QDateTime lastLoginAt;
     QDateTime passwordUpdatedAt;
-    
-    // Роли и проекты
+
+    // Роли (RU-названия) и role_codes
     QStringList roles;
-    QList<QJsonObject> projects;
-    
+    QStringList roleCodes;
+
+    bool isSuperAdmin = false;
+
     QJsonObject toJson() const;
     static UserProfile fromJson(const QJsonObject& json);
-    
-    // Вспомогательные методы
+
+    QString fullName() const;
     bool isActive() const { return status == "active" && !isBlocked && !isDeleted; }
-    bool hasRole(const QString& role) const { return roles.contains(role); }
-    
-    // Метод для определения каталога виджетов по роли
-    QString getWidgetsPath() const;
+    bool hasRole(const QString& roleCode) const { return roleCodes.contains(roleCode); }
 };
 
 } // namespace UsersService

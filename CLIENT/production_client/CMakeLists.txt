@@ -8,11 +8,9 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Network Qml Quick QuickControls2)
 
-# Путь к common
 set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
 set(COMMON_INCLUDE ${COMMON_DIR}/include)
 
-# ========== БИБЛИОТЕКА РЕНДЕРИНГА ==========
 set(RENDERER_SOURCES
     src/renderer/JsonUiRenderer.cpp
     src/renderer/QmlObjectFactory.cpp
@@ -31,55 +29,63 @@ set(RENDERER_HEADERS
     src/core/DataManager.h
 )
 
-add_library(RendererLib STATIC
-    ${RENDERER_SOURCES}
-    ${RENDERER_HEADERS}
-)
-
+add_library(RendererLib STATIC ${RENDERER_SOURCES} ${RENDERER_HEADERS})
 target_include_directories(RendererLib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer/qml
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
 )
+target_link_libraries(RendererLib PUBLIC Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Network)
 
-target_link_libraries(RendererLib
-    PUBLIC
-        Qt6::Core
-        Qt6::Qml
-        Qt6::Quick
-        Qt6::QuickControls2
-        Qt6::Network
-)
-
-# ========== QML РЕСУРСЫ ==========
 set(QML_FILES
     qml/main.qml
+
     qml/windows/AuthWindow.qml
     qml/windows/MainWindow.qml
     qml/windows/SplashScreen.qml
     qml/windows/SettingsWindow.qml
+    qml/windows/NotificationsWindow.qml
+    qml/windows/DelegatedWindow.qml
+    qml/windows/ImpersonateWindow.qml
+
+    qml/components/TopBar.qml
+    qml/components/TabContent.qml
     qml/components/WidgetLoader.qml
     qml/components/ToastNotification.qml
     qml/components/LoadingSpinner.qml
-    qml/components/TabContent.qml
+    qml/components/NotificationsWindow.qml
+    qml/components/MastergraphStatusCard.qml
+    qml/components/ProjectRolesList.qml
+    qml/components/OfflineIndicator.qml
+    qml/components/UserInfoPanel.qml
+
+    qml/delegates/ProjectDelegate.qml
+    qml/delegates/MastergraphDelegate.qml
+    qml/delegates/RoleDelegate.qml
+
+    qml/views/DashboardView.qml
+    qml/views/ProjectsView.qml
+    qml/views/MastergraphView.qml
+    qml/views/SettingsView.qml
+
     qml/dialogs/ChangePasswordDialog.qml
     qml/dialogs/ConfirmDialog.qml
     qml/dialogs/ErrorDialog.qml
+    qml/dialogs/UpdateNotification.qml
+
     qml/styles/AppStyle.qml
     qml/styles/Colors.qml
     qml/styles/Typography.qml
     qml/styles/Button.qml
+    qml/styles/GlobalSettings.qml
+
     qml/utils/DateUtils.qml
     qml/utils/StringUtils.qml
     qml/utils/Validators.qml
+
+    qml/ThemeManager.qml
 )
-
-file(GLOB COMMON_WIDGETS "qml/widgets/common/*.qml")
-list(APPEND QML_FILES ${COMMON_WIDGETS})
-
-file(GLOB_RECURSE ROLE_WIDGETS "qml/widgets/roles/*.qml")
-list(APPEND QML_FILES ${ROLE_WIDGETS})
 
 qt_add_qml_module(ProductionClient
     URI ProductionClient
@@ -87,7 +93,6 @@ qt_add_qml_module(ProductionClient
     QML_FILES ${QML_FILES}
 )
 
-# ========== ОСНОВНОЙ КЛИЕНТ ==========
 add_executable(ProductionClientApp
     main.cpp
     src/qml_bridge/AuthBridge.cpp
@@ -119,7 +124,6 @@ target_include_directories(ProductionClientApp PRIVATE
     ${COMMON_INCLUDE}
 )
 
-# ========== ИНСТРУМЕНТ ПРЕВЬЮ (ТОЛЬКО ДЛЯ РАЗРАБОТКИ) ==========
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_subdirectory(tools/renderer_preview)
 endif()

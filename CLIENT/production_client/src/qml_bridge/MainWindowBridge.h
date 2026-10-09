@@ -16,26 +16,26 @@ class MainWindowBridge : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString userName READ userName NOTIFY userDataChanged)
+    Q_PROPERTY(QString userFullName READ userFullName NOTIFY userDataChanged)
     Q_PROPERTY(QString userEmail READ userEmail NOTIFY userDataChanged)
     Q_PROPERTY(QString userPosition READ userPosition NOTIFY userDataChanged)
-    Q_PROPERTY(QString userRole READ userRole NOTIFY userDataChanged)
+    Q_PROPERTY(QString userDept READ userDept NOTIFY userDataChanged)
+    Q_PROPERTY(QStringList userRoles READ userRoles NOTIFY userDataChanged)
     Q_PROPERTY(int passwordDaysLeft READ passwordDaysLeft NOTIFY passwordExpiryChanged)
     Q_PROPERTY(bool passwordExpired READ passwordExpired NOTIFY passwordExpiryChanged)
-    Q_PROPERTY(QVariantList projects READ projects NOTIFY userDataChanged)
-    Q_PROPERTY(QString widgetsPath READ widgetsPath NOTIFY userDataChanged)
     Q_PROPERTY(QString accessToken READ accessToken NOTIFY userDataChanged)
 
 public:
     explicit MainWindowBridge(std::shared_ptr<UsersService::AuthService> authService, QObject *parent = nullptr);
 
     QString userName() const;
+    QString userFullName() const;
     QString userEmail() const;
     QString userPosition() const;
-    QString userRole() const;
+    QString userDept() const;
+    QStringList userRoles() const;
     int passwordDaysLeft() const;
     bool passwordExpired() const;
-    QVariantList projects() const;
-    QString widgetsPath() const;
     QString accessToken() const;
 
     Q_INVOKABLE void changePassword(const QString& currentPassword, const QString& newPassword);
