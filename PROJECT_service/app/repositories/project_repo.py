@@ -5,13 +5,16 @@ from sqlalchemy.orm import selectinload
 from typing import Optional, List
 from app.models.project import Project, ProjectStatus
 from app.models.project_member import ProjectMember
+from app.models.project_role import ProjectRole
 
 
 class ProjectRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(self, title, description, created_by, priority=0, chief_engineer_id=None, planning_engineer_id=None, status=ProjectStatus.DRAFT) -> Project:
+    async def create(self, title, description, created_by, priority=0,
+                     chief_engineer_id=None, planning_engineer_id=None,
+                     status=ProjectStatus.DRAFT) -> Project:
         p = Project(
             title=title,
             description=description,
@@ -74,11 +77,18 @@ class ProjectRepository:
         )
         return result.scalars().all()
 
-    async def add_member(self, project_id, user_id) -> Optional[ProjectMember]:
+    async def add_member(self, project_id, role_code, user_id) -> Optional[ProjectMember]:
+        # Проверяем, что роль существует
+        role = await self.db.execute(
+            select(ProjectRole).where(ProjectRole.role_code == role_code)
+        )
+        if not role.scalar_one_or_none():
+            return None
+        # Проверяем дубликат
         existing = await self.get_member(project_id, user_id)
         if existing:
             return None
-        m = ProjectMember(project_id=project_id, user_id=user_id)
+        m = ProjectMember(project_id=project_id, role_code=role_code, user_id=user_id)
         self.db.add(m)
         await self.db.commit()
         await self.db.refresh(m)
@@ -93,8 +103,6 @@ class ProjectRepository:
         await self.db.commit()
         return result.rowcount > 0
 
-    async def list_projects_for_member(self, user_id: int) -> List[Project]:
-        result = await self.db.execute(
-            select(Project).join(ProjectMember).where(ProjectMember.user_id == user_id)
-        )
+    async def list_roles(self) -> List[ProjectRole]:
+        result = await self.db.execute(select(ProjectRole).order_by(ProjectRole.role_code))
         return result.scalars().all()

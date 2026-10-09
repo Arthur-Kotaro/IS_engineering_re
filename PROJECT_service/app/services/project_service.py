@@ -6,14 +6,12 @@ from app.services.access_service import (
     AccessService,
     PERM_VIEW_PROJECT,
     PERM_EDIT_PROJECT,
-    PERM_EDIT_MASTERGRAPHIC,
     PERM_MANAGE_MEMBERS,
-    PERM_APPROVE_MEMBERS,
 )
 from app.schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
-    ProjectDetailResponse, CheckAccessResponse,
-    ProjectMemberResponse, ProjectMemberCreate,
+    ProjectDetailResponse, ProjectMemberCreate, ProjectMemberResponse,
+    CheckAccessResponse, ProjectRoleResponse,
 )
 from app.models.project import Project, ProjectStatus
 
@@ -48,18 +46,23 @@ class ProjectService:
             created_by=created_by,
             status=data.status or ProjectStatus.DRAFT,
         )
-        if data.chief_engineer_id:
-            await self.repo.add_member(p.project_id, data.chief_engineer_id)
-        if data.planning_engineer_id and data.planning_engineer_id != data.chief_engineer_id:
-            await self.repo.add_member(p.project_id, data.planning_engineer_id)
-        return self._to_response(p, members_count=len(await self.repo.list_members(p.project_id)))
+        # Автоматически добавляем CE и IPP как участников
+        await self.repo.add_member(p.project_id, "chief_engineer", data.chief_engineer_id)
+        if data.planning_engineer_id != data.chief_engineer_id:
+            await self.repo.add_member(p.project_id, "planning_engineer", data.planning_engineer_id)
+        return self._to_response(p, members_count=2 if data.planning_engineer_id != data.chief_engineer_id else 1)
 
     async def get_project(self, project_id: int) -> Optional[ProjectDetailResponse]:
         p = await self.repo.get_by_id(project_id, with_members=True)
         if not p:
             return None
         members = [
-            ProjectMemberResponse(user_id=m.user_id, joined_at=m.joined_at)
+            ProjectMemberResponse(
+                member_id=m.member_id,
+                user_id=m.user_id,
+                role_code=m.role_code,
+                joined_at=m.joined_at,
+            )
             for m in p.members
         ]
         return ProjectDetailResponse(
@@ -74,14 +77,14 @@ class ProjectService:
             created_at=p.created_at,
             updated_at=p.updated_at,
             members_count=len(members),
-            members=[m.model_dump() for m in members],
+            members=members,
         )
 
     async def list_projects(self, skip: int, limit: int, status=None) -> List[ProjectResponse]:
         projects = await self.repo.get_all(skip, limit, status)
         return [self._to_response(p) for p in projects]
 
-    async def update_project(self, project_id: int, data: ProjectUpdate, user_id: int, token=None) -> Optional[ProjectResponse]:
+    async def update_project(self, project_id, data: ProjectUpdate, user_id, token=None) -> Optional[ProjectResponse]:
         access = await self.access.check_access(project_id, user_id, PERM_EDIT_PROJECT, token)
         if not access["has_access"]:
             raise HTTPException(403, "No edit_project access")
@@ -91,22 +94,27 @@ class ProjectService:
             return None
         return self._to_response(p)
 
-    async def add_member(self, project_id: int, data: ProjectMemberCreate, current_user_id: int, token=None) -> ProjectMemberResponse:
+    async def add_member(self, project_id, data: ProjectMemberCreate, current_user_id, token=None) -> ProjectMemberResponse:
         access = await self.access.check_access(project_id, current_user_id, PERM_MANAGE_MEMBERS, token)
         if not access["has_access"]:
             raise HTTPException(403, "No manage_members access")
-        m = await self.repo.add_member(project_id, data.user_id)
+        m = await self.repo.add_member(project_id, data.role_code, data.user_id)
         if not m:
-            raise HTTPException(400, "User already in project")
-        return ProjectMemberResponse(user_id=m.user_id, joined_at=m.joined_at)
+            raise HTTPException(400, "User already in project or role invalid")
+        return ProjectMemberResponse(
+            member_id=m.member_id,
+            user_id=m.user_id,
+            role_code=m.role_code,
+            joined_at=m.joined_at,
+        )
 
-    async def remove_member(self, project_id: int, user_id: int, current_user_id: int, token=None) -> bool:
+    async def remove_member(self, project_id, user_id, current_user_id, token=None) -> bool:
         access = await self.access.check_access(project_id, current_user_id, PERM_MANAGE_MEMBERS, token)
         if not access["has_access"]:
             raise HTTPException(403, "No manage_members access")
         return await self.repo.remove_member(project_id, user_id)
 
-    async def check_access(self, project_id: int, user_id: int, permission: str, token=None) -> CheckAccessResponse:
+    async def check_access(self, project_id, user_id, permission, token=None) -> CheckAccessResponse:
         result = await self.access.check_access(project_id, user_id, permission, token)
         p = await self.repo.get_by_id(project_id)
         return CheckAccessResponse(
@@ -116,14 +124,12 @@ class ProjectService:
             project_status=p.status if p else None,
         )
 
-    async def list_with_access(self, user_id: int, permission: str, token=None) -> List[ProjectResponse]:
+    async def list_with_access(self, user_id, permission, token=None) -> List[ProjectResponse]:
         items = await self.access.list_projects_with_access(user_id, permission, token)
         result = []
         for item in items:
             p = await self.repo.get_by_id(item["project_id"])
             if not p:
                 continue
-            resp = self._to_response(p)
-            resp.access_reason = item["reason"]
-            result.append(resp)
+            result.append(self._to_response(p))
         return result

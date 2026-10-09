@@ -6,9 +6,10 @@ from app.schemas.project import (
     ProjectCreate, ProjectUpdate,
     ProjectResponse, ProjectDetailResponse,
     ProjectMemberCreate, ProjectMemberResponse,
-    CheckAccessResponse,
+    CheckAccessResponse, ProjectRoleResponse,
 )
 from app.services.project_service import ProjectService
+from app.repositories.project_repo import ProjectRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -53,8 +54,13 @@ async def list_with_access(
     request: Request = None,
     db: AsyncSession = Depends(get_db),
 ):
-    uid = _user_id(request)
-    return await ProjectService(db).list_with_access(uid, permission, _token(request))
+    return await ProjectService(db).list_with_access(_user_id(request), permission, _token(request))
+
+
+@router.get("/roles", response_model=List[ProjectRoleResponse])
+async def list_project_roles(db: AsyncSession = Depends(get_db)):
+    repo = ProjectRepository(db)
+    return await repo.list_roles()
 
 
 @router.get("/{project_id}", response_model=ProjectDetailResponse)

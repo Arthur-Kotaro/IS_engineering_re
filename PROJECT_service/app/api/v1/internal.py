@@ -1,5 +1,5 @@
 # app/api/v1/internal.py
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from typing import List, Optional
 from app.database import get_db
 from app.schemas.project import ProjectResponse, CheckAccessResponse

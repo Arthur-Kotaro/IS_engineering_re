@@ -34,23 +34,35 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     members_count: int = 0
-    access_reason: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProjectMemberResponse(BaseModel):
+    member_id: int
+    user_id: int
+    role_code: str
+    joined_at: datetime
 
     class Config:
         from_attributes = True
 
 
 class ProjectDetailResponse(ProjectResponse):
-    members: List[dict] = []
+    members: List[ProjectMemberResponse] = []
 
 
 class ProjectMemberCreate(BaseModel):
     user_id: int
+    role_code: str = Field(..., min_length=1, max_length=50)
 
 
-class ProjectMemberResponse(BaseModel):
-    user_id: int
-    joined_at: datetime
+class ProjectRoleResponse(BaseModel):
+    role_code: str
+    role_name_en: str
+    role_name_ru: str
+    role_description_ru: Optional[str]
 
     class Config:
         from_attributes = True

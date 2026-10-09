@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     AUTH_SERVICE_PORT: int = 8010
 
     class Config:
-        env_file = ".env"
+        env_file = (".env", "../.env")
         extra = "ignore"
 
 
@@ -34,7 +34,7 @@ redis_client: aioredis.Redis = aioredis.Redis(
     decode_responses=True,
 )
 
-app = FastAPI(title="Auth Service", version="2.0.0")
+app = FastAPI(title="Auth Service", version="3.0.0")
 
 
 @app.get("/health")
@@ -99,6 +99,7 @@ async def verify(request: Request):
     if user_id is None:
         raise HTTPException(401, "Invalid token: missing user_id")
 
+    position = payload.get("position")
     roles = payload.get("roles", [])
     is_super_admin = payload.get("is_super_admin", False)
     impersonated_by = payload.get("impersonated_by")
@@ -107,6 +108,8 @@ async def verify(request: Request):
         "X-User-ID": str(user_id),
         "X-User-Role": "super_admin" if is_super_admin else (",".join(roles) if roles else "user"),
     }
+    if position:
+        headers["X-User-Position"] = str(position)
     if impersonated_by is not None:
         headers["X-Impersonated-By"] = str(impersonated_by)
     if impersonation_id:

@@ -1,93 +1,103 @@
-# ADR-0005: Модель прав на проект
+# ADR-0005: Модель прав на проект (переписан)
 
 ## Статус
 Accepted
 
 ## Дата
-2026-10-04
+2026-10-09
 
 ## Контекст
 
-На предприятии — матричная система управления. Проекты реализуются проектными командами. Горизонтальное взаимодействие через команды.
+**Предыдущая версия этого ADR (2026-09-26) содержала выдуманную модель:**
+- Роли `owner`, `manager`, `editor`, `viewer` — **не существуют** в реальной системе.
+- Права `edit_project`, `delete_project` — **не отражают** бизнес.
+- Композиция `direct OR subordinate OR delegated` — **не реализована**.
 
-Каждый проект возглавляет **главный инженер** (`chief_engineer`, CVE). Ему помогает **инженер по планированию продукта** (`planning_engineer`, IPP) — держатель мастерграфика.
-
-Проект создаётся ролью **X** («Директор по менеджменту проектов») — новая роль, в БД пока нет.
-
-`admin` — технический специалист вне проектной работы. Имеет все права.
+Эта версия — правильная.
 
 ## Модель
 
-### Одна система ролей
+### Справочник проектных ролей (`project_roles`)
 
-Роли — **глобальные**, живут в User Service. Роль в проекте **совпадает** с глобальной. Отдельных ролей в проекте нет.
+10 ролей:
+- `chief_engineer` — Главный инженер.
+- `prototype_pm` — Руководитель проекта по прототипам (прото-РП).
+- `industrialization_manager` — Менеджер по индустриализации.
+- `architect` — Архитектор.
+- `validator` — Специалист по валидации.
+- `test_specialist` — Специалист по испытаниям.
+- `planning_engineer` — Инженер по планированию продукта (IPP).
+- `quality_engineer` — Инженер по качеству.
+- `project_economist` — Экономист проекта.
+- `project_member` — Плейсхолдер.
 
-`project_members` содержит только `(project_id, user_id, joined_at)`. Никакого `role`.
+### Участники проекта (`project_members`)
 
-### Роли в проектной работе
+- `member_id` (surrogate PK).
+- `project_id` (FK).
+- `role_code` (FK на `project_roles`).
+- `user_id`.
+- `UNIQUE (project_id, user_id)`.
 
-| Роль | Функция |
-|---|---|
-| X (новая) | Создаёт проект, назначает CVE и IPP |
-| `chief_engineer` (CVE) | Глава проекта. Утверждает команду. Редактирует МГ. Ведёт 1–2 проекта |
-| `planning_engineer` (IPP) | Держатель МГ. Формирует команду. Заполняет МГ |
-| `admin` | Вне проектов. Все права |
-| Члены команды | Читают МГ. Ведут ЛГ под свои задачи МГ |
+**Один человек — одна роль в проекте.**
 
-### Специальные роли в команде
-
-По одному человеку на проект:
-- `architect`
-- `validator`
-- `planning_engineer`
-- `chief_engineer`
-- `industrialization_manager`
-- `project_economist` (нет в БД, будет добавлена)
-
-### Права (permissions)
+### Права
 
 | Право | Кто |
 |---|---|
-| `view_project` | CVE, IPP, члены команды, admin |
-| `edit_mastergraphic` | CVE, IPP проекта, admin |
-| `manage_members` | CVE, IPP проекта, admin |
-| `approve_members` | CVE проекта, admin |
-| `edit_project` | CVE проекта, admin |
-| `delete_project` | (не реализовано) |
+| `view_project` | Все члены команды |
+| `edit_mastergraphic` | `chief_engineer` и `planning_engineer` проекта |
+| `manage_members` | `chief_engineer` и `planning_engineer` |
+| `approve_members` | `chief_engineer` |
+| `edit_project` | `chief_engineer` |
+| `delete_project` | Не реализовано |
 
-### Логика проверки
+### Особый случай: `admin`
 
-`check_access(project_id, user_id, permission)`:
+Пользователь с ролью `admin` (или `is_super_admin`) имеет все права на все проекты.
 
-1. Получить `roles` пользователя из User Service.
-2. Если `admin` в ролях — разрешить всё.
-3. Получить проект: `chief_engineer_id`, `planning_engineer_id`.
-4. Проверить членство в `project_members`.
-5. В зависимости от permission — разрешить/запретить.
+### Проверка
 
-### Локальные графики (ЛГ)
+```python
+async def check_access(project_id, user_id, permission):
+    project = get_project(project_id)
+    user = get_user(user_id)  # из User Service
 
-ЛГ хранятся **в отдельных микросервисах** (Tests Service, Prototyping Service, ...).
-Не в Mastergraphics Service.
+    if "admin" in user.roles or user.is_super_admin:
+        return allowed
 
-**«Ответственность за периметр»:** каждый член команды с задачей в МГ создаёт локальный график своего подразделения. ЛГ редуцируется до задачи МГ.
+    is_ce = project.chief_engineer_id == user_id
+    is_pe = project.planning_engineer_id == user_id
+    is_member = member_exists(project_id, user_id)
 
-## Что удалено
+    if permission == "view_project":
+        return is_member or is_ce or is_pe
+    if permission == "edit_mastergraphic":
+        return is_ce or is_pe
+    if permission == "manage_members":
+        return is_ce or is_pe
+    if permission == "approve_members":
+        return is_ce
+    if permission == "edit_project":
+        return is_ce
+    return False
 
-- Роли `owner`, `manager`, `editor`, `viewer` — **выдуманные**, не существуют.
-- Поле `role` в `project_members` — **избыточно**.
-- Композиция `direct OR subordinate OR delegated` — **не реализована**, это была ошибочная модель.
-- Поля `access_via`, `via_user_id` в ответах — **не нужны**.
+Что удалено
 
-## Что предстоит
+    Роли owner, manager, editor, viewer.
 
-- Добавить роль X в User Service.
-- Добавить роль `project_economist`.
-- Реализовать `delete_project`.
-- Реализовать утверждение команды (`approve_members`) — workflow.
-- Локальные графики в MG Service и специализированных сервисах.
+    Композиция direct OR subordinate OR delegated.
 
-## Ссылки
+    Поля access_via, via_user_id в ответах.
 
-- ADR-0004: Делегирование
-- ADR-0006: Имперсонация
+    Поддержка subordinate_access и delegation_access.
+
+Что осталось
+
+    chief_engineer_id и planning_engineer_id в таблице projects — для быстрого доступа к ролям главы команды.
+
+Ссылки
+
+    ADR-0010: Роли, должности, подразделения.
+
+    docs/domain/enterprise/administrative-structure.md.

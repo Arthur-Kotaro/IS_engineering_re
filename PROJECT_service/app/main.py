@@ -8,9 +8,6 @@ from app.api.v1 import projects, internal
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up Project Service...")
-    from app.models import project, project_member  # noqa
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     yield
     await engine.dispose()
     print("Shutting down Project Service...")
@@ -18,8 +15,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Project Service",
-    description="Сервис управления проектами и правами",
-    version="2.0.0",
+    description="Сервис управления проектами",
+    version="3.0.0",
     lifespan=lifespan,
 )
 
