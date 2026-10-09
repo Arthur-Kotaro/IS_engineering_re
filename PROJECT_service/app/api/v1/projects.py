@@ -1,5 +1,5 @@
 # app/api/v1/projects.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from typing import List, Optional
 from app.database import get_db
 from app.schemas.project import (
@@ -72,26 +72,7 @@ async def update_project(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    return await ProjectService(db).update_project(project_id, data, _user_id(request))
-
-
-@router.patch("/{project_id}/status", response_model=ProjectResponse)
-async def update_project_status(
-    project_id: int,
-    status_value: str = Query(..., alias="status"),
-    request: Request = None,
-    db: AsyncSession = Depends(get_db),
-):
-    return await ProjectService(db).update_status(project_id, status_value, _user_id(request))
-
-
-@router.delete("/{project_id}", status_code=204)
-async def delete_project(
-    project_id: int,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    await ProjectService(db).delete_project(project_id, _user_id(request))
+    return await ProjectService(db).update_project(project_id, data, _user_id(request), _token(request))
 
 
 @router.post("/{project_id}/members", response_model=ProjectMemberResponse)
@@ -101,7 +82,7 @@ async def add_member(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    return await ProjectService(db).add_member(project_id, data, _user_id(request))
+    return await ProjectService(db).add_member(project_id, data, _user_id(request), _token(request))
 
 
 @router.delete("/{project_id}/members/{user_id}", status_code=204)
@@ -111,7 +92,7 @@ async def remove_member(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    await ProjectService(db).remove_member(project_id, user_id, _user_id(request))
+    await ProjectService(db).remove_member(project_id, user_id, _user_id(request), _token(request))
 
 
 @router.get("/{project_id}/check-access", response_model=CheckAccessResponse)

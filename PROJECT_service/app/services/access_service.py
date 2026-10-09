@@ -1,9 +1,19 @@
 # app/services/access_service.py
 import httpx
-from typing import Optional, List, Dict, Set
+import logging
+from typing import Optional, List, Dict
 from app.config import settings
 from app.repositories.project_repo import ProjectRepository
-from app.models.project_member import ProjectMember, ProjectRole
+
+logger = logging.getLogger(__name__)
+
+
+PERM_VIEW_PROJECT = "view_project"
+PERM_EDIT_PROJECT = "edit_project"
+PERM_EDIT_MASTERGRAPHIC = "edit_mastergraphic"
+PERM_MANAGE_MEMBERS = "manage_members"
+PERM_DELETE_PROJECT = "delete_project"
+PERM_APPROVE_MEMBERS = "approve_members"
 
 
 class AccessService:
@@ -21,27 +31,23 @@ class AccessService:
                 resp = await client.get(url, headers=headers)
                 if resp.status_code == 200:
                     return resp.json()
-        except Exception:
-            return None
+        except Exception as e:
+            logger.warning(f"AccessService GET {url}: {e}")
         return None
 
-    async def get_subordinates(self, user_id: int, token: Optional[str]) -> List[int]:
+    async def get_user_roles(self, user_id: int, token: Optional[str]) -> List[str]:
         data = await self._http_get(
-            f"{settings.USER_SERVICE_URL}/api/v1/users/{user_id}/subordinates",
+            f"{settings.USER_SERVICE_URL}/api/v1/users/{user_id}",
             token=token,
             user_id=user_id,
         )
         if not data:
             return []
-        return [u["user_id"] for u in data]
+        return data.get("roles", [])
 
-    async def get_active_delegations(self, delegate_id: int) -> List[Dict]:
-        data = await self._http_get(
-            f"{settings.DELEGATION_SERVICE_URL}/api/v1/delegations/active/{delegate_id}"
-        )
-        if not data:
-            return []
-        return data
+    async def is_member(self, project_id: int, user_id: int) -> bool:
+        m = await self.repo.get_member(project_id, user_id)
+        return m is not None
 
     async def check_access(
         self,
@@ -50,46 +56,51 @@ class AccessService:
         permission: str,
         token: Optional[str] = None,
     ) -> Dict:
-        # 1. Direct
-        m = await self.repo.get_member(project_id, user_id)
-        if m and permission in ProjectRole.permissions_for(m.role):
-            return {
-                "has_access": True,
-                "reason": "direct",
-                "role": m.role,
-                "via_user_id": None,
-            }
+        project = await self.repo.get_by_id(project_id)
+        if not project:
+            return {"has_access": False, "reason": "project_not_found", "role": None}
 
-        # 2. Subordinate (1 уровень)
-        subs = await self.get_subordinates(user_id, token)
-        if subs:
-            for sub_id in subs:
-                sm = await self.repo.get_member(project_id, sub_id)
-                if sm and permission in ProjectRole.permissions_for(sm.role):
-                    return {
-                        "has_access": True,
-                        "reason": "subordinate_access",
-                        "role": sm.role,
-                        "via_user_id": sub_id,
-                    }
+        roles = await self.get_user_roles(user_id, token)
+        is_admin = "admin" in roles
 
-        # 3. Delegation
-        delegations = await self.get_active_delegations(user_id)
-        for d in delegations:
-            delegator_id = d.get("delegator_id")
-            if not delegator_id:
-                continue
-            dm = await self.repo.get_member(project_id, delegator_id)
-            if dm and permission in ProjectRole.permissions_for(dm.role):
-                return {
-                    "has_access": True,
-                    "reason": "delegation",
-                    "role": dm.role,
-                    "via_user_id": delegator_id,
-                    "delegation_id": d.get("delegation_id"),
-                }
+        if is_admin:
+            return {"has_access": True, "reason": "admin", "role": "admin"}
 
-        return {"has_access": False, "reason": "none", "role": None, "via_user_id": None}
+        is_member = await self.is_member(project_id, user_id)
+        is_ce = project.chief_engineer_id == user_id
+        is_pe = project.planning_engineer_id == user_id
+
+        if permission == PERM_VIEW_PROJECT:
+            if is_member or is_ce or is_pe:
+                return {"has_access": True, "reason": "member", "role": None}
+            return {"has_access": False, "reason": "not_member", "role": None}
+
+        if permission == PERM_EDIT_MASTERGRAPHIC:
+            if is_ce:
+                return {"has_access": True, "reason": "chief_engineer", "role": "chief_engineer"}
+            if is_pe:
+                return {"has_access": True, "reason": "planning_engineer", "role": "planning_engineer"}
+            return {"has_access": False, "reason": "not_authorized", "role": None}
+
+        if permission == PERM_MANAGE_MEMBERS:
+            if is_ce or is_pe:
+                return {"has_access": True, "reason": "manager", "role": None}
+            return {"has_access": False, "reason": "not_authorized", "role": None}
+
+        if permission == PERM_APPROVE_MEMBERS:
+            if is_ce:
+                return {"has_access": True, "reason": "chief_engineer", "role": "chief_engineer"}
+            return {"has_access": False, "reason": "not_authorized", "role": None}
+
+        if permission == PERM_EDIT_PROJECT:
+            if is_ce:
+                return {"has_access": True, "reason": "chief_engineer", "role": "chief_engineer"}
+            return {"has_access": False, "reason": "not_authorized", "role": None}
+
+        if permission == PERM_DELETE_PROJECT:
+            return {"has_access": False, "reason": "not_implemented", "role": None}
+
+        return {"has_access": False, "reason": "unknown_permission", "role": None}
 
     async def list_projects_with_access(
         self,
@@ -97,48 +108,41 @@ class AccessService:
         permission: str,
         token: Optional[str] = None,
     ) -> List[Dict]:
-        result: Dict[int, Dict] = {}
+        roles = await self.get_user_roles(user_id, token)
+        is_admin = "admin" in roles
 
-        # 1. Direct
-        direct_memberships = await self.repo.list_memberships_by_user_ids([user_id])
-        for m in direct_memberships:
-            if permission in ProjectRole.permissions_for(m.role):
-                result[m.project_id] = {
-                    "project_id": m.project_id,
-                    "access_via": "direct",
-                    "role": m.role,
-                    "via_user_id": None,
-                }
+        all_projects = await self.repo.get_all(0, 10000)
 
-        # 2. Subordinate
-        subs = await self.get_subordinates(user_id, token)
-        if subs:
-            sub_memberships = await self.repo.list_memberships_by_user_ids(subs)
-            for m in sub_memberships:
-                if m.project_id in result:
-                    continue
-                if permission in ProjectRole.permissions_for(m.role):
-                    result[m.project_id] = {
-                        "project_id": m.project_id,
-                        "access_via": "subordinate_access",
-                        "role": m.role,
-                        "via_user_id": m.user_id,
-                    }
+        result = []
+        for p in all_projects:
+            if is_admin:
+                result.append({"project_id": p.project_id, "reason": "admin", "role": "admin"})
+                continue
 
-        # 3. Delegation
-        delegations = await self.get_active_delegations(user_id)
-        delegator_ids = [d.get("delegator_id") for d in delegations if d.get("delegator_id")]
-        if delegator_ids:
-            del_memberships = await self.repo.list_memberships_by_user_ids(delegator_ids)
-            for m in del_memberships:
-                if m.project_id in result:
-                    continue
-                if permission in ProjectRole.permissions_for(m.role):
-                    result[m.project_id] = {
-                        "project_id": m.project_id,
-                        "access_via": "delegation",
-                        "role": m.role,
-                        "via_user_id": m.user_id,
-                    }
+            is_ce = p.chief_engineer_id == user_id
+            is_pe = p.planning_engineer_id == user_id
+            is_member = await self.is_member(p.project_id, user_id)
 
-        return list(result.values())
+            allowed = False
+            reason = None
+
+            if permission == PERM_VIEW_PROJECT and (is_member or is_ce or is_pe):
+                allowed = True
+                reason = "member"
+            elif permission == PERM_EDIT_MASTERGRAPHIC and (is_ce or is_pe):
+                allowed = True
+                reason = "chief_engineer" if is_ce else "planning_engineer"
+            elif permission == PERM_MANAGE_MEMBERS and (is_ce or is_pe):
+                allowed = True
+                reason = "manager"
+            elif permission == PERM_APPROVE_MEMBERS and is_ce:
+                allowed = True
+                reason = "chief_engineer"
+            elif permission == PERM_EDIT_PROJECT and is_ce:
+                allowed = True
+                reason = "chief_engineer"
+
+            if allowed:
+                result.append({"project_id": p.project_id, "reason": reason, "role": None})
+
+        return result

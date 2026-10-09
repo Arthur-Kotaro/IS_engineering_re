@@ -11,8 +11,16 @@ class ProjectRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(self, title, description, created_by, status=ProjectStatus.DRAFT) -> Project:
-        p = Project(title=title, description=description, created_by=created_by, status=status)
+    async def create(self, title, description, created_by, priority=0, chief_engineer_id=None, planning_engineer_id=None, status=ProjectStatus.DRAFT) -> Project:
+        p = Project(
+            title=title,
+            description=description,
+            created_by=created_by,
+            priority=priority,
+            chief_engineer_id=chief_engineer_id,
+            planning_engineer_id=planning_engineer_id,
+            status=status,
+        )
         self.db.add(p)
         await self.db.commit()
         await self.db.refresh(p)
@@ -29,7 +37,7 @@ class ProjectRepository:
         stmt = select(Project)
         if status:
             stmt = stmt.where(Project.status == status)
-        stmt = stmt.order_by(Project.created_at.desc()).offset(skip).limit(limit)
+        stmt = stmt.order_by(Project.priority.desc(), Project.created_at.desc()).offset(skip).limit(limit)
         result = await self.db.execute(stmt)
         return result.scalars().all()
 
@@ -66,11 +74,11 @@ class ProjectRepository:
         )
         return result.scalars().all()
 
-    async def add_member(self, project_id, user_id, role) -> Optional[ProjectMember]:
+    async def add_member(self, project_id, user_id) -> Optional[ProjectMember]:
         existing = await self.get_member(project_id, user_id)
         if existing:
             return None
-        m = ProjectMember(project_id=project_id, user_id=user_id, role=role)
+        m = ProjectMember(project_id=project_id, user_id=user_id)
         self.db.add(m)
         await self.db.commit()
         await self.db.refresh(m)
@@ -85,32 +93,8 @@ class ProjectRepository:
         await self.db.commit()
         return result.rowcount > 0
 
-    async def update_member_role(self, project_id, user_id, role) -> bool:
-        m = await self.get_member(project_id, user_id)
-        if not m:
-            return False
-        m.role = role
-        await self.db.commit()
-        return True
-
     async def list_projects_for_member(self, user_id: int) -> List[Project]:
         result = await self.db.execute(
             select(Project).join(ProjectMember).where(ProjectMember.user_id == user_id)
-        )
-        return result.scalars().all()
-
-    async def list_members_for_user_projects(self, user_id: int) -> List[ProjectMember]:
-        """Все записи memberships для проектов, где пользователь — участник."""
-        subq = select(ProjectMember.project_id).where(ProjectMember.user_id == user_id)
-        result = await self.db.execute(
-            select(ProjectMember).where(ProjectMember.project_id.in_(subq))
-        )
-        return result.scalars().all()
-
-    async def list_memberships_by_user_ids(self, user_ids: List[int]) -> List[ProjectMember]:
-        if not user_ids:
-            return []
-        result = await self.db.execute(
-            select(ProjectMember).where(ProjectMember.user_id.in_(user_ids))
         )
         return result.scalars().all()

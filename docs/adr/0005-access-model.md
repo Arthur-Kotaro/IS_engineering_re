@@ -4,93 +4,90 @@
 Accepted
 
 ## Дата
-2026-09-26
+2026-10-04
 
 ## Контекст
 
-Project Service — источник прав на проект. Права проверяются при действиях над проектом и его мастерграфиком.
+На предприятии — матричная система управления. Проекты реализуются проектными командами. Горизонтальное взаимодействие через команды.
+
+Каждый проект возглавляет **главный инженер** (`chief_engineer`, CVE). Ему помогает **инженер по планированию продукта** (`planning_engineer`, IPP) — держатель мастерграфика.
+
+Проект создаётся ролью **X** («Директор по менеджменту проектов») — новая роль, в БД пока нет.
+
+`admin` — технический специалист вне проектной работы. Имеет все права.
 
 ## Модель
 
-### Роли в проекте
+### Одна система ролей
 
-- `owner` — владелец (создатель).
-- `manager` — управляющий.
-- `editor` — редактор.
-- `viewer` — наблюдатель.
+Роли — **глобальные**, живут в User Service. Роль в проекте **совпадает** с глобальной. Отдельных ролей в проекте нет.
 
-Роль в проекте — **одна** для пользователя. Не может быть одновременно editor и viewer.
+`project_members` содержит только `(project_id, user_id, joined_at)`. Никакого `role`.
+
+### Роли в проектной работе
+
+| Роль | Функция |
+|---|---|
+| X (новая) | Создаёт проект, назначает CVE и IPP |
+| `chief_engineer` (CVE) | Глава проекта. Утверждает команду. Редактирует МГ. Ведёт 1–2 проекта |
+| `planning_engineer` (IPP) | Держатель МГ. Формирует команду. Заполняет МГ |
+| `admin` | Вне проектов. Все права |
+| Члены команды | Читают МГ. Ведут ЛГ под свои задачи МГ |
+
+### Специальные роли в команде
+
+По одному человеку на проект:
+- `architect`
+- `validator`
+- `planning_engineer`
+- `chief_engineer`
+- `industrialization_manager`
+- `project_economist` (нет в БД, будет добавлена)
 
 ### Права (permissions)
 
-- `view_project`
-- `edit_project`
-- `edit_mastergraphic`
-- `manage_members`
-- `delete_project`
+| Право | Кто |
+|---|---|
+| `view_project` | CVE, IPP, члены команды, admin |
+| `edit_mastergraphic` | CVE, IPP проекта, admin |
+| `manage_members` | CVE, IPP проекта, admin |
+| `approve_members` | CVE проекта, admin |
+| `edit_project` | CVE проекта, admin |
+| `delete_project` | (не реализовано) |
 
-### Соответствие ролей и прав
+### Логика проверки
 
-| Роль | view_project | edit_project | edit_mastergraphic | manage_members | delete_project |
-|---|---|---|---|---|---|
-| owner | ✅ | ✅ | ✅ | ✅ | ✅ |
-| manager | ✅ | ✅ | ✅ | ✅ | ❌ |
-| editor | ✅ | ❌ | ✅ | ❌ | ❌ |
-| viewer | ✅ | ❌ | ❌ | ❌ | ❌ |
+`check_access(project_id, user_id, permission)`:
 
-## Композиция прав
+1. Получить `roles` пользователя из User Service.
+2. Если `admin` в ролях — разрешить всё.
+3. Получить проект: `chief_engineer_id`, `planning_engineer_id`.
+4. Проверить членство в `project_members`.
+5. В зависимости от permission — разрешить/запретить.
 
-effective_permission(user, project, permission) =
-direct_permission(user, project, permission)
-OR subordinate_permission(user, project, permission)
-OR delegated_permission(user, project, permission)
+### Локальные графики (ЛГ)
 
+ЛГ хранятся **в отдельных микросервисах** (Tests Service, Prototyping Service, ...).
+Не в Mastergraphics Service.
 
-- **Direct:** `project_members(user_id, project_id, role)` и `permission in role.permissions`.
-- **Subordinate:** начальник действует от имени подчинённого (1 уровень). Для каждого подчинённого `S` проверяется `direct_permission(S, project, permission)`.
-- **Delegated:** для каждой активной делегации, где user = `delegate_id`, проверяется `direct_permission(delegator_id, project, permission)`.
+**«Ответственность за периметр»:** каждый член команды с задачей в МГ создаёт локальный график своего подразделения. ЛГ редуцируется до задачи МГ.
 
-## Ответ на проверку
+## Что удалено
 
-json
-{
-  "has_access": true,
-  "reason": "direct" | "subordinate_access" | "delegation" | "none",
-  "role": "owner",
-  "via_user_id": 101,
-  "project_status": "active"
-}
+- Роли `owner`, `manager`, `editor`, `viewer` — **выдуманные**, не существуют.
+- Поле `role` в `project_members` — **избыточно**.
+- Композиция `direct OR subordinate OR delegated` — **не реализована**, это была ошибочная модель.
+- Поля `access_via`, `via_user_id` в ответах — **не нужны**.
 
-via_user_id — подчинённый или делегатор, от имени которого действует пользователь. При direct — null.
+## Что предстоит
 
-Эндпоинты
+- Добавить роль X в User Service.
+- Добавить роль `project_economist`.
+- Реализовать `delete_project`.
+- Реализовать утверждение команды (`approve_members`) — workflow.
+- Локальные графики в MG Service и специализированных сервисах.
 
-Публичные (через X-User-ID):
+## Ссылки
 
-· GET /api/v1/projects/list-with-access?permission=
-· GET /api/v1/projects/{id}/check-access?user_id=&permission=
-
-Внутренние:
-
-· GET /internal/projects/list-with-access?user_id=&permission=
-· GET /internal/projects/{id}/check-access?user_id=&permission=
-
-Источник иерархии
-
-User Service, эндпоинт GET /api/v1/users/{id}/subordinates.
-Кэш в Project Service — TTL 30 сек (в будущем).
-
-Источник делегаций
-
-Delegation Service, эндпоинт GET /api/v1/delegations/active/{delegate_id}.
-Запрос выполняется Project Service'ом напрямую (не через nginx, не через gateway).
-
-Аудит
-
-При действии через подчинённого или делегацию, сервисы, использующие права (MG, Project), сохраняют:
-
-· actor_id — реальный действующий пользователь (X-Impersonated-By или X-User-ID).
-· acting_as_id — донор (X-User-ID).
-· access_reason — direct | subordinate_access | delegation.
-· via_user_id — подчинённый или делегатор.
-
+- ADR-0004: Делегирование
+- ADR-0006: Имперсонация
