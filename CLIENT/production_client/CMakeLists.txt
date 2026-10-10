@@ -85,6 +85,11 @@ set(QML_FILES
     qml/utils/Validators.qml
 
     qml/ThemeManager.qml
+
+    qml/widgets/SearchableListSingle.qml
+    qml/widgets/SearchableListMulti.qml
+    qml/widgets/SearchableSelect.qml
+
 )
 
 qt_add_qml_module(ProductionClient
