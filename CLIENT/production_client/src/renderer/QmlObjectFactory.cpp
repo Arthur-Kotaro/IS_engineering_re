@@ -144,17 +144,19 @@ QObject* QmlObjectFactory::create(const QString& type, const QJsonObject& spec, 
 
     qDebug() << "      QML code length:" << qmlCode.length() << "bytes";
 
-    QString fullQml = QString(
+        QString fullQml = QString(
         "import QtQuick 6.0\n"
         "import QtQuick.Controls 6.0\n"
         "import QtQuick.Layouts 6.0\n"
         "import Styles 1.0\n"
+        "import BaseWidgets 1.0\n"
         "%1\n"
     ).arg(qmlCode);
 
     {
         QFile f("/tmp/all_qml.log");
-        if (f.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        if (f.open(QIODevice::WriteOnly | QIODevice::Append))
+        {
             f.write("=== QML ===\n");
             f.write(fullQml.toUtf8());
             f.write("\n=== END ===\n\n");
@@ -165,7 +167,8 @@ QObject* QmlObjectFactory::create(const QString& type, const QJsonObject& spec, 
     QQmlComponent component(m_engine);
     component.setData(fullQml.toUtf8(), QUrl());
 
-    if (component.isError()) {
+    if (component.isError())
+    {
         qWarning() << "      QML component error:" << component.errorString();
         return nullptr;
     }

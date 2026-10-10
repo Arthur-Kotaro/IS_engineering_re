@@ -11,10 +11,10 @@ ColumnLayout {
     property bool required: false
     property var options: []
     property var selectedValues: []
+    property var filteredOptions: []
 
     spacing: 4
 
-    // ---- Заголовок ----
     Text {
         visible: root.label !== ""
         text: root.label + (root.required ? " *" : "")
@@ -23,7 +23,6 @@ ColumnLayout {
         Layout.fillWidth: true
     }
 
-    // ---- Строка фильтра ----
     TextField {
         id: filterField
         placeholderText: "Фильтр..."
@@ -40,9 +39,10 @@ ColumnLayout {
             border.width: 1
             radius: 4
         }
+
+        onTextChanged: root.rebuildFiltered()
     }
 
-    // ---- Список с множественным выбором ----
     Rectangle {
         Layout.fillWidth: true
         Layout.preferredHeight: 300
@@ -56,49 +56,88 @@ ColumnLayout {
             anchors.fill: parent
             anchors.margins: 4
             clip: true
-            model: filteredModel
+            model: root.filteredOptions
+            spacing: 2
 
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded
             }
 
-            delegate: CheckBox {
-                id: checkDelegate
+            delegate: Item {
+                id: delegateRoot
                 width: listView.width
-                text: modelData.label
-                font.pixelSize: GlobalSettings.fontSize
-                checked: root.isSelected(modelData.value)
+                height: 32
 
-                onCheckedChanged: {
-                    root.toggleValue(modelData.value, checked)
+                property var rowData: modelData
+                property bool isChecked: root.isSelected(rowData ? rowData.value : null)
+
+                Rectangle {
+                    id: checkBox
+                    width: 18
+                    height: 18
+                    radius: 3
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left
+                    anchors.leftMargin: 6
+                    color: delegateRoot.isChecked ? Colors.button : "transparent"
+                    border.color: delegateRoot.isChecked ? Colors.button : Colors.border
+                    border.width: 2
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "✓"
+                        color: Colors.buttonText
+                        font.pixelSize: 12
+                        font.bold: true
+                        visible: delegateRoot.isChecked
+                    }
+                }
+
+                Text {
+                    anchors.left: checkBox.right
+                    anchors.leftMargin: 8
+                    anchors.right: parent.right
+                    anchors.rightMargin: 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: delegateRoot.rowData ? delegateRoot.rowData.label : ""
+                    color: Colors.text
+                    font.pixelSize: GlobalSettings.fontSize
+                    elide: Text.ElideRight
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (!delegateRoot.rowData) return
+                        root.toggleValue(delegateRoot.rowData.value, !delegateRoot.isChecked)
+                    }
                 }
             }
         }
 
         Text {
             anchors.centerIn: parent
-            visible: filteredModel.count === 0
+            visible: root.filteredOptions.length === 0
             text: "Нет совпадений"
             color: Colors.textSecondary
             font.pixelSize: GlobalSettings.fontSize
         }
     }
 
-    // ---- Модель с фильтром ----
-    ListModel {
-        id: filteredModel
-    }
-
-    function rebuildFilteredModel() {
-        filteredModel.clear()
+    function rebuildFiltered() {
         var q = filterField.text.toLowerCase()
+        var arr = []
         for (var i = 0; i < root.options.length; i++) {
             var opt = root.options[i]
+            if (!opt) continue
             var lbl = String(opt.label || "")
             if (q === "" || lbl.toLowerCase().indexOf(q) >= 0) {
-                filteredModel.append({ "value": opt.value, "label": lbl })
+                arr.push({ "value": opt.value, "label": lbl })
             }
         }
+        root.filteredOptions = arr
     }
 
     function isSelected(value) {
@@ -122,6 +161,12 @@ ColumnLayout {
         }
         root.selectedValues = arr
 
+        // Обновляем делегаты вручную (JS-массив не пересоздаёт делегаты при изменении selectedValues)
+        for (var j = 0; j < listView.count; j++) {
+            var item = listView.itemAtIndex(j)
+            if (item) item.isChecked = root.isSelected(item.rowData ? item.rowData.value : null)
+        }
+
         if (widgetBridge) {
             widgetBridge.sendWidgetInput(root.fieldId, {
                 "type": "multiselect",
@@ -131,14 +176,7 @@ ColumnLayout {
         }
     }
 
-    onOptionsChanged: rebuildFilteredModel()
+    onOptionsChanged: rebuildFiltered()
 
-    Connections {
-        target: filterField
-        function onTextChanged() {
-            root.rebuildFilteredModel()
-        }
-    }
-
-    Component.onCompleted: rebuildFilteredModel()
+    Component.onCompleted: rebuildFiltered()
 }

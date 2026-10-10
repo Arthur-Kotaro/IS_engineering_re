@@ -193,7 +193,7 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
         "import QtQuick.Controls 6.0\n"
         "import QtQuick.Layouts 6.0\n"
         "ColumnLayout {\n"
-        "    anchors.fill: parent\n"
+        "    width: parent ? parent.width : 0\n"
         "    spacing: 12\n"
         "}\n";
 
@@ -223,7 +223,8 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
 
     layoutItem->setParentItem(container);
     layoutItem->setWidth(container->width());
-    layoutItem->setHeight(container->height());
+    // Высота НЕ anchors.fill: parent, а по implicitHeight (рассчитает ColumnLayout сам).
+    // setHeight не вызываем — QML ColumnLayout с Layout-детьми сам определит высоту.
 
     qDebug() << "  Root ColumnLayout created, width=" << layoutItem->width() << "height=" << layoutItem->height();
 

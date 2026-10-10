@@ -757,6 +757,7 @@ QString generatePasswordField(const QJsonObject& spec)
         "}\n"
     ).arg(labelPart).arg(widgetId).arg(placeholder);
 }
+
 QString generateSelectField(const QJsonObject& spec)
 {
     QString label = spec["label"].toString("");
@@ -766,61 +767,47 @@ QString generateSelectField(const QJsonObject& spec)
     QString labelField = spec["label_field"].toString("label");
 
     QStringList items;
-    if (spec.contains("source_data") && spec["source_data"].isArray()) {
-        for (const QJsonValue& v : spec["source_data"].toArray()) {
+    if (spec.contains("source_data") && spec["source_data"].isArray())
+    {
+        for (const QJsonValue& v : spec["source_data"].toArray())
+        {
             QJsonObject obj = v.toObject();
             QString lbl = obj[labelField].toString();
-            QString val = obj[valueField].toVariant().toString();
             if (lbl.isEmpty()) continue;
+            QString val = obj[valueField].toVariant().toString();
+
             QString escapedLbl = lbl;
             escapedLbl.replace("\\", "\\\\");
             escapedLbl.replace("\"", "\\\"");
             escapedLbl.replace("\n", " ");
+
             QString escapedVal = val;
             escapedVal.replace("\\", "\\\\");
             escapedVal.replace("\"", "\\\"");
+
             items << QStringLiteral("{\"value\": \"%1\", \"label\": \"%2\"}").arg(escapedVal, escapedLbl);
         }
     }
 
-    QString modelStr = items.isEmpty()
-    ? QStringLiteral("[{\"value\": \"\", \"label\": \"Выберите вариант...\"}]")
-    : QStringLiteral("[{\"value\": \"\", \"label\": \"Выберите вариант...\"}, ") + items.join(", ") + "]";
+    QString optionsStr = "[" + items.join(", ") + "]";
 
-    QString labelPart;
-    if (!label.isEmpty()) {
-        labelPart = QString(
-            "Text {\n"
-            "    text: \"%1\"%2\n"
-            "    color: Colors.text\n"
-            "    font.pixelSize: GlobalSettings.fontSize\n"
-            "    Layout.fillWidth: true\n"
-            "}\n"
-        ).arg(label).arg(required ? " *" : "");
-    }
+    QString escapedLabel = label;
+    escapedLabel.replace("\\", "\\\\");
+    escapedLabel.replace("\"", "\\\"");
 
-        return QString(
-        "ColumnLayout {\n"
+    QString escapedId = widgetId;
+    escapedId.replace("\\", "\\\\");
+    escapedId.replace("\"", "\\\"");
+
+    return QString(
+        "SearchableListSingle {\n"
+        "    label: \"%1\"\n"
+        "    fieldId: \"%2\"\n"
+        "    required: %3\n"
+        "    options: %4\n"
         "    Layout.fillWidth: true\n"
-        "    spacing: 4\n"
-        "%1"
-        "    ComboBox {\n"
-        "        id: combo_%2\n"
-        "        model: %3\n"
-        "        textRole: \"label\"\n"
-        "        valueRole: \"value\"\n"
-        "        Layout.fillWidth: true\n"
-        "        Layout.preferredHeight: 36\n"
-        "        font.pixelSize: GlobalSettings.fontSize\n"
-        "        onActivated: function(index) {\n"
-        "            if (widgetBridge && index > 0) {\n"
-        "                var input = { 'type': 'select', 'value': currentValue, 'paramName': '%2' }\n"
-        "                widgetBridge.sendWidgetInput('%2', input)\n"
-        "            }\n"
-        "        }\n"
-        "    }\n"
         "}\n"
-    ).arg(labelPart).arg(widgetId).arg(modelStr);
+    ).arg(escapedLabel, escapedId).arg(required ? "true" : "false").arg(optionsStr);
 }
 
 QString generateMultiSelectField(const QJsonObject& spec)
@@ -832,75 +819,47 @@ QString generateMultiSelectField(const QJsonObject& spec)
     QString labelField = spec["label_field"].toString("label");
 
     QStringList items;
-    if (spec.contains("source_data") && spec["source_data"].isArray()) {
-        for (const QJsonValue& v : spec["source_data"].toArray()) {
+    if (spec.contains("source_data") && spec["source_data"].isArray())
+    {
+        for (const QJsonValue& v : spec["source_data"].toArray())
+        {
             QJsonObject obj = v.toObject();
             QString lbl = obj[labelField].toString();
-            QString val = obj[valueField].toVariant().toString();
             if (lbl.isEmpty()) continue;
+            QString val = obj[valueField].toVariant().toString();
+
             QString escapedLbl = lbl;
             escapedLbl.replace("\\", "\\\\");
             escapedLbl.replace("\"", "\\\"");
             escapedLbl.replace("\n", " ");
+
             QString escapedVal = val;
             escapedVal.replace("\\", "\\\\");
             escapedVal.replace("\"", "\\\"");
+
             items << QStringLiteral("{\"value\": \"%1\", \"label\": \"%2\"}").arg(escapedVal, escapedLbl);
         }
     }
 
-    QString modelStr = "[" + items.join(", ") + "]";
+    QString optionsStr = "[" + items.join(", ") + "]";
 
-    QString labelPart;
-    if (!label.isEmpty()) {
-        labelPart = QString(
-            "Text {\n"
-            "    text: \"%1%2\"\n"
-            "    color: Colors.text\n"
-            "    font.pixelSize: 14\n"
-            "    Layout.fillWidth: true\n"
-            "}\n"
-        ).arg(label).arg(required ? " *" : "");
-    }
+    QString escapedLabel = label;
+    escapedLabel.replace("\\", "\\\\");
+    escapedLabel.replace("\"", "\\\"");
+
+    QString escapedId = widgetId;
+    escapedId.replace("\\", "\\\\");
+    escapedId.replace("\"", "\\\"");
 
     return QString(
-        "ColumnLayout {\n"
+        "SearchableListMulti {\n"
+        "    label: \"%1\"\n"
+        "    fieldId: \"%2\"\n"
+        "    required: %3\n"
+        "    options: %4\n"
         "    Layout.fillWidth: true\n"
-        "    spacing: 4\n"
-        "%1"
-        "    Rectangle {\n"
-        "        Layout.fillWidth: true\n"
-        "        Layout.preferredHeight: 150\n"
-        "        color: Colors.surface\n"
-        "        border.color: Colors.border\n"
-        "        border.width: 1\n"
-        "        radius: 4\n"
-        "        ListView {\n"
-        "            id: ms_%2\n"
-        "            anchors.fill: parent\n"
-        "            anchors.margins: 4\n"
-        "            clip: true\n"
-        "            model: %3\n"
-        "            property var selectedValues: []\n"
-        "            delegate: CheckBox {\n"
-        "                width: ms_%2.width\n"
-        "                text: modelData.label\n"
-        "                font.pixelSize: GlobalSettings.fontSize\n"
-        "                onCheckedChanged: {\n"
-        "                    var v = modelData.value\n"
-        "                    var arr = ms_%2.selectedValues\n"
-        "                    var idx = arr.indexOf(v)\n"
-        "                    if (checked && idx < 0) arr.push(v)\n"
-        "                    else if (!checked && idx >= 0) arr.splice(idx, 1)\n"
-        "                    ms_%2.selectedValues = arr\n"
-        "                    if (widgetBridge) {\n"
-        "                        var input = { 'type': 'multiselect', 'value': arr, 'paramName': '%2' }\n"
-        "                        widgetBridge.sendWidgetInput('%2', input)\n"
-        "                    }\n"
-        "                }\n"
-        "            }\n"
-        "        }\n"
-        "    }\n"
         "}\n"
-    ).arg(labelPart).arg(widgetId).arg(modelStr);
+    ).arg(escapedLabel, escapedId)
+     .arg(required ? "true" : "false")
+     .arg(optionsStr);
 }

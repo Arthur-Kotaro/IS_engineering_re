@@ -23,11 +23,26 @@ Rectangle {
         loading = false
     }
 
-    Item {
-        id: uiContainer
+        Flickable {
+        id: uiFlick
         anchors.fill: parent
         anchors.margins: 10
         visible: !loading
+        clip: true
+        contentWidth: width
+        contentHeight: uiContainer.childrenRect.height
+        boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.VerticalFlick
+
+        ScrollBar.vertical: ScrollBar {
+            policy: ScrollBar.AsNeeded
+        }
+
+        Item {
+            id: uiContainer
+            width: uiFlick.width
+            height: childrenRect.height
+        }
     }
 
     BusyIndicator {
