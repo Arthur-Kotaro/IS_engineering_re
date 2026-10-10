@@ -20,6 +20,12 @@
 #   ./start_all.sh -b          # Инфраструктура + бизнес
 #   ./start_all.sh -f          # Все сервисы + клиент
 #   ./start_all.sh             # default (инфраструктура)
+#
+# Скрипт запускает сервисы в фоне и СРАЗУ возвращает управление терминалу.
+# Управление:
+#   ./status.sh        — проверить статус
+#   ./stop_all.sh      — остановить всё
+#   ./restart_all.sh   — перезапустить
 
 # ========== НАСТРОЙКИ ==========
 GREEN='\033[0;32m'
@@ -104,31 +110,31 @@ start_service() {
     local service_name=$1
     local port=$2
     local service_path="$PROJECT_ROOT/$service_name"
-    
+
     echo -e "\n${YELLOW}▶ Запуск $service_name на порту $port...${NC}"
-    
+
     if [ ! -d "$service_path" ]; then
         echo -e "${YELLOW}⚠  Директория $service_name не найдена, пропускаем${NC}"
         return 0
     fi
-    
+
     if [ ! -f "$service_path/run.sh" ]; then
         echo -e "${YELLOW}⚠  run.sh не найден в $service_name, пропускаем${NC}"
         return 0
     fi
-    
+
     if check_port $port; then
         echo -e "${YELLOW}⚠  Порт $port занят. Пропускаем $service_name${NC}"
         return 0
     fi
-    
+
     cd "$service_path"
     nohup ./run.sh > "$LOG_DIR/${service_name}.log" 2>&1 &
     local pid=$!
     echo $pid > "$LOG_DIR/${service_name}.pid"
-    
+
     sleep 2
-    
+
     if ps -p $pid > /dev/null 2>&1; then
         echo -e "${GREEN}✅ $service_name запущен (PID: $pid)${NC}"
         echo -e "   Лог: $LOG_DIR/${service_name}.log"
@@ -142,34 +148,34 @@ start_ui_composer() {
     local service_name="UI_COMPOSER_SERVICE"
     local port=8020
     local service_path="$PROJECT_ROOT/$service_name"
-    
+
     echo -e "\n${YELLOW}▶ Запуск UI Composer Service на порту $port...${NC}"
-    
+
     if [ ! -d "$service_path" ]; then
         echo -e "${YELLOW}⚠  Директория $service_name не найдена, пропускаем${NC}"
         return 0
     fi
-    
+
     if check_port $port; then
         echo -e "${YELLOW}⚠  Порт $port занят. Пропускаем $service_name${NC}"
         return 0
     fi
-    
+
     cd "$service_path"
-    
+
     if [ ! -d "venv" ]; then
         echo -e "${YELLOW}⚠  Виртуальное окружение не найдено, создаем...${NC}"
         python3 -m venv venv
         source venv/bin/activate
         pip install -r requirements.txt > /dev/null 2>&1
     fi
-    
+
     nohup venv/bin/uvicorn src.main:app --host 0.0.0.0 --port $port > "$LOG_DIR/${service_name}.log" 2>&1 &
     local pid=$!
     echo $pid > "$LOG_DIR/${service_name}.pid"
-    
+
     sleep 2
-    
+
     if ps -p $pid > /dev/null 2>&1; then
         echo -e "${GREEN}✅ $service_name запущен (PID: $pid)${NC}"
         echo -e "   Лог: $LOG_DIR/${service_name}.log"
@@ -181,7 +187,7 @@ start_ui_composer() {
 
 start_gateway() {
     echo -e "\n${YELLOW}▶ Перезагрузка Nginx Gateway...${NC}"
-    
+
     if sudo nginx -t 2>/dev/null; then
         if sudo systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null; then
             echo -e "${GREEN}✅ Nginx Gateway перезагружен (порт 8080)${NC}"
@@ -197,14 +203,14 @@ start_gateway() {
 
 start_client() {
     echo -e "\n${YELLOW}▶ Запуск клиента...${NC}"
-    
+
     local client_paths=(
         "$PROJECT_ROOT/CLIENT/build/production_client/ProductionClientApp"
         "$PROJECT_ROOT/CLIENT/build/ProductionClientApp"
         "$PROJECT_ROOT/CLIENT/build/IS_Client"
         "$PROJECT_ROOT/CLIENT/build/client"
     )
-    
+
     local client_bin=""
     for path in "${client_paths[@]}"; do
         if [ -f "$path" ] && [ -x "$path" ]; then
@@ -212,12 +218,12 @@ start_client() {
             break
         fi
     done
-    
+
     if [ -z "$client_bin" ]; then
         echo -e "${YELLOW}⚠  Исполняемый файл клиента не найден, пропускаем${NC}"
         return 0
     fi
-    
+
     cd "$(dirname "$client_bin")"
     nohup ./$(basename "$client_bin") > "$LOG_DIR/client.log" 2>&1 &
     local pid=$!
@@ -227,22 +233,22 @@ start_client() {
     echo -e "   Бинарь: $client_bin"
 }
 
-stop_all() {
-    echo -e "\n${YELLOW}🛑 Остановка всех сервисов...${NC}"
-    
-    for pid_file in "$LOG_DIR"/*.pid; do
-        if [ -f "$pid_file" ]; then
+# Аварийная остановка — срабатывает только если скрипт прервали (Ctrl+C)
+# во время запуска, ДО того как он отдал управление. При нормальном
+# завершении сервисы НЕ трогаются: они живут в фоне, управляй через stop_all.sh.
+abort_startup() {
+    echo -e "\n${YELLOW}⚠  Прервано пользователем, останавливаем запущенные сервисы...${NC}"
+    if [ -x "$PROJECT_ROOT/stop_all.sh" ]; then
+        "$PROJECT_ROOT/stop_all.sh"
+    else
+        for pid_file in "$LOG_DIR"/*.pid; do
+            [ -f "$pid_file" ] || continue
             local pid=$(cat "$pid_file")
-            if ps -p $pid > /dev/null 2>&1; then
-                kill -TERM $pid 2>/dev/null || kill -KILL $pid 2>/dev/null
-                echo "   Остановлен процесс $pid"
-            fi
+            kill -TERM "$pid" 2>/dev/null || true
             rm -f "$pid_file"
-        fi
-    done
-    
-    pkill -f "uvicorn.*--port" 2>/dev/null || true
-    echo -e "${GREEN}✅ Все сервисы остановлены${NC}"
+        done
+    fi
+    exit 1
 }
 
 check_health() {
@@ -256,7 +262,9 @@ check_health() {
 }
 
 # ========== ОБРАБОТКА СИГНАЛОВ ==========
-trap stop_all EXIT INT TERM
+# Только INT/TERM: прерывание во время запуска. НЕ EXIT — иначе сервисы
+# умирали бы при любом нормальном завершении скрипта.
+trap abort_startup INT TERM
 
 # ========== ЗАПУСК ИНФРАСТРУКТУРЫ (всегда) ==========
 echo -e "\n${BLUE}🏗  Инфраструктурные сервисы:${NC}"
@@ -285,7 +293,7 @@ if [[ "$MODE" == "business" ]] || [[ "$MODE" == "full" ]]; then
     echo "   • PJP Service (8002)"
     echo "   • Mastergraphics Service (8003)"
     echo "   • PROTO Service (8004)"
-    
+
     start_service "PJP_SERVICE" 8002
     start_service "MG_service" 8003
     start_service "PROTO_service" 8004
@@ -323,7 +331,6 @@ echo -e "\n${GREEN}========================================${NC}"
 echo -e "${GREEN}✅ Запуск завершен!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo -e "\n📊 Логи: $LOG_DIR/"
-echo -e "🛑 Для остановки нажмите Ctrl+C"
 echo -e "\n🌐 API Gateway: http://localhost:8080"
 echo -e "📄 UI Composer: http://localhost:8020"
 
@@ -335,4 +342,11 @@ elif [[ "$MODE" == "business" ]]; then
     echo "   ./start_all.sh -f"
 fi
 
-wait
+echo -e "\n${YELLOW}💡 Сервисы работают в фоне. Терминал свободен.${NC}"
+echo -e "${YELLOW}   Остановка: ./stop_all.sh${NC}"
+echo -e "${YELLOW}   Статус:    ./status.sh${NC}"
+echo -e "${YELLOW}   Рестарт:   ./restart_all.sh${NC}"
+echo ""
+
+# Скрипт завершается здесь и возвращает терминал.
+# Никакого `wait`, никакого `trap ... EXIT`.
