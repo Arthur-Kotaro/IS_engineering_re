@@ -37,6 +37,13 @@ class UIBuilder:
             if not self._is_truthy(visible):
                 return None
 
+        # Обработка источников для полей Form/Select/MultiSelect
+        if w.get("type") == "Form" and "fields" in w and isinstance(w["fields"], list):
+            for field in w["fields"]:
+                src_name = field.get("source")
+                if src_name and isinstance(data, dict) and src_name in data:
+                    field["source_data"] = data[src_name]
+
         if "data" in w and isinstance(w["data"], dict):
             if "rows" in w["data"]:
                 w["data"]["rows"] = self._resolve_placeholder(w["data"]["rows"], data)

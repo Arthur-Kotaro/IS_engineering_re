@@ -48,6 +48,7 @@ int main(int argc, char *argv[])
     
     // 4. Регистрируем Colors как синглтон
     qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/Colors.qml"), "Styles", 1, 0, "Colors");
+    qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/GlobalSettings.qml"), "Styles", 1, 0, "GlobalSettings");
     
     // 5. Передаём config в QML контекст
     engine.rootContext()->setContextProperty("appCore", &core);

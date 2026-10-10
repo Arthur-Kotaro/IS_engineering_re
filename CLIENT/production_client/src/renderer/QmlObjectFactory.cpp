@@ -5,6 +5,7 @@
 #include <QQuickItem>
 #include <QDebug>
 #include <QJsonArray>
+#include <QFile>
 
 // Внешние объявления генераторов
 extern QString generateLabel(const QJsonObject&);
@@ -150,6 +151,16 @@ QObject* QmlObjectFactory::create(const QString& type, const QJsonObject& spec, 
         "import Styles 1.0\n"
         "%1\n"
     ).arg(qmlCode);
+
+    {
+        QFile f("/tmp/all_qml.log");
+        if (f.open(QIODevice::WriteOnly | QIODevice::Append)) {
+            f.write("=== QML ===\n");
+            f.write(fullQml.toUtf8());
+            f.write("\n=== END ===\n\n");
+            f.close();
+        }
+    }
 
     QQmlComponent component(m_engine);
     component.setData(fullQml.toUtf8(), QUrl());

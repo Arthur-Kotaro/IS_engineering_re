@@ -32,6 +32,8 @@ public:
     void clearWidgets();
     void updateLayout(QQuickItem* item);
 
+    int widgetCount() const { return m_widgets.size(); }
+
 signals:
     void widgetCreated(const QString& id, QObject* widget);
     void renderStarted();

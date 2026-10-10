@@ -55,8 +55,10 @@ Rectangle {
         text: "Ожидание данных..."
     }
 
-    function loadData() {
-        if (!root.endpoint) {
+    function loadData()
+    {
+        if (!root.endpoint)
+        {
             debugText.text = "Ошибка: не указан endpoint"
             debugText.visible = true
             return
@@ -64,6 +66,10 @@ Rectangle {
 
         root.loading = true
         debugText.visible = false
+
+        if (root.accessToken !== "") {
+            widgetBridge.setAccessToken(root.accessToken)
+        }
 
         var url = root.endpoint
         if (!url.startsWith("http://") && !url.startsWith("https://")) {

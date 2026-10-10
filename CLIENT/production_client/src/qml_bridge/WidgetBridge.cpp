@@ -15,33 +15,32 @@
 #include <QNetworkReply>
 #include <QUrl>
 
-WidgetBridge::WidgetBridge(QObject* parent)
-    : QObject(parent)
-    , m_networkManager(new QNetworkAccessManager(this))
+WidgetBridge::WidgetBridge(QObject* parent): QObject(parent), m_networkManager(new QNetworkAccessManager(this))
 {
     qDebug() << "WidgetBridge initialized";
-    connect(m_networkManager, &QNetworkAccessManager::finished,
-            this, &WidgetBridge::onNetworkReplyFinished);
+    connect(m_networkManager, &QNetworkAccessManager::finished, this, &WidgetBridge::onNetworkReplyFinished);
 }
 
 WidgetBridge::~WidgetBridge() {}
 
 void WidgetBridge::setDataManager(DataManager* dataManager)
 {
-    if (m_dataManager != dataManager) {
+    if (m_dataManager != dataManager)
+    {
         m_dataManager = dataManager;
         qDebug() << "WidgetBridge: DataManager set";
+        m_currentToken.clear();
+        if (m_dataManager) m_dataManager->setParameter("__access_token__", m_currentToken);
     }
 }
 
 void WidgetBridge::setRenderer(JsonUiRenderer* renderer)
 {
-    if (m_renderer != renderer) {
+    if (m_renderer != renderer)
+    {
         m_renderer = renderer;
         qDebug() << "WidgetBridge: Renderer set";
-        if (m_renderer && m_dataManager) {
-            m_renderer->setDataManager(m_dataManager);
-        }
+        if (m_renderer && m_dataManager) m_renderer->setDataManager(m_dataManager);
     }
 }
 
@@ -50,7 +49,8 @@ void WidgetBridge::loadInterface(const QString& jsonPath)
     qDebug() << "WidgetBridge: loadInterface from" << jsonPath;
 
     QFile file(jsonPath);
-    if (!file.open(QIODevice::ReadOnly)) {
+    if (!file.open(QIODevice::ReadOnly))
+    {
         emit interfaceError("Cannot open file: " + jsonPath);
         return;
     }
@@ -67,7 +67,8 @@ void WidgetBridge::loadInterfaceFromJson(const QString& jsonString)
     QJsonParseError parseError;
     QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8(), &parseError);
 
-    if (parseError.error != QJsonParseError::NoError) {
+    if (parseError.error != QJsonParseError::NoError)
+    {
         emit interfaceError("JSON parse error: " + parseError.errorString());
         return;
     }
@@ -81,34 +82,42 @@ void WidgetBridge::loadInterfaceFromJson(const QString& jsonString)
 
     QQuickItem* container = nullptr;
     auto windows = QGuiApplication::topLevelWindows();
-    for (auto window : windows) {
-        if (auto quickWindow = qobject_cast<QQuickWindow*>(window)) {
+    for (auto window : windows)
+    {
+        if (auto quickWindow = qobject_cast<QQuickWindow*>(window))
+        {
             container = quickWindow->findChild<QQuickItem*>("interfaceContainer");
             if (container) break;
         }
     }
 
-    if (!container) {
+    if (!container)
+    {
         emit interfaceError("Cannot find interfaceContainer");
         return;
     }
 
-    for (auto child : container->childItems()) {
+    for (auto child : container->childItems())
+    {
         child->deleteLater();
     }
 
-    if (m_renderer) {
+    if (m_renderer)
+    {
         m_renderer->render(m_currentInterface, container);
         QString title = m_currentInterface["title"].toString("Интерфейс");
         emit interfaceLoaded(title);
-    } else {
+    }
+    else
+    {
         emit interfaceError("Renderer not set");
     }
 }
 
 void WidgetBridge::requestWidgetData(const QString& widgetId, const QJsonObject& spec)
 {
-    if (!m_dataManager) {
+    if (!m_dataManager)
+    {
         qWarning() << "WidgetBridge: No DataManager";
         return;
     }
@@ -123,12 +132,20 @@ void WidgetBridge::sendWidgetInput(const QString& widgetId, const QJsonObject& i
         return;
     }
 
-    qDebug() << "WidgetBridge: sendWidgetInput for" << widgetId;
+    if (input.contains("paramName")) {
+        QString name = input["paramName"].toString();
+        QJsonValue val = input["value"];
+        QString strVal;
 
-    if (input.contains("paramName") && input.contains("value")) {
-        m_dataManager->setParameter(input["paramName"].toString(), input["value"].toString());
+        if (val.isArray()) {
+            QJsonDocument doc(val.toArray());
+            strVal = QString::fromUtf8(doc.toJson(QJsonDocument::Compact));
+        } else {
+            strVal = val.toVariant().toString();
+        }
+
+        m_dataManager->setParameter(name, strVal);
         emit widgetInputSent(widgetId, true, "Saved");
-        refreshAllWidgets();
     } else {
         emit widgetInputSent(widgetId, false, "Missing param");
     }
@@ -136,14 +153,13 @@ void WidgetBridge::sendWidgetInput(const QString& widgetId, const QJsonObject& i
 
 void WidgetBridge::setParameter(const QString& name, const QString& value)
 {
-    if (m_dataManager) {
-        m_dataManager->setParameter(name, value);
-    }
+    if (m_dataManager) m_dataManager->setParameter(name, value);
 }
 
 void WidgetBridge::setParameters(const QJsonObject& params)
 {
-    for (auto it = params.begin(); it != params.end(); ++it) {
+    for (auto it = params.begin(); it != params.end(); ++it)
+    {
         setParameter(it.key(), it.value().toString());
     }
 }
@@ -151,16 +167,12 @@ void WidgetBridge::setParameters(const QJsonObject& params)
 void WidgetBridge::refreshWidget(const QString& widgetId)
 {
     Q_UNUSED(widgetId);
-    if (m_renderer) {
-        m_renderer->refreshAllCharts();
-    }
+    if (m_renderer) m_renderer->refreshAllCharts();
 }
 
 void WidgetBridge::refreshAllWidgets()
 {
-    if (m_renderer) {
-        m_renderer->refreshAllCharts();
-    }
+    if (m_renderer) m_renderer->refreshAllCharts();
 }
 
 void WidgetBridge::httpRequest(const QString& url, const QString& method, const QString& token, const QString& body, const QString& callbackId)
@@ -170,9 +182,7 @@ void WidgetBridge::httpRequest(const QString& url, const QString& method, const 
     QNetworkRequest request;
     request.setUrl(QUrl(url));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    if (!token.isEmpty()) {
-        request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
-    }
+    if (!token.isEmpty()) request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
 
     QNetworkReply* reply = nullptr;
     if (method == "GET") {
@@ -189,10 +199,13 @@ void WidgetBridge::httpRequest(const QString& url, const QString& method, const 
         return;
     }
 
-    if (reply) {
+    if (reply)
+    {
         m_pendingRequests[reply] = callbackId;
         qDebug() << "WidgetBridge: request sent, callbackId stored:" << callbackId << "reply:" << reply;
-    } else {
+    }
+    else
+    {
         qDebug() << "WidgetBridge: ERROR - reply is null!";
         emit httpResponse(callbackId, 0, "Failed to send request");
     }
@@ -200,7 +213,8 @@ void WidgetBridge::httpRequest(const QString& url, const QString& method, const 
 
 void WidgetBridge::onNetworkReplyFinished(QNetworkReply* reply)
 {
-    if (!reply) {
+    if (!reply)
+    {
         qDebug() << "WidgetBridge: onNetworkReplyFinished - reply is null!";
         return;
     }
@@ -224,16 +238,18 @@ void WidgetBridge::onNetworkReplyFinished(QNetworkReply* reply)
 
 void WidgetBridge::renderPage(const QJsonObject& uiData, QQuickItem* container)
 {
-    if (m_renderer && container) {
+    if (m_renderer && container)
+    {
         m_renderer->render(uiData, container);
-    } else {
+    }
+    else
+    {
         qWarning() << "WidgetBridge: Cannot render - renderer or container is null";
     }
 }
 
 void WidgetBridge::sendWorkflowEvent(const QString& sessionId, const QString& widgetId,
-                                     const QString& eventType, const QJsonObject& data,
-                                     const QString& accessToken)
+                                     const QString& eventType, const QJsonObject& data, const QString& accessToken)
 {
     QJsonObject payload;
     payload["session_id"] = sessionId;
@@ -243,11 +259,61 @@ void WidgetBridge::sendWorkflowEvent(const QString& sessionId, const QString& wi
 
     QNetworkRequest request(QUrl("http://localhost:8080/workflow/event"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    if (!accessToken.isEmpty()) {
-        request.setRawHeader("Authorization", ("Bearer " + accessToken).toUtf8());
-    }
+    if (!accessToken.isEmpty())  request.setRawHeader("Authorization", ("Bearer " + accessToken).toUtf8());
 
     QString cbId = "wf_" + widgetId + "_" + QString::number(QDateTime::currentMSecsSinceEpoch());
     QNetworkReply* reply = m_networkManager->post(request, QJsonDocument(payload).toJson());
     m_pendingRequests[reply] = cbId;
+}
+
+
+QString WidgetBridge::getParameter(const QString& name) const
+{
+    if (!m_dataManager) return QString();
+    return m_dataManager->getParameter(name);
+}
+
+void WidgetBridge::submitForm(const QString& endpoint, const QString& method, const QJsonObject& body, const QString& callbackId)
+{
+    if (!m_dataManager)
+    {
+        emit httpResponse(callbackId, 0, "No DataManager");
+        return;
+    }
+
+    QString url = endpoint;
+    if (!url.startsWith("http")) url = "http://localhost:8080" + url;
+
+    QNetworkRequest request{QUrl(url)};
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QString token = m_dataManager->getParameter("__access_token__");
+    if (!token.isEmpty()) request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
+
+    QNetworkReply* reply = nullptr;
+    QByteArray payload = QJsonDocument(body).toJson();
+
+    if (method == "POST")
+    {
+        reply = m_networkManager->post(request, payload);
+    }
+    else if (method == "PUT")
+    {
+        reply = m_networkManager->put(request, payload);
+    }
+    else
+    {
+        reply = m_networkManager->post(request, payload);
+    }
+
+    m_pendingRequests[reply] = callbackId;
+}
+
+void WidgetBridge::setAccessToken(const QString& token)
+{
+    m_currentToken = token;
+    if (m_dataManager) {
+        m_dataManager->setParameter("__access_token__", token);
+    }
+    qDebug() << "WidgetBridge: access token set, length =" << token.length();
 }

@@ -32,20 +32,54 @@ QString generatePushButton(const QJsonObject& spec)
 {
     QString text = spec["text"].toString("Button");
     QString widgetId = spec["id"].toString();
-    
+    QString formEndpoint = spec["form_endpoint"].toString();
+    QString formMethod = spec["form_method"].toString("POST");
+
+    QString fieldsJson = "[]";
+    if (spec.contains("form_fields") && spec["form_fields"].isArray())
+    {
+        QJsonDocument doc(spec["form_fields"].toArray());
+        fieldsJson = QString::fromUtf8(doc.toJson(QJsonDocument::Compact));
+        fieldsJson.replace("\\", "\\\\");
+        fieldsJson.replace("'", "\\'");
+    }
+
+    if (!formEndpoint.isEmpty())
+    {
+        return QString(
+            "Button {\n"
+            "    text: \"%1\"\n"
+            "    Layout.fillWidth: true\n"
+            "    Layout.preferredHeight: 36\n"
+            "    onClicked: {\n"
+            "        if (widgetBridge) {\n"
+            "            var fields = %2\n"
+            "            var body = {}\n"
+            "            for (var i = 0; i < fields.length; i++) {\n"
+            "                var f = fields[i]\n"
+            "                var name = f.field\n"
+            "                if (name && name.length > 0) {\n"
+            "                    body[name] = widgetBridge.getParameter(name)\n"
+            "                }\n"
+            "            }\n"
+            "            widgetBridge.submitForm('%3', '%4', body, '%5')\n"
+            "        }\n"
+            "    }\n"
+            "}\n"
+        ).arg(text).arg(fieldsJson).arg(formEndpoint).arg(formMethod).arg(widgetId);
+    }
+
     return QString(
         "Button {\n"
         "    text: \"%1\"\n"
         "    Layout.fillWidth: true\n"
         "    Layout.preferredHeight: 36\n"
         "    onClicked: {\n"
-"        if (typeof sendWorkflowEvent === 'function') {\n"
-"            sendWorkflowEvent('%2', 'click', {})\n"
-"        } else if (widgetBridge) {\n"
-"            var input = { 'type': 'button', 'value': text, 'paramName': '%2' }\n"
-"            widgetBridge.sendWidgetInput('%2', input)\n"
-"        }\n"
-"    }\n"
+        "        if (widgetBridge) {\n"
+        "            var input = { 'type': 'button', 'value': text, 'paramName': '%2' }\n"
+        "            widgetBridge.sendWidgetInput('%2', input)\n"
+        "        }\n"
+        "    }\n"
         "}\n"
     ).arg(text).arg(widgetId);
 }
@@ -535,19 +569,20 @@ QString generateTextField(const QJsonObject& spec)
     QString placeholder = spec["placeholder"].toString("Введите текст...");
     bool required = spec["required"].toBool(false);
     QString widgetId = spec["id"].toString();
-    
+
     QString labelPart;
-    if (!label.isEmpty()) {
+    if (!label.isEmpty())
+    {
         labelPart = QString(
             "Text {\n"
-            "    text: \"%1\"%2\n"
+            "    text: \"%1%2\"\n"
             "    color: Colors.text\n"
             "    font.pixelSize: 14\n"
             "    Layout.fillWidth: true\n"
             "}\n"
         ).arg(label).arg(required ? " *" : "");
     }
-    
+
     return QString(
         "ColumnLayout {\n"
         "    Layout.fillWidth: true\n"
@@ -561,15 +596,6 @@ QString generateTextField(const QJsonObject& spec)
         "        Layout.preferredHeight: 36\n"
         "        color: Colors.text\n"
         "        selectionColor: Colors.primary\n"
-        "        focus: true\n"
-        "        activeFocusOnTab: true\n"
-        "        cursorVisible: true\n"
-        "        cursorDelegate: Rectangle {\n"
-        "            width: 2\n"
-        "            height: parent.height * 0.7\n"
-        "            color: Colors.primary\n"
-        "            anchors.verticalCenter: parent.verticalCenter\n"
-        "        }\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
         "            border.color: Colors.border\n"
@@ -578,11 +604,7 @@ QString generateTextField(const QJsonObject& spec)
         "        }\n"
         "        onTextChanged: {\n"
         "            if (widgetBridge) {\n"
-        "                var input = {\n"
-        "                    'type': 'text',\n"
-        "                    'value': text,\n"
-        "                    'paramName': '%2'\n"
-        "                }\n"
+        "                var input = { 'type': 'text', 'value': text, 'paramName': '%2' }\n"
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
         "        }\n"
@@ -641,19 +663,19 @@ QString generateEmailField(const QJsonObject& spec)
     QString placeholder = spec["placeholder"].toString("email@example.com");
     bool required = spec["required"].toBool(false);
     QString widgetId = spec["id"].toString();
-    
+
     QString labelPart;
     if (!label.isEmpty()) {
         labelPart = QString(
             "Text {\n"
-            "    text: \"%1\"%2\n"
+            "    text: \"%1%2\"\n"
             "    color: Colors.text\n"
             "    font.pixelSize: 14\n"
             "    Layout.fillWidth: true\n"
             "}\n"
         ).arg(label).arg(required ? " *" : "");
     }
-    
+
     return QString(
         "ColumnLayout {\n"
         "    Layout.fillWidth: true\n"
@@ -667,15 +689,6 @@ QString generateEmailField(const QJsonObject& spec)
         "        Layout.preferredHeight: 36\n"
         "        color: Colors.text\n"
         "        selectionColor: Colors.primary\n"
-        "        focus: true\n"
-        "        activeFocusOnTab: true\n"
-        "        cursorVisible: true\n"
-        "        cursorDelegate: Rectangle {\n"
-        "            width: 2\n"
-        "            height: parent.height * 0.7\n"
-        "            color: Colors.primary\n"
-        "            anchors.verticalCenter: parent.verticalCenter\n"
-        "        }\n"
         "        inputMethodHints: Qt.ImhEmailCharactersOnly\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
@@ -685,11 +698,7 @@ QString generateEmailField(const QJsonObject& spec)
         "        }\n"
         "        onTextChanged: {\n"
         "            if (widgetBridge) {\n"
-        "                var input = {\n"
-        "                    'type': 'email',\n"
-        "                    'value': text,\n"
-        "                    'paramName': '%2'\n"
-        "                }\n"
+        "                var input = { 'type': 'email', 'value': text, 'paramName': '%2' }\n"
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
         "        }\n"
@@ -704,19 +713,20 @@ QString generatePasswordField(const QJsonObject& spec)
     QString placeholder = spec["placeholder"].toString("Введите пароль...");
     bool required = spec["required"].toBool(false);
     QString widgetId = spec["id"].toString();
-    
+
     QString labelPart;
-    if (!label.isEmpty()) {
+    if (!label.isEmpty())
+    {
         labelPart = QString(
             "Text {\n"
-            "    text: \"%1\"%2\n"
+            "    text: \"%1%2\"\n"
             "    color: Colors.text\n"
             "    font.pixelSize: 14\n"
             "    Layout.fillWidth: true\n"
             "}\n"
         ).arg(label).arg(required ? " *" : "");
     }
-    
+
     return QString(
         "ColumnLayout {\n"
         "    Layout.fillWidth: true\n"
@@ -730,15 +740,6 @@ QString generatePasswordField(const QJsonObject& spec)
         "        Layout.preferredHeight: 36\n"
         "        color: Colors.text\n"
         "        selectionColor: Colors.primary\n"
-        "        focus: true\n"
-        "        activeFocusOnTab: true\n"
-        "        cursorVisible: true\n"
-        "        cursorDelegate: Rectangle {\n"
-        "            width: 2\n"
-        "            height: parent.height * 0.7\n"
-        "            color: Colors.primary\n"
-        "            anchors.verticalCenter: parent.verticalCenter\n"
-        "        }\n"
         "        echoMode: TextInput.Password\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
@@ -748,11 +749,7 @@ QString generatePasswordField(const QJsonObject& spec)
         "        }\n"
         "        onTextChanged: {\n"
         "            if (widgetBridge) {\n"
-        "                var input = {\n"
-        "                    'type': 'password',\n"
-        "                    'value': text,\n"
-        "                    'paramName': '%2'\n"
-        "                }\n"
+        "                var input = { 'type': 'password', 'value': text, 'paramName': '%2' }\n"
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
         "        }\n"
@@ -760,60 +757,70 @@ QString generatePasswordField(const QJsonObject& spec)
         "}\n"
     ).arg(labelPart).arg(widgetId).arg(placeholder);
 }
-
 QString generateSelectField(const QJsonObject& spec)
 {
     QString label = spec["label"].toString("");
     bool required = spec["required"].toBool(false);
     QString widgetId = spec["id"].toString();
-    
+    QString valueField = spec["value_field"].toString("value");
+    QString labelField = spec["label_field"].toString("label");
+
+    QStringList items;
+    if (spec.contains("source_data") && spec["source_data"].isArray()) {
+        for (const QJsonValue& v : spec["source_data"].toArray()) {
+            QJsonObject obj = v.toObject();
+            QString lbl = obj[labelField].toString();
+            QString val = obj[valueField].toVariant().toString();
+            if (lbl.isEmpty()) continue;
+            QString escapedLbl = lbl;
+            escapedLbl.replace("\\", "\\\\");
+            escapedLbl.replace("\"", "\\\"");
+            escapedLbl.replace("\n", " ");
+            QString escapedVal = val;
+            escapedVal.replace("\\", "\\\\");
+            escapedVal.replace("\"", "\\\"");
+            items << QStringLiteral("{\"value\": \"%1\", \"label\": \"%2\"}").arg(escapedVal, escapedLbl);
+        }
+    }
+
+    QString modelStr = items.isEmpty()
+    ? QStringLiteral("[{\"value\": \"\", \"label\": \"Выберите вариант...\"}]")
+    : QStringLiteral("[{\"value\": \"\", \"label\": \"Выберите вариант...\"}, ") + items.join(", ") + "]";
+
     QString labelPart;
     if (!label.isEmpty()) {
         labelPart = QString(
             "Text {\n"
             "    text: \"%1\"%2\n"
             "    color: Colors.text\n"
-            "    font.pixelSize: 14\n"
+            "    font.pixelSize: GlobalSettings.fontSize\n"
             "    Layout.fillWidth: true\n"
             "}\n"
         ).arg(label).arg(required ? " *" : "");
     }
-    
-    return QString(
+
+        return QString(
         "ColumnLayout {\n"
         "    Layout.fillWidth: true\n"
         "    spacing: 4\n"
         "%1"
         "    ComboBox {\n"
         "        id: combo_%2\n"
-        "        model: [\"Выберите вариант...\"]\n"
+        "        model: %3\n"
+        "        textRole: \"label\"\n"
+        "        valueRole: \"value\"\n"
         "        Layout.fillWidth: true\n"
         "        Layout.preferredHeight: 36\n"
-        "        background: Rectangle {\n"
-        "            color: Colors.surface\n"
-        "            border.color: Colors.border\n"
-        "            border.width: 1\n"
-        "            radius: 4\n"
-        "        }\n"
-        "        contentItem: Text {\n"
-        "            text: combo_%2.displayText\n"
-        "            color: Colors.text\n"
-        "            font.pixelSize: 14\n"
-        "            verticalAlignment: Text.AlignVCenter\n"
-        "        }\n"
-        "        onCurrentTextChanged: {\n"
-        "            if (widgetBridge && currentIndex > 0) {\n"
-        "                var input = {\n"
-        "                    'type': 'select',\n"
-        "                    'value': currentText,\n"
-        "                    'paramName': '%2'\n"
-        "                }\n"
+        "        font.pixelSize: GlobalSettings.fontSize\n"
+        "        onActivated: function(index) {\n"
+        "            if (widgetBridge && index > 0) {\n"
+        "                var input = { 'type': 'select', 'value': currentValue, 'paramName': '%2' }\n"
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
         "        }\n"
         "    }\n"
         "}\n"
-    ).arg(labelPart).arg(widgetId);
+    ).arg(labelPart).arg(widgetId).arg(modelStr);
 }
 
 QString generateMultiSelectField(const QJsonObject& spec)
@@ -821,49 +828,79 @@ QString generateMultiSelectField(const QJsonObject& spec)
     QString label = spec["label"].toString("");
     bool required = spec["required"].toBool(false);
     QString widgetId = spec["id"].toString();
-    
+    QString valueField = spec["value_field"].toString("value");
+    QString labelField = spec["label_field"].toString("label");
+
+    QStringList items;
+    if (spec.contains("source_data") && spec["source_data"].isArray()) {
+        for (const QJsonValue& v : spec["source_data"].toArray()) {
+            QJsonObject obj = v.toObject();
+            QString lbl = obj[labelField].toString();
+            QString val = obj[valueField].toVariant().toString();
+            if (lbl.isEmpty()) continue;
+            QString escapedLbl = lbl;
+            escapedLbl.replace("\\", "\\\\");
+            escapedLbl.replace("\"", "\\\"");
+            escapedLbl.replace("\n", " ");
+            QString escapedVal = val;
+            escapedVal.replace("\\", "\\\\");
+            escapedVal.replace("\"", "\\\"");
+            items << QStringLiteral("{\"value\": \"%1\", \"label\": \"%2\"}").arg(escapedVal, escapedLbl);
+        }
+    }
+
+    QString modelStr = "[" + items.join(", ") + "]";
+
     QString labelPart;
     if (!label.isEmpty()) {
         labelPart = QString(
             "Text {\n"
-            "    text: \"%1\"%2\n"
+            "    text: \"%1%2\"\n"
             "    color: Colors.text\n"
             "    font.pixelSize: 14\n"
             "    Layout.fillWidth: true\n"
             "}\n"
         ).arg(label).arg(required ? " *" : "");
     }
-    
+
     return QString(
         "ColumnLayout {\n"
         "    Layout.fillWidth: true\n"
         "    spacing: 4\n"
         "%1"
-        "    ListView {\n"
-        "        id: listView_%2\n"
+        "    Rectangle {\n"
         "        Layout.fillWidth: true\n"
-        "        Layout.preferredHeight: 100\n"
-        "        model: [\"Выберите варианты...\"]\n"
-        "        delegate: Rectangle {\n"
-        "            width: parent.width\n"
-        "            height: 30\n"
-        "            color: Colors.surface\n"
-        "            border.color: Colors.border\n"
-        "            border.width: 1\n"
-        "            radius: 4\n"
-        "            Text {\n"
-        "                anchors.centerIn: parent\n"
-        "                text: modelData\n"
-        "                color: Colors.text\n"
+        "        Layout.preferredHeight: 150\n"
+        "        color: Colors.surface\n"
+        "        border.color: Colors.border\n"
+        "        border.width: 1\n"
+        "        radius: 4\n"
+        "        ListView {\n"
+        "            id: ms_%2\n"
+        "            anchors.fill: parent\n"
+        "            anchors.margins: 4\n"
+        "            clip: true\n"
+        "            model: %3\n"
+        "            property var selectedValues: []\n"
+        "            delegate: CheckBox {\n"
+        "                width: ms_%2.width\n"
+        "                text: modelData.label\n"
+        "                font.pixelSize: GlobalSettings.fontSize\n"
+        "                onCheckedChanged: {\n"
+        "                    var v = modelData.value\n"
+        "                    var arr = ms_%2.selectedValues\n"
+        "                    var idx = arr.indexOf(v)\n"
+        "                    if (checked && idx < 0) arr.push(v)\n"
+        "                    else if (!checked && idx >= 0) arr.splice(idx, 1)\n"
+        "                    ms_%2.selectedValues = arr\n"
+        "                    if (widgetBridge) {\n"
+        "                        var input = { 'type': 'multiselect', 'value': arr, 'paramName': '%2' }\n"
+        "                        widgetBridge.sendWidgetInput('%2', input)\n"
+        "                    }\n"
+        "                }\n"
         "            }\n"
-        "        }\n"
-        "        background: Rectangle {\n"
-        "            color: Colors.surface\n"
-        "            border.color: Colors.border\n"
-        "            border.width: 1\n"
-        "            radius: 4\n"
         "        }\n"
         "    }\n"
         "}\n"
-    ).arg(labelPart).arg(widgetId);
+    ).arg(labelPart).arg(widgetId).arg(modelStr);
 }

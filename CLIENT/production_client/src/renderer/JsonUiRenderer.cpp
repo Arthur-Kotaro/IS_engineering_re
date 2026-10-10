@@ -330,7 +330,8 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                         QJsonObject field = fields[j].toObject();
                         QString label = field["label"].toString();
                         QString value = field["value"].toString();
-                        QString fieldId = id + "_field_" + QString::number(j);
+                        QString fieldName = field["field"].toString();
+                        QString fieldId = fieldName.isEmpty() ? (id + "_field_" + QString::number(j)) : fieldName;
                         
                         qDebug() << "        Field[" << j << "] label=" << label << "value=" << value;
                         
@@ -352,15 +353,18 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                 }
             }
 
-            if (type == "Form" && spec.contains("fields") && spec["fields"].isArray()) {
+            if (type == "Form" && spec.contains("fields") && spec["fields"].isArray())
+            {
                 QJsonArray fields = spec["fields"].toArray();
                 qDebug() << "      Form has" << fields.size() << "fields";
                 
-                if (targetParent) {
+                if (targetParent)
+                {
                     for (int j = 0; j < fields.size(); ++j) {
                         QJsonObject field = fields[j].toObject();
                         QString fieldType = field["type"].toString();
-                        QString fieldId = id + "_field_" + QString::number(j);
+                        QString fieldName = field["field"].toString();
+                        QString fieldId = fieldName.isEmpty() ? (id + "_field_" + QString::number(j)) : fieldName;
                         
                         qDebug() << "        Field[" << j << "] type=" << fieldType << " field=" << field["field"].toString();
                         
@@ -381,17 +385,24 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                             fieldSpec["source"] = field["source"].toString();
                             fieldSpec["value_field"] = field["value_field"].toString();
                             fieldSpec["label_field"] = field["label_field"].toString();
+                            if (field.contains("source_data")) {
+                                fieldSpec["source_data"] = field["source_data"];
+                            }
                         } else if (fieldType == "MultiSelectField") {
                             widgetType = "MultiSelectField";
                             fieldSpec["source"] = field["source"].toString();
                             fieldSpec["value_field"] = field["value_field"].toString();
                             fieldSpec["label_field"] = field["label_field"].toString();
+                            if (field.contains("source_data")) {
+                                fieldSpec["source_data"] = field["source_data"];
+                            }
                         } else {
                             widgetType = "TextField";
                         }
                         
                         QObject* fieldWidget = m_factory->create(widgetType, fieldSpec, targetParent);
-                        if (fieldWidget) {
+                        if (fieldWidget)
+                        {
                             QQuickItem* fieldItem = qobject_cast<QQuickItem*>(fieldWidget);
                             if (fieldItem) {
                                 fieldItem->setParentItem(targetParent);
@@ -403,7 +414,8 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                 }
             }
 
-            if (type == "Form" && spec.contains("submit_endpoint") && targetParent) {
+            if (type == "Form" && spec.contains("submit_endpoint") && targetParent)
+            {
                 QString submitEndpoint = spec["submit_endpoint"].toString();
                 QString submitMethod = spec["submit_method"].toString("POST");
                 
@@ -411,11 +423,16 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                 buttonSpec["type"] = "QPushButton";
                 buttonSpec["id"] = id + "_submit";
                 buttonSpec["text"] = spec["submit_text"].toString("Создать");
+                buttonSpec["form_endpoint"] = submitEndpoint;
+                buttonSpec["form_method"] = submitMethod;
+                buttonSpec["form_fields"] = spec["fields"];
                 
                 QObject* submitButton = m_factory->create("QPushButton", buttonSpec, targetParent);
-                if (submitButton) {
+                if (submitButton)
+                {
                     QQuickItem* buttonItem = qobject_cast<QQuickItem*>(submitButton);
-                    if (buttonItem) {
+                    if (buttonItem)
+                    {
                         buttonItem->setParentItem(targetParent);
                         qDebug() << "      Submit button created for Form: " << id;
                     }
