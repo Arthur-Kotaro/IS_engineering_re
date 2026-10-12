@@ -28,49 +28,48 @@
   "title": "string",
   "widgets": [...],
   "context": {
-    "session_id": "uuid",
-    "current_step": "search",
-    "workflow_name": "hr_search_user"
+    "session_id": "uuid | null",
+    "current_step": "string | null",
+    "workflow_name": "string | null",
+    "can_go_back": false
   }
 }
-```
+can_go_back:
 
-Если шаблон без workflow — без context.
+    true, если в истории сессии есть предыдущий шаг (len(session.history) > 0);
 
+    false для стартового шага workflow;
+
+    false для статических страниц (без workflow), session_id при этом null.
+
+Клиент использует can_go_back для активации/деактивации кнопки «Назад»
+(см. ADR 0011).
 POST /workflow/event
 
 Body:
-
-```json
 {
   "session_id": "uuid",
   "widget_id": "search_btn",
   "event_type": "click",
   "data": {"search_input": "Иван"}
 }
-```
-
 Ответ 200: то же, что /page/{path} — со следующим шагом.
-
+context.can_go_back пересчитывается относительно новой истории сессии.
 POST /workflow/back
 
 Body: {"session_id": "uuid"}.
 
-Ответ 200: предыдущий шаг.
-
+Ответ 200: предыдущий шаг. context.can_go_back пересчитывается
+относительно укороченной истории.
 POST /workflow/close
 
 Body: {"session_id": "uuid"}.
 
 Ответ 200: {"message": "Session closed"}.
-
 Формат workflow
 
 См. docs/adr/0007-workflow.md.
-
 Формат шаблона
-
-```yaml
 name: string
 title: string
 endpoint: string
@@ -88,64 +87,54 @@ ui:
       id: string
       <properties>
       widgets: [вложенные]
-```
-
 Типы виджетов
 
-· Контейнеры: Card, QGroupBox, ColumnLayout, RowLayout, QGridLayout.
-· Поля: TextField, EmailField, PasswordField, SearchField, SelectField, MultiSelectField.
-· Кнопки: Button.
-· Отображение: Label, Table, ProgressBar.
-· Диаграммы: ChartPie, ChartBar, ChartLine, ChartBarCompare.
-· Специализированные: GanttChartView (планируется).
+    Контейнеры: Card, QGroupBox, ColumnLayout, RowLayout, QGridLayout.
+
+    Поля: TextField, EmailField, PasswordField, SearchField, SelectField, MultiSelectField.
+
+    Кнопки: Button.
+
+    Отображение: Label, Table, ProgressBar.
+
+    Диаграммы: ChartPie, ChartBar, ChartLine, ChartBarCompare.
+
+    Специализированные: GanttChartView (планируется).
 
 Типы событий
-
-Виджет event_type
-Button click
-TextField, EmailField, PasswordField input
-SearchField submit
-SelectField, MultiSelectField change
-Table (строка) row_select
-ColumnLayout (форма) submit
-
+Виджет	event_type
+Button	click
+TextField, EmailField, PasswordField	input
+SearchField	submit
+SelectField, MultiSelectField	change
+Table (строка)	row_select
+ColumnLayout (форма)	submit
 Sources
-
 Обычный источник
 
-```yaml
 sources:
   - id: departments
     service: user_service
     endpoint: /api/v1/hr/departments
     method: GET
-```
-
 UI Composer делает запрос к сервису от имени пользователя.
 Передаёт X-User-ID, X-Impersonated-By, Authorization.
 
 Источник из сессии
 
-```yaml
 sources:
   - id: search_results
     service: session
     endpoint: "session:search_results"
-```
-
 Возвращает значение из session.data["search_results"].
-
 Подстановка __me__
 
 В endpoint: /api/v1/users/__me__/subordinates — __me__ заменяется на X-User-ID.
-
 Сессия
 
 Redis DB 1, ключ session:{uuid}, TTL 3600 сек.
 
 Содержимое:
-
-```json
 {
   "session_id": "uuid",
   "workflow_name": "hr_search_user",
@@ -154,13 +143,15 @@ Redis DB 1, ключ session:{uuid}, TTL 3600 сек.
   "data": {"search_input": "Иван", "search_results": [...]},
   "history": ["search"]
 }
-```
-
 Проброс заголовков
 
 UI Composer передаёт в бизнес-сервисы:
 
-· X-User-ID — из входного запроса.
-· X-Impersonated-By — если есть.
-· Authorization — если есть (для защищённых эндпоинтов).
-· X-Internal-Key — для /internal/* (из переменной окружения INTERNAL_API_KEY).
+    X-User-ID — из входного запроса.
+
+    X-Impersonated-By — если есть.
+
+    Authorization — если есть (для защищённых эндпоинтов).
+
+    X-Internal-Key — для /internal/* (из переменной окружения INTERNAL_API_KEY).
+    EOF

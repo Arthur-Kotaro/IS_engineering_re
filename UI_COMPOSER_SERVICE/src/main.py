@@ -87,6 +87,12 @@ async def get_page(full_path: str, request: Request):
             template.sources, user_id, token, query_params, impersonated_by, None
         )
         ui = ui_builder.build(template, data)
+        ui["context"] = {
+            "session_id": None,
+            "current_step": None,
+            "workflow_name": None,
+            "can_go_back": False,
+        }
         return ui
 
     session = await session_service.create(
@@ -110,6 +116,7 @@ async def get_page(full_path: str, request: Request):
             "session_id": session.session_id,
             "current_step": session.current_step,
             "workflow_name": workflow.name,
+            "can_go_back": len(session.history) > 0,
         },
     }
 
@@ -225,6 +232,7 @@ async def workflow_event(request: Request):
             "title": step.title or "",
             "widgets": [],
             "context": {
+                "can_go_back": len(session.history) > 0,
                 "session_id": session.session_id,
                 "current_step": session.current_step,
                 "workflow_name": session.workflow_name,
@@ -244,6 +252,7 @@ async def workflow_event(request: Request):
         "title": next_step_obj.title or template.title,
         "widgets": ui["widgets"],
         "context": {
+            "can_go_back": len(session.history) > 0,
             "session_id": session.session_id,
             "current_step": session.current_step,
             "workflow_name": session.workflow_name,
@@ -282,6 +291,7 @@ async def workflow_back(request: Request):
         "title": step.title or template.title,
         "widgets": ui["widgets"],
         "context": {
+            "can_go_back": len(session.history) > 0,
             "session_id": session.session_id,
             "current_step": session.current_step,
             "workflow_name": session.workflow_name,

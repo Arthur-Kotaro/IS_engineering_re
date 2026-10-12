@@ -223,10 +223,9 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
 
     layoutItem->setParentItem(container);
     layoutItem->setWidth(container->width());
-    // Высота НЕ anchors.fill: parent, а по implicitHeight (рассчитает ColumnLayout сам).
-    // setHeight не вызываем — QML ColumnLayout с Layout-детьми сам определит высоту.
+    layoutItem->setObjectName("rootLayout");
 
-    qDebug() << "  Root ColumnLayout created, width=" << layoutItem->width() << "height=" << layoutItem->height();
+    qDebug() << "  Root ColumnLayout created, width=" << layoutItem->width();
 
     m_lastLayout = layoutItem;
 
@@ -263,12 +262,6 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
         QString id = spec["id"].toString();
 
         qDebug() << "    Widget[" << i << "] type=" << type << "id=" << id;
-
-        if (spec.contains("height")) {
-            qDebug() << "      height=" << spec["height"].toInt();
-        } else {
-            qDebug() << "      WARNING: no 'height' field";
-        }
 
         bool hasChildren = spec.contains("widgets") && spec["widgets"].isArray();
         bool hasFields = false;

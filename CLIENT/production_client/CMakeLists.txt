@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Network Qml Quick QuickControls2)
+find_package(Qt6 REQUIRED COMPONENTS Core Network Qml Quick QuickControls2 QuickShapes)
 
 set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
 set(COMMON_INCLUDE ${COMMON_DIR}/include)
@@ -54,11 +54,14 @@ set(QML_FILES
     qml/components/WidgetLoader.qml
     qml/components/ToastNotification.qml
     qml/components/LoadingSpinner.qml
-    qml/components/NotificationsWindow.qml
     qml/components/MastergraphStatusCard.qml
     qml/components/ProjectRolesList.qml
     qml/components/OfflineIndicator.qml
     qml/components/UserInfoPanel.qml
+
+    qml/widgets/SearchableListSingle.qml
+    qml/widgets/SearchableListMulti.qml
+    qml/widgets/SearchableSelect.qml
 
     qml/delegates/ProjectDelegate.qml
     qml/delegates/MastergraphDelegate.qml
@@ -85,11 +88,6 @@ set(QML_FILES
     qml/utils/Validators.qml
 
     qml/ThemeManager.qml
-
-    qml/widgets/SearchableListSingle.qml
-    qml/widgets/SearchableListMulti.qml
-    qml/widgets/SearchableSelect.qml
-
 )
 
 qt_add_qml_module(ProductionClient
@@ -119,6 +117,7 @@ target_link_libraries(ProductionClientApp
         Qt6::Qml
         Qt6::Quick
         Qt6::QuickControls2
+        Qt6::QuickShapes
 )
 
 target_include_directories(ProductionClientApp PRIVATE

@@ -2,6 +2,9 @@
 #include <QJsonObject>
 #include <QJsonArray>
 
+// Общая ширина для полей ввода. Инфографика не ограничивается.
+static const char* kFieldMaxWidth = "    Layout.maximumWidth: 800\n";
+
 QString generateLabel(const QJsonObject& spec)
 {
     QString text = spec["text"].toString("Label");
@@ -50,6 +53,7 @@ QString generatePushButton(const QJsonObject& spec)
             "Button {\n"
             "    text: \"%1\"\n"
             "    Layout.fillWidth: true\n"
+            "    Layout.maximumWidth: 800\n"
             "    Layout.preferredHeight: 36\n"
             "    onClicked: {\n"
             "        if (widgetBridge) {\n"
@@ -73,6 +77,7 @@ QString generatePushButton(const QJsonObject& spec)
         "Button {\n"
         "    text: \"%1\"\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    Layout.preferredHeight: 36\n"
         "    onClicked: {\n"
         "        if (widgetBridge) {\n"
@@ -109,6 +114,7 @@ QString generateComboBox(const QJsonObject& spec)
         "    id: combo_%1\n"
         "    model: %2\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    Layout.preferredHeight: 36\n"
         "    background: Rectangle {\n"
         "        color: Colors.surface\n"
@@ -147,6 +153,7 @@ QString generateLineEdit(const QJsonObject& spec)
         "    placeholderText: \"%2\"\n"
         "    placeholderTextColor: Colors.textSecondary\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    Layout.preferredHeight: 36\n"
         "    color: Colors.text\n"
         "    selectionColor: Colors.primary\n"
@@ -248,6 +255,7 @@ QString generateDateEdit(const QJsonObject& spec)
         "    id: date_%1\n"
         "    model: [\"%2\"]\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    Layout.preferredHeight: 36\n"
         "    editable: true\n"
         "    background: Rectangle {\n"
@@ -286,6 +294,7 @@ QString generateDateTimeEdit(const QJsonObject& spec)
         "    id: datetime_%1\n"
         "    model: [\"%2\"]\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    Layout.preferredHeight: 36\n"
         "    editable: true\n"
         "    background: Rectangle {\n"
@@ -341,6 +350,7 @@ QString generateTextEdit(const QJsonObject& spec)
         "    placeholderText: \"Введите текст...\"\n"
         "    placeholderTextColor: Colors.textSecondary\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    Layout.preferredHeight: 100\n"
         "    color: Colors.text\n"
         "    selectionColor: Colors.primary\n"
@@ -378,6 +388,7 @@ QString generateSlider(const QJsonObject& spec)
         "    to: %3\n"
         "    value: %4\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    onValueChanged: {\n"
         "        if (widgetBridge) {\n"
         "            var input = {\n"
@@ -406,6 +417,7 @@ QString generateSpinBox(const QJsonObject& spec)
         "    to: %3\n"
         "    value: %4\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    onValueChanged: {\n"
         "        if (widgetBridge) {\n"
         "            var input = {\n"
@@ -420,7 +432,6 @@ QString generateSpinBox(const QJsonObject& spec)
     ).arg(widgetId).arg(min).arg(max).arg(value);
 }
 
-// Заглушки для сложных виджетов
 QString generateListWidget(const QJsonObject& spec)
 {
     return QString(
@@ -586,6 +597,7 @@ QString generateTextField(const QJsonObject& spec)
     return QString(
         "ColumnLayout {\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    spacing: 4\n"
         "%1"
         "    TextField {\n"
@@ -625,18 +637,13 @@ QString generateSearchField(const QJsonObject& spec)
         "    placeholderText: \"🔍 %2\"\n"
         "    placeholderTextColor: Colors.textSecondary\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    Layout.preferredHeight: 36\n"
         "    color: Colors.text\n"
         "    selectionColor: Colors.primary\n"
         "    focus: true\n"
         "    activeFocusOnTab: true\n"
         "    cursorVisible: true\n"
-        "    cursorDelegate: Rectangle {\n"
-        "        width: 2\n"
-        "        height: parent.height * 0.7\n"
-        "        color: Colors.primary\n"
-        "        anchors.verticalCenter: parent.verticalCenter\n"
-        "    }\n"
         "    background: Rectangle {\n"
         "        color: Colors.surface\n"
         "        border.color: Colors.border\n"
@@ -679,6 +686,7 @@ QString generateEmailField(const QJsonObject& spec)
     return QString(
         "ColumnLayout {\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    spacing: 4\n"
         "%1"
         "    TextField {\n"
@@ -730,6 +738,7 @@ QString generatePasswordField(const QJsonObject& spec)
     return QString(
         "ColumnLayout {\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "    spacing: 4\n"
         "%1"
         "    TextField {\n"
@@ -767,10 +776,8 @@ QString generateSelectField(const QJsonObject& spec)
     QString labelField = spec["label_field"].toString("label");
 
     QStringList items;
-    if (spec.contains("source_data") && spec["source_data"].isArray())
-    {
-        for (const QJsonValue& v : spec["source_data"].toArray())
-        {
+    if (spec.contains("source_data") && spec["source_data"].isArray()) {
+        for (const QJsonValue& v : spec["source_data"].toArray()) {
             QJsonObject obj = v.toObject();
             QString lbl = obj[labelField].toString();
             if (lbl.isEmpty()) continue;
@@ -785,7 +792,8 @@ QString generateSelectField(const QJsonObject& spec)
             escapedVal.replace("\\", "\\\\");
             escapedVal.replace("\"", "\\\"");
 
-            items << QStringLiteral("{\"value\": \"%1\", \"label\": \"%2\"}").arg(escapedVal, escapedLbl);
+            items << QStringLiteral("{\"value\": \"%1\", \"label\": \"%2\"}")
+                     .arg(escapedVal, escapedLbl);
         }
     }
 
@@ -806,8 +814,11 @@ QString generateSelectField(const QJsonObject& spec)
         "    required: %3\n"
         "    options: %4\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "}\n"
-    ).arg(escapedLabel, escapedId).arg(required ? "true" : "false").arg(optionsStr);
+    ).arg(escapedLabel, escapedId)
+     .arg(required ? "true" : "false")
+     .arg(optionsStr);
 }
 
 QString generateMultiSelectField(const QJsonObject& spec)
@@ -819,10 +830,8 @@ QString generateMultiSelectField(const QJsonObject& spec)
     QString labelField = spec["label_field"].toString("label");
 
     QStringList items;
-    if (spec.contains("source_data") && spec["source_data"].isArray())
-    {
-        for (const QJsonValue& v : spec["source_data"].toArray())
-        {
+    if (spec.contains("source_data") && spec["source_data"].isArray()) {
+        for (const QJsonValue& v : spec["source_data"].toArray()) {
             QJsonObject obj = v.toObject();
             QString lbl = obj[labelField].toString();
             if (lbl.isEmpty()) continue;
@@ -837,7 +846,8 @@ QString generateMultiSelectField(const QJsonObject& spec)
             escapedVal.replace("\\", "\\\\");
             escapedVal.replace("\"", "\\\"");
 
-            items << QStringLiteral("{\"value\": \"%1\", \"label\": \"%2\"}").arg(escapedVal, escapedLbl);
+            items << QStringLiteral("{\"value\": \"%1\", \"label\": \"%2\"}")
+                     .arg(escapedVal, escapedLbl);
         }
     }
 
@@ -858,6 +868,7 @@ QString generateMultiSelectField(const QJsonObject& spec)
         "    required: %3\n"
         "    options: %4\n"
         "    Layout.fillWidth: true\n"
+        "    Layout.maximumWidth: 800\n"
         "}\n"
     ).arg(escapedLabel, escapedId)
      .arg(required ? "true" : "false")
