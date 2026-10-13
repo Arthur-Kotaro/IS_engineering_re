@@ -13,6 +13,9 @@ ColumnLayout {
     property var selectedValues: []
     property var filteredOptions: []
 
+    property bool fieldIsValid: !required || selectedValues.length > 0
+    signal fieldValidationChanged(bool valid)
+
     spacing: 4
 
     Text {
@@ -67,7 +70,6 @@ ColumnLayout {
                 id: delegateRoot
                 width: listView.width
                 height: 32
-
                 property var rowData: modelData
                 property bool isChecked: root.isSelected(rowData ? rowData.value : null)
 
@@ -154,18 +156,18 @@ ColumnLayout {
         for (var i = 0; i < arr.length; i++) {
             if (String(arr[i]) === String(value)) { idx = i; break }
         }
-        if (checked && idx < 0) {
-            arr.push(value)
-        } else if (!checked && idx >= 0) {
-            arr.splice(idx, 1)
-        }
+        if (checked && idx < 0) arr.push(value)
+        else if (!checked && idx >= 0) arr.splice(idx, 1)
         root.selectedValues = arr
 
-        // Обновляем делегаты вручную (JS-массив не пересоздаёт делегаты при изменении selectedValues)
         for (var j = 0; j < listView.count; j++) {
             var item = listView.itemAtIndex(j)
             if (item) item.isChecked = root.isSelected(item.rowData ? item.rowData.value : null)
         }
+
+        var valid = !root.required || arr.length > 0
+        root.fieldIsValid = valid
+        root.fieldValidationChanged(valid)
 
         if (widgetBridge) {
             widgetBridge.sendWidgetInput(root.fieldId, {
@@ -178,5 +180,8 @@ ColumnLayout {
 
     onOptionsChanged: rebuildFiltered()
 
-    Component.onCompleted: rebuildFiltered()
+    Component.onCompleted: {
+        rebuildFiltered()
+        fieldValidationChanged(fieldIsValid)
+    }
 }

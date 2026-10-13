@@ -609,12 +609,13 @@ QString generateTextField(const QJsonObject& spec)
         "        placeholderTextColor: Colors.textSecondary\n"
         "        Layout.fillWidth: true\n"
         "        Layout.preferredHeight: 36\n"
-        "        color: __isValid ? Colors.text : Colors.error\n"
+        "        color: fieldIsValid ? Colors.text : Colors.error\n"
         "        selectionColor: Colors.primary\n"
-        "        property bool __isValid: true\n"
+        "        property bool fieldIsValid: true\n"
+        "        signal fieldValidationChanged(bool valid)\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
-        "            border.color: __isValid ? Colors.border : Colors.error\n"
+        "            border.color: fieldIsValid ? Colors.border : Colors.error\n"
         "            border.width: 1\n"
         "            radius: 4\n"
         "        }\n"
@@ -624,9 +625,10 @@ QString generateTextField(const QJsonObject& spec)
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
         "            var r = Validators.validate('%4', text, %5)\n"
-        "            __isValid = r.valid\n"
+        "            fieldIsValid = r.valid\n"
         "            errorText_%2.text = r.message\n"
         "            errorText_%2.visible = !r.valid\n"
+        "            fieldValidationChanged(r.valid)\n"
         "        }\n"
         "    }\n"
         "    Text {\n"
@@ -649,9 +651,20 @@ QString generateSearchField(const QJsonObject& spec)
     QString placeholder = spec["placeholder"].toString("Поиск...");
     int minLength = spec["min_length"].toInt(0);
     QString widgetId = spec["id"].toString();
-    QString validation = spec["validation"].toString("");
+    QString validation = spec["validation"].toString();
     bool required = spec["required"].toBool(false);
-    
+
+    QString validationCheck = "";
+    if (!validation.isEmpty()) {
+        validationCheck = QString(
+            "            var r = Validators.validate('%1', text, %2)\n"
+            "            fieldIsValid = r.valid\n"
+            "            errorText_%3.text = r.message\n"
+            "            errorText_%3.visible = !r.valid\n"
+            "            fieldValidationChanged(r.valid)\n"
+        ).arg(validation).arg(required ? "true" : "false").arg(widgetId);
+    }
+
     return QString(
         "TextField {\n"
         "    id: searchField_%1\n"
@@ -660,15 +673,16 @@ QString generateSearchField(const QJsonObject& spec)
         "    Layout.fillWidth: true\n"
         "    Layout.maximumWidth: 800\n"
         "    Layout.preferredHeight: 36\n"
-        "    color: __isValid ? Colors.text : Colors.error\n"
+        "    color: fieldIsValid ? Colors.text : Colors.error\n"
         "    selectionColor: Colors.primary\n"
         "    focus: true\n"
         "    activeFocusOnTab: true\n"
         "    cursorVisible: true\n"
-        "    property bool __isValid: true\n"
+        "    property bool fieldIsValid: true\n"
+        "    signal fieldValidationChanged(bool valid)\n"
         "    background: Rectangle {\n"
         "        color: Colors.surface\n"
-        "        border.color: __isValid ? Colors.border : Colors.error\n"
+        "        border.color: fieldIsValid ? Colors.border : Colors.error\n"
         "        border.width: 1\n"
         "        radius: 4\n"
         "    }\n"
@@ -681,12 +695,7 @@ QString generateSearchField(const QJsonObject& spec)
         "            }\n"
         "            widgetBridge.sendWidgetInput('%1', input)\n"
         "        }\n"
-        "        if ('%4' !== '') {\n"
-        "            var r = Validators.validate('%4', text, %5)\n"
-        "            __isValid = r.valid\n"
-        "            errorText_%1.text = r.message\n"
-        "            errorText_%1.visible = !r.valid\n"
-        "        }\n"
+        "%4"
         "    }\n"
         "    Text {\n"
         "        id: errorText_%1\n"
@@ -698,8 +707,7 @@ QString generateSearchField(const QJsonObject& spec)
         "        wrapMode: Text.WordWrap\n"
         "    }\n"
         "}\n"
-    ).arg(widgetId).arg(placeholder).arg(minLength).arg(validation)
-     .arg(required ? "true" : "false");
+    ).arg(widgetId).arg(placeholder).arg(minLength).arg(validationCheck);
 }
 
 QString generateEmailField(const QJsonObject& spec)
@@ -708,8 +716,7 @@ QString generateEmailField(const QJsonObject& spec)
     QString placeholder = spec["placeholder"].toString("email@example.com");
     bool required = spec["required"].toBool(false);
     QString validation = spec["validation"].toString();
-    if (validation.isEmpty())
-    {
+    if (validation.isEmpty()) {
         validation = "email";
     }
     QString widgetId = spec["id"].toString();
@@ -738,13 +745,14 @@ QString generateEmailField(const QJsonObject& spec)
         "        placeholderTextColor: Colors.textSecondary\n"
         "        Layout.fillWidth: true\n"
         "        Layout.preferredHeight: 36\n"
-        "        color: __isValid ? Colors.text : Colors.error\n"
+        "        color: fieldIsValid ? Colors.text : Colors.error\n"
         "        selectionColor: Colors.primary\n"
         "        inputMethodHints: Qt.ImhEmailCharactersOnly\n"
-        "        property bool __isValid: true\n"
+        "        property bool fieldIsValid: true\n"
+        "        signal fieldValidationChanged(bool valid)\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
-        "            border.color: __isValid ? Colors.border : Colors.error\n"
+        "            border.color: fieldIsValid ? Colors.border : Colors.error\n"
         "            border.width: 1\n"
         "            radius: 4\n"
         "        }\n"
@@ -754,9 +762,10 @@ QString generateEmailField(const QJsonObject& spec)
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
         "            var r = Validators.validate('%4', text, %5)\n"
-        "            __isValid = r.valid\n"
+        "            fieldIsValid = r.valid\n"
         "            errorText_%2.text = r.message\n"
         "            errorText_%2.visible = !r.valid\n"
+        "            fieldValidationChanged(r.valid)\n"
         "        }\n"
         "    }\n"
         "    Text {\n"
@@ -779,7 +788,10 @@ QString generatePasswordField(const QJsonObject& spec)
     QString label = spec["label"].toString("");
     QString placeholder = spec["placeholder"].toString("Введите пароль...");
     bool required = spec["required"].toBool(false);
-    QString validation = spec["validation"].toString("password");
+    QString validation = spec["validation"].toString();
+    if (validation.isEmpty()) {
+        validation = "password";
+    }
     QString widgetId = spec["id"].toString();
 
     QString labelPart;
@@ -807,13 +819,14 @@ QString generatePasswordField(const QJsonObject& spec)
         "        placeholderTextColor: Colors.textSecondary\n"
         "        Layout.fillWidth: true\n"
         "        Layout.preferredHeight: 36\n"
-        "        color: __isValid ? Colors.text : Colors.error\n"
+        "        color: fieldIsValid ? Colors.text : Colors.error\n"
         "        selectionColor: Colors.primary\n"
         "        echoMode: TextInput.Password\n"
-        "        property bool __isValid: true\n"
+        "        property bool fieldIsValid: true\n"
+        "        signal fieldValidationChanged(bool valid)\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
-        "            border.color: __isValid ? Colors.border : Colors.error\n"
+        "            border.color: fieldIsValid ? Colors.border : Colors.error\n"
         "            border.width: 1\n"
         "            radius: 4\n"
         "        }\n"
@@ -823,9 +836,10 @@ QString generatePasswordField(const QJsonObject& spec)
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
         "            var r = Validators.validate('%4', text, %5)\n"
-        "            __isValid = r.valid\n"
+        "            fieldIsValid = r.valid\n"
         "            errorText_%2.text = r.message\n"
         "            errorText_%2.visible = !r.valid\n"
+        "            fieldValidationChanged(r.valid)\n"
         "        }\n"
         "    }\n"
         "    Text {\n"

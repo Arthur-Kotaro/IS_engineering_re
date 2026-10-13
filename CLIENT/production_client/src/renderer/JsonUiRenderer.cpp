@@ -9,6 +9,8 @@
 #include <QJsonValue>
 #include <QTimer>
 #include <QMetaObject>
+#include <QVariant>
+#include <functional>
 
 JsonUiRenderer::JsonUiRenderer(QQmlEngine* engine, QObject* parent)
     : QObject(parent)
@@ -108,12 +110,9 @@ QQuickItem* JsonUiRenderer::findInnerLayout(QQuickItem* container, int depth)
 {
     if (!container) return nullptr;
 
-    qDebug() << "    findInnerLayout() depth=" << depth << "class=" << container->metaObject()->className();
-
     if (container->inherits("QQuickColumnLayout") ||
         container->inherits("QQuickRowLayout") ||
         container->inherits("QQuickGridLayout")) {
-        qDebug() << "      Found Layout!";
         return container;
     }
 
@@ -132,18 +131,13 @@ void JsonUiRenderer::updateLayout(QQuickItem* item)
 {
     if (!item) return;
 
-    QString className = item->metaObject()->className();
-    qDebug() << "updateLayout() called for" << className;
-
     if (item->inherits("QQuickColumnLayout") ||
         item->inherits("QQuickRowLayout") ||
         item->inherits("QQuickGridLayout")) {
         item->polish();
         item->update();
-        qDebug() << "  Layout updated with polish() + update()";
     } else {
         item->update();
-        qDebug() << "  Container updated with update()";
     }
 
     emit layoutUpdated();
@@ -155,7 +149,6 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
     qDebug() << "JsonUiRenderer::render() START";
     qDebug() << "  Container:" << (container ? "valid" : "null");
     qDebug() << "  Container width:" << (container ? container->width() : 0);
-    qDebug() << "  Container height:" << (container ? container->height() : 0);
     qDebug() << "========================================";
 
     emit renderStarted();
@@ -171,6 +164,8 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
         child->deleteLater();
     }
     m_widgets.clear();
+    m_currentFormFields.clear();
+    m_currentSubmitButton = nullptr;
 
     QJsonArray widgets = root["widgets"].toArray();
     qDebug() << "  Total widgets in root:" << widgets.size();
@@ -180,13 +175,6 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
         emit renderFinished();
         return;
     }
-
-    for (int i = 0; i < widgets.size(); ++i) {
-        QJsonObject obj = widgets[i].toObject();
-        qDebug() << "  Root widget[" << i << "]:" << obj["type"].toString() << "id=" << obj["id"].toString();
-    }
-
-    qDebug() << "Creating root ColumnLayout...";
 
     QString layoutQml = 
         "import QtQuick 6.0\n"
@@ -225,8 +213,6 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
     layoutItem->setWidth(container->width());
     layoutItem->setObjectName("rootLayout");
 
-    qDebug() << "  Root ColumnLayout created, width=" << layoutItem->width();
-
     m_lastLayout = layoutItem;
 
     renderWidgets(widgets, layoutItem);
@@ -240,22 +226,16 @@ void JsonUiRenderer::render(const QJsonObject& root, QQuickItem* container)
     });
 
     emit renderFinished();
-    qDebug() << "========================================";
     qDebug() << "JsonUiRenderer::render() FINISHED (async)";
-    qDebug() << "========================================";
 }
 
 void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parentLayout)
 {
-    qDebug() << "  renderWidgets() called: widgets=" << widgets.size() << ", parentLayout=" << (parentLayout ? "valid" : "null");
-    qDebug() << "    ParentLayout width=" << (parentLayout ? parentLayout->width() : 0) << "height=" << (parentLayout ? parentLayout->height() : 0);
+    qDebug() << "  renderWidgets() called: widgets=" << widgets.size();
 
     for (int i = 0; i < widgets.size(); ++i) {
         const QJsonValue& value = widgets[i];
-        if (!value.isObject()) {
-            qDebug() << "    Widget[" << i << "] is not an object, skipping";
-            continue;
-        }
+        if (!value.isObject()) continue;
 
         QJsonObject spec = value.toObject();
         QString type = spec["type"].toString();
@@ -264,215 +244,214 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
         qDebug() << "    Widget[" << i << "] type=" << type << "id=" << id;
 
         bool hasChildren = spec.contains("widgets") && spec["widgets"].isArray();
-        bool hasFields = false;
-        
-        if (spec.contains("data") && spec["data"].isObject()) {
-            QJsonObject dataObj = spec["data"].toObject();
-            if (dataObj.contains("fields") && dataObj["fields"].isArray()) {
-                hasFields = true;
-            }
-        }
-        
-        if (hasChildren) {
-            qDebug() << "      widgets count=" << spec["widgets"].toArray().size();
-        }
-        if (hasFields) {
-            qDebug() << "      fields count in data";
-        }
 
         bool isContainer = (type == "Card" || type == "Form" || type == "QGroupBox" ||
                             type == "QVBoxLayout" || type == "QHBoxLayout" || type == "QGridLayout");
 
-        if (isContainer) {
-            qDebug() << "      This is a CONTAINER widget";
+        if (type == "Form") {
+            m_currentFormFields.clear();
+            m_currentSubmitButton = nullptr;
+            qDebug() << "      Form started - cleared form fields list";
         }
 
         QObject* widget = m_factory->create(type, spec, parentLayout);
 
-        if (widget) {
-            qDebug() << "      Widget CREATED successfully: " << type << "id=" << id;
-            if (!id.isEmpty()) {
-                m_widgets[id] = widget;
-                emit widgetCreated(id, widget);
-            }
-
-            QQuickItem* containerItem = qobject_cast<QQuickItem*>(widget);
-            QQuickItem* targetParent = containerItem;
-            
-            if (containerItem) {
-                QQuickItem* innerLayout = findInnerLayout(containerItem, 0);
-                if (innerLayout) {
-                    targetParent = innerLayout;
-                    qDebug() << "      Found inner layout for children";
-                }
-            }
-
-            if (hasChildren && targetParent) {
-                int childCount = spec["widgets"].toArray().size();
-                qDebug() << "      Container has" << childCount << "child widgets";
-                renderWidgets(spec["widgets"].toArray(), targetParent);
-                updateLayout(targetParent);
-            }
-
-            if (hasFields && (type == "Card" || type == "QGroupBox")) {
-                QJsonObject dataObj = spec["data"].toObject();
-                QJsonArray fields = dataObj["fields"].toArray();
-                qDebug() << "      Card has" << fields.size() << "fields";
-                
-                if (targetParent) {
-                    for (int j = 0; j < fields.size(); ++j) {
-                        QJsonObject field = fields[j].toObject();
-                        QString label = field["label"].toString();
-                        QString value = field["value"].toString();
-                        QString fieldName = field["field"].toString();
-                        QString fieldId = fieldName.isEmpty() ? (id + "_field_" + QString::number(j)) : fieldName;
-                        
-                        qDebug() << "        Field[" << j << "] label=" << label << "value=" << value;
-                        
-                        QJsonObject fieldSpec;
-                        fieldSpec["type"] = "QLabel";
-                        fieldSpec["id"] = fieldId;
-                        fieldSpec["text"] = label + ": " + value;
-                        
-                        QObject* fieldWidget = m_factory->create("QLabel", fieldSpec, targetParent);
-                        if (fieldWidget) {
-                            QQuickItem* fieldItem = qobject_cast<QQuickItem*>(fieldWidget);
-                            if (fieldItem) {
-                                fieldItem->setParentItem(targetParent);
-                                qDebug() << "        Field widget created: " << fieldId;
-                            }
-                        }
-                    }
-                    updateLayout(targetParent);
-                }
-            }
-
-            if (type == "Form" && spec.contains("fields") && spec["fields"].isArray())
-            {
-                QJsonArray fields = spec["fields"].toArray();
-                qDebug() << "      Form has" << fields.size() << "fields";
-                
-                if (targetParent)
-                {
-                    for (int j = 0; j < fields.size(); ++j) {
-                        QJsonObject field = fields[j].toObject();
-                        QString fieldType = field["type"].toString();
-                        QString fieldName = field["field"].toString();
-                        QString fieldId = fieldName.isEmpty() ? (id + "_field_" + QString::number(j)) : fieldName;
-                        
-                        qDebug() << "        Field[" << j << "] type=" << fieldType << " field=" << field["field"].toString();
-                        
-                        QJsonObject fieldSpec;
-                        fieldSpec["id"] = fieldId;
-                        fieldSpec["label"] = field["label"].toString();
-                        fieldSpec["field"] = field["field"].toString();
-                        fieldSpec["placeholder"] = field["placeholder"].toString();
-                        fieldSpec["required"] = field["required"].toBool(false);
-                        if (field.contains("validation") && !field["validation"].toString().isEmpty())
-                        {
-                            fieldSpec["validation"] = field["validation"].toString();
-                        }
-                        
-                        QString widgetType;
-                        if (fieldType == "EmailField") {
-                            widgetType = "EmailField";
-                        } else if (fieldType == "PasswordField") {
-                            widgetType = "PasswordField";
-                        } else if (fieldType == "SelectField") {
-                            widgetType = "SelectField";
-                            fieldSpec["source"] = field["source"].toString();
-                            fieldSpec["value_field"] = field["value_field"].toString();
-                            fieldSpec["label_field"] = field["label_field"].toString();
-                            if (field.contains("source_data")) {
-                                fieldSpec["source_data"] = field["source_data"];
-                            }
-                        } else if (fieldType == "MultiSelectField") {
-                            widgetType = "MultiSelectField";
-                            fieldSpec["source"] = field["source"].toString();
-                            fieldSpec["value_field"] = field["value_field"].toString();
-                            fieldSpec["label_field"] = field["label_field"].toString();
-                            if (field.contains("source_data")) {
-                                fieldSpec["source_data"] = field["source_data"];
-                            }
-                        } else {
-                            widgetType = "TextField";
-                        }
-                        
-                        QObject* fieldWidget = m_factory->create(widgetType, fieldSpec, targetParent);
-                        if (fieldWidget)
-                        {
-                            QQuickItem* fieldItem = qobject_cast<QQuickItem*>(fieldWidget);
-                            if (fieldItem) {
-                                fieldItem->setParentItem(targetParent);
-                                qDebug() << "        Field widget created: " << fieldId;
-                            }
-                        }
-                    }
-                    updateLayout(targetParent);
-                }
-            }
-
-            if (type == "Form" && spec.contains("submit_endpoint") && targetParent)
-            {
-                QString submitEndpoint = spec["submit_endpoint"].toString();
-                QString submitMethod = spec["submit_method"].toString("POST");
-                
-                QJsonObject buttonSpec;
-                buttonSpec["type"] = "QPushButton";
-                buttonSpec["id"] = id + "_submit";
-                buttonSpec["text"] = spec["submit_text"].toString("Создать");
-                buttonSpec["form_endpoint"] = submitEndpoint;
-                buttonSpec["form_method"] = submitMethod;
-                buttonSpec["form_fields"] = spec["fields"];
-                
-                QObject* submitButton = m_factory->create("QPushButton", buttonSpec, targetParent);
-                if (submitButton)
-                {
-                    QQuickItem* buttonItem = qobject_cast<QQuickItem*>(submitButton);
-                    if (buttonItem)
-                    {
-                        buttonItem->setParentItem(targetParent);
-                        qDebug() << "      Submit button created for Form: " << id;
-                    }
-                }
-                updateLayout(targetParent);
-            }
-
-            if (!isContainer && spec.contains("data") && spec["data"].isObject()) {
-                QJsonObject dataSpec = spec["data"].toObject();
-                qDebug() << "      Data source detected, requesting data";
-                m_dataManager->requestData(id, dataSpec);
-            }
-        } else {
+        if (!widget) {
             qWarning() << "      FAILED to create widget: " << type << "id=" << id;
+            continue;
+        }
+
+        if (!id.isEmpty()) {
+            m_widgets[id] = widget;
+            emit widgetCreated(id, widget);
+        }
+
+        QQuickItem* containerItem = qobject_cast<QQuickItem*>(widget);
+        QQuickItem* targetParent = containerItem;
+        
+        if (containerItem) {
+            QQuickItem* innerLayout = findInnerLayout(containerItem, 0);
+            if (innerLayout) {
+                targetParent = innerLayout;
+            }
+        }
+
+        if (hasChildren && targetParent) {
+            renderWidgets(spec["widgets"].toArray(), targetParent);
+            updateLayout(targetParent);
+        }
+
+        // ============================================================
+        // Поля формы с валидацией
+        // ============================================================
+        if (type == "Form" && spec.contains("fields") && spec["fields"].isArray())
+        {
+            QJsonArray fields = spec["fields"].toArray();
+            qDebug() << "      Form has" << fields.size() << "fields";
+            
+            if (targetParent)
+            {
+                for (int j = 0; j < fields.size(); ++j) {
+                    QJsonObject field = fields[j].toObject();
+                    QString fieldType = field["type"].toString();
+                    QString fieldName = field["field"].toString();
+                    QString fieldId = fieldName.isEmpty() ? (id + "_field_" + QString::number(j)) : fieldName;
+                    
+                    QJsonObject fieldSpec;
+                    fieldSpec["id"] = fieldId;
+                    fieldSpec["label"] = field["label"].toString();
+                    fieldSpec["field"] = field["field"].toString();
+                    fieldSpec["placeholder"] = field["placeholder"].toString();
+                    fieldSpec["required"] = field["required"].toBool(false);
+                    if (field.contains("validation") && !field["validation"].toString().isEmpty()) {
+                        fieldSpec["validation"] = field["validation"].toString();
+                    }
+                    
+                    QString widgetType;
+                    if (fieldType == "EmailField") {
+                        widgetType = "EmailField";
+                    } else if (fieldType == "PasswordField") {
+                        widgetType = "PasswordField";
+                    } else if (fieldType == "SelectField") {
+                        widgetType = "SelectField";
+                        fieldSpec["source"] = field["source"].toString();
+                        fieldSpec["value_field"] = field["value_field"].toString();
+                        fieldSpec["label_field"] = field["label_field"].toString();
+                        if (field.contains("source_data")) {
+                            fieldSpec["source_data"] = field["source_data"];
+                        }
+                    } else if (fieldType == "MultiSelectField") {
+                        widgetType = "MultiSelectField";
+                        fieldSpec["source"] = field["source"].toString();
+                        fieldSpec["value_field"] = field["value_field"].toString();
+                        fieldSpec["label_field"] = field["label_field"].toString();
+                        if (field.contains("source_data")) {
+                            fieldSpec["source_data"] = field["source_data"];
+                        }
+                    } else {
+                        widgetType = "TextField";
+                    }
+                    
+                    QObject* fieldWidget = m_factory->create(widgetType, fieldSpec, targetParent);
+                    if (fieldWidget)
+                    {
+                        QQuickItem* fieldItem = qobject_cast<QQuickItem*>(fieldWidget);
+                        if (fieldItem) {
+                            fieldItem->setParentItem(targetParent);
+
+                            // Ищем внутри созданного виджета тот Item,
+                            // у которого есть property "fieldIsValid".
+                            QQuickItem* validatable = nullptr;
+                            std::function<void(QQuickItem*)> findValidatable =
+                                [&](QQuickItem* item) {
+                                    if (!item || validatable) return;
+                                    if (item->property("fieldIsValid").isValid()) {
+                                        validatable = item;
+                                        return;
+                                    }
+                                    for (QQuickItem* child : item->childItems()) {
+                                        findValidatable(child);
+                                    }
+                                };
+                            findValidatable(fieldItem);
+
+                            if (validatable) {
+                                m_currentFormFields.append(validatable);
+                                QObject::connect(validatable, SIGNAL(fieldValidationChanged(bool)),
+                                                 this, SLOT(onFieldValidationChanged(bool)));
+                                qDebug() << "        Connected validatable field:" << fieldId
+                                         << "class=" << validatable->metaObject()->className();
+                            } else {
+                                qWarning() << "        No validatable item found for field:" << fieldId;
+                            }
+                        }
+                    }
+                }
+                updateLayout(targetParent);
+            }
+        }
+
+        // ============================================================
+        // Submit-кнопка формы
+        // ============================================================
+        if (type == "Form" && spec.contains("submit_endpoint") && targetParent)
+        {
+            QString submitEndpoint = spec["submit_endpoint"].toString();
+            QString submitMethod = spec["submit_method"].toString("POST");
+            
+            QJsonObject buttonSpec;
+            buttonSpec["type"] = "QPushButton";
+            buttonSpec["id"] = id + "_submit";
+            buttonSpec["text"] = spec["submit_text"].toString("Создать");
+            buttonSpec["form_endpoint"] = submitEndpoint;
+            buttonSpec["form_method"] = submitMethod;
+            buttonSpec["form_fields"] = spec["fields"];
+            
+            QObject* submitButton = m_factory->create("QPushButton", buttonSpec, targetParent);
+            if (submitButton)
+            {
+                QQuickItem* buttonItem = qobject_cast<QQuickItem*>(submitButton);
+                if (buttonItem)
+                {
+                    buttonItem->setParentItem(targetParent);
+                    m_currentSubmitButton = buttonItem;
+                    qDebug() << "      Submit button created";
+                    updateSubmitButtonState();
+                }
+            }
+            updateLayout(targetParent);
+        }
+
+        if (!isContainer && spec.contains("data") && spec["data"].isObject()) {
+            QJsonObject dataSpec = spec["data"].toObject();
+            m_dataManager->requestData(id, dataSpec);
+        }
+    }
+}
+
+void JsonUiRenderer::updateSubmitButtonState()
+{
+    if (!m_currentSubmitButton) {
+        return;
+    }
+
+    bool allValid = true;
+    for (QQuickItem* item : m_currentFormFields) {
+        if (!item) continue;
+        QVariant v = item->property("fieldIsValid");
+        if (v.isValid() && !v.toBool()) {
+            allValid = false;
+            break;
         }
     }
 
-    qDebug() << "  renderWidgets() completed";
+    m_currentSubmitButton->setProperty("enabled", allValid);
+    qDebug() << "updateSubmitButtonState: allValid=" << allValid
+             << "fields=" << m_currentFormFields.size();
+}
+
+void JsonUiRenderer::onFieldValidationChanged(bool valid)
+{
+    qDebug() << "onFieldValidationChanged: valid=" << valid;
+    updateSubmitButtonState();
 }
 
 QObject* JsonUiRenderer::findWidget(const QString& id) const
 {
-    QObject* widget = m_widgets.value(id, nullptr);
-    qDebug() << "findWidget(" << id << ") ->" << (widget ? "found" : "not found");
-    return widget;
+    return m_widgets.value(id, nullptr);
 }
 
 void JsonUiRenderer::updateWidgetData(const QString& id, const QJsonObject& data)
 {
-    qDebug() << "updateWidgetData(" << id << ") called, data size=" << data.size();
-    QObject* widget = findWidget(id);
-    if (!widget) {
-        qWarning() << "  Widget not found:" << id;
-        return;
-    }
-    qDebug() << "  Widget found, updating...";
+    Q_UNUSED(id);
+    Q_UNUSED(data);
 }
 
 void JsonUiRenderer::clearWidgets()
 {
-    qDebug() << "clearWidgets() called, clearing" << m_widgets.size() << "widgets";
     m_widgets.clear();
+    m_currentFormFields.clear();
+    m_currentSubmitButton = nullptr;
 }
 
 void JsonUiRenderer::onDataReady(const QString& widgetId, const QJsonDocument& data)
@@ -504,7 +483,6 @@ void JsonUiRenderer::setDataManager(DataManager* dataManager)
 {
     if (m_dataManager != dataManager) {
         m_dataManager = dataManager;
-        qDebug() << "JsonUiRenderer: DataManager set";
     }
 }
 

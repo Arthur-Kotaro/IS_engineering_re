@@ -3,7 +3,9 @@
 
 #include <QObject>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QMap>
+#include <QList>
 
 class QQmlEngine;
 class QQuickItem;
@@ -46,17 +48,25 @@ private slots:
     void onDataError(const QString& widgetId, const QString& error, const QString& endpoint, int httpCode);
     void onDataProgress(const QString& widgetId, int percent);
 
+    // D3: сигнал от поля формы об изменении валидности
+    void onFieldValidationChanged(bool valid);
+
 private:
     void renderWidgets(const QJsonArray& widgets, QQuickItem* parentLayout);
     QQuickItem* findInnerLayout(QQuickItem* container, int depth = 0);
     void scheduleHeightUpdate(QQuickItem* layoutItem);
     void repaintCharts(QQuickItem* item);
+    void updateSubmitButtonState();
 
     QQmlEngine* m_engine;
     QmlObjectFactory* m_factory;
     DataManager* m_dataManager;
     QMap<QString, QObject*> m_widgets;
     QQuickItem* m_lastLayout = nullptr;
+
+    // D3: поля текущей формы и submit-кнопка
+    QList<QQuickItem*> m_currentFormFields;
+    QQuickItem* m_currentSubmitButton = nullptr;
 };
 
 #endif // JSONUIRENDERER_H

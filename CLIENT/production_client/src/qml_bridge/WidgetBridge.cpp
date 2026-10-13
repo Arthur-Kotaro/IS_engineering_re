@@ -28,7 +28,6 @@ void WidgetBridge::setDataManager(DataManager* dataManager)
     if (m_dataManager != dataManager)
     {
         m_dataManager = dataManager;
-        qDebug() << "WidgetBridge: DataManager set";
         m_currentToken.clear();
         if (m_dataManager) m_dataManager->setParameter("__access_token__", m_currentToken);
     }
@@ -39,15 +38,12 @@ void WidgetBridge::setRenderer(JsonUiRenderer* renderer)
     if (m_renderer != renderer)
     {
         m_renderer = renderer;
-        qDebug() << "WidgetBridge: Renderer set";
         if (m_renderer && m_dataManager) m_renderer->setDataManager(m_dataManager);
     }
 }
 
 void WidgetBridge::loadInterface(const QString& jsonPath)
 {
-    qDebug() << "WidgetBridge: loadInterface from" << jsonPath;
-
     QFile file(jsonPath);
     if (!file.open(QIODevice::ReadOnly))
     {
@@ -62,8 +58,6 @@ void WidgetBridge::loadInterface(const QString& jsonPath)
 
 void WidgetBridge::loadInterfaceFromJson(const QString& jsonString)
 {
-    qDebug() << "WidgetBridge: loadInterfaceFromJson";
-
     QJsonParseError parseError;
     QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8(), &parseError);
 
@@ -121,7 +115,6 @@ void WidgetBridge::requestWidgetData(const QString& widgetId, const QJsonObject&
         qWarning() << "WidgetBridge: No DataManager";
         return;
     }
-    qDebug() << "WidgetBridge: requestWidgetData for" << widgetId;
     m_dataManager->requestData(widgetId, spec);
 }
 
@@ -194,7 +187,6 @@ void WidgetBridge::httpRequest(const QString& url, const QString& method, const 
     } else if (method == "DELETE") {
         reply = m_networkManager->deleteResource(request);
     } else {
-        qWarning() << "Unknown HTTP method:" << method;
         emit httpResponse(callbackId, 0, "Unknown method");
         return;
     }
@@ -202,22 +194,16 @@ void WidgetBridge::httpRequest(const QString& url, const QString& method, const 
     if (reply)
     {
         m_pendingRequests[reply] = callbackId;
-        qDebug() << "WidgetBridge: request sent, callbackId stored:" << callbackId << "reply:" << reply;
     }
     else
     {
-        qDebug() << "WidgetBridge: ERROR - reply is null!";
         emit httpResponse(callbackId, 0, "Failed to send request");
     }
 }
 
 void WidgetBridge::onNetworkReplyFinished(QNetworkReply* reply)
 {
-    if (!reply)
-    {
-        qDebug() << "WidgetBridge: onNetworkReplyFinished - reply is null!";
-        return;
-    }
+    if (!reply) return;
 
     QString callbackId = m_pendingRequests.value(reply, "");
     m_pendingRequests.remove(reply);
@@ -290,8 +276,45 @@ void WidgetBridge::submitForm(const QString& endpoint, const QString& method, co
     QString token = m_dataManager->getParameter("__access_token__");
     if (!token.isEmpty()) request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
 
+    // Нормализация body: строки вида "[...]" -> массивы,
+    // строки-числа внутри массивов -> int.
+    // Нужно для MultiSelectField (role_ids).
+    QJsonObject normalizedBody;
+    for (auto it = body.begin(); it != body.end(); ++it) {
+        QString key = it.key();
+        QJsonValue val = it.value();
+        if (val.isString()) {
+            QString s = val.toString().trimmed();
+            if (s.startsWith("[") && s.endsWith("]")) {
+                QJsonParseError err;
+                QJsonDocument doc = QJsonDocument::fromJson(s.toUtf8(), &err);
+                if (err.error == QJsonParseError::NoError && doc.isArray()) {
+                    QJsonArray arr = doc.array();
+                    QJsonArray normalized;
+                    for (const QJsonValue& v : arr) {
+                        if (v.isString()) {
+                            bool ok = false;
+                            int n = v.toString().toInt(&ok);
+                            if (ok) normalized.append(n);
+                            else normalized.append(v);
+                        } else {
+                            normalized.append(v);
+                        }
+                    }
+                    normalizedBody[key] = normalized;
+                    qDebug() << "submitForm: normalized array for" << key
+                             << "size=" << normalized.size();
+                    continue;
+                }
+            }
+        }
+        normalizedBody[key] = val;
+    }
+
+    QByteArray payload = QJsonDocument(normalizedBody).toJson();
+    qDebug() << "submitForm: payload =" << QString::fromUtf8(payload);
+
     QNetworkReply* reply = nullptr;
-    QByteArray payload = QJsonDocument(body).toJson();
 
     if (method == "POST")
     {
@@ -315,5 +338,4 @@ void WidgetBridge::setAccessToken(const QString& token)
     if (m_dataManager) {
         m_dataManager->setParameter("__access_token__", token);
     }
-    qDebug() << "WidgetBridge: access token set, length =" << token.length();
 }

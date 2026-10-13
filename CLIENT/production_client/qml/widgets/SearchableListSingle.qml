@@ -13,6 +13,9 @@ ColumnLayout {
     property var currentValue: null
     property var filteredOptions: []
 
+    property bool fieldIsValid: !required || currentValue !== null
+    signal fieldValidationChanged(bool valid)
+
     spacing: 4
 
     Text {
@@ -67,7 +70,6 @@ ColumnLayout {
                 id: delegateRoot
                 width: listView.width
                 height: 32
-
                 property var rowData: modelData
 
                 Rectangle {
@@ -79,12 +81,10 @@ ColumnLayout {
                     anchors.left: parent.left
                     anchors.leftMargin: 6
                     color: "transparent"
-                    border.color: {
-                        if (!delegateRoot.rowData) return Colors.border
-                        return (root.currentValue !== null
-                                && String(root.currentValue) === String(delegateRoot.rowData.value))
-                                ? Colors.button : Colors.border
-                    }
+                    border.color: delegateRoot.rowData
+                                  && root.currentValue !== null
+                                  && String(root.currentValue) === String(delegateRoot.rowData.value)
+                                  ? Colors.button : Colors.border
                     border.width: 2
 
                     Rectangle {
@@ -125,6 +125,9 @@ ColumnLayout {
                                 "paramName": root.fieldId
                             })
                         }
+                        var valid = !root.required || root.currentValue !== null
+                        root.fieldIsValid = valid
+                        root.fieldValidationChanged(valid)
                     }
                 }
             }
@@ -155,5 +158,8 @@ ColumnLayout {
 
     onOptionsChanged: rebuildFiltered()
 
-    Component.onCompleted: rebuildFiltered()
+    Component.onCompleted: {
+        rebuildFiltered()
+        fieldValidationChanged(fieldIsValid)
+    }
 }
