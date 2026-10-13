@@ -15,6 +15,7 @@ class UserRepository:
         return select(User).options(
             selectinload(User.roles),
             selectinload(User.department),
+            selectinload(User.position),
         )
 
     async def get_by_id(self, user_id: int, include_deleted: bool = False) -> Optional[User]:
@@ -78,6 +79,12 @@ class UserRepository:
         created_by: Optional[int] = None,
         **kwargs,
     ) -> User:
+        """
+        Создаёт пользователя, возвращает объект БЕЗ связей (position, department, roles).
+        Связи будут подгружены при повторном запросе через get_by_id.
+        Refresh не вызывается: он триггерит ленивую загрузку связей и падает
+        в async-контексте (MissingGreenlet).
+        """
         user = User(
             email=email,
             user_name=username,
@@ -91,8 +98,8 @@ class UserRepository:
             **kwargs,
         )
         self.db.add(user)
-        await self.db.commit()
-        await self.db.refresh(user)
+        await self.db.flush()  # заполняет user_id, но не истекает связи
+        print(f"[user_repo] create: user_id={user.user_id} flushed")
         return user
 
     async def update(self, user_id: int, update_data: Dict[str, Any]) -> Optional[User]:
@@ -110,8 +117,8 @@ class UserRepository:
                 setattr(user, key, value)
 
         await self.db.commit()
-        await self.db.refresh(user)
-        return user
+        # Возвращаем из БД со связями
+        return await self.get_by_id(user_id, include_deleted=True)
 
     async def delete(self, user_id: int, soft: bool = True) -> bool:
         user = await self.get_by_id(user_id, include_deleted=True)
@@ -172,7 +179,6 @@ class UserRepository:
         user.password_hash = new_password_hash
         user.password_updated_at = datetime.now(timezone.utc)
         await self.db.commit()
-        await self.db.refresh(user)
         return True
 
     async def set_temp_password(self, user_id: int, temp_password_hash: str, expires_at) -> bool:

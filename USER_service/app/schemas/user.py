@@ -11,7 +11,6 @@ class UserCreate(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=100)
     first_name: str = Field(..., min_length=1, max_length=100)
     middle_name: Optional[str] = Field(None, max_length=100)
-    password: str = Field(..., min_length=12)
     gender: Optional[str] = Field(None, pattern="^[MF]$")
     birth_date: Optional[date] = None
     position_id: int
@@ -73,6 +72,24 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ManagerInfo(BaseModel):
+    """Данные руководителя подразделения, куда назначен новый пользователь."""
+    user_id: int
+    full_name: str
+    position_name_ru: Optional[str] = None
+    dept_name_ru: Optional[str] = None
+    email: Optional[str] = None
+    phone_work: Optional[str] = None
+    phone_mobile: Optional[str] = None
+
+
+class UserCreatedResponse(BaseModel):
+    """Ответ на POST /hr/users. Единственный раз возвращает временный пароль."""
+    user: UserResponse
+    temporary_password: str
+    manager: Optional[ManagerInfo] = None
 
 
 class UserStatus:

@@ -31,12 +31,17 @@ engine = create_async_engine(
     echo=False,
 )
 
-# Фабрика асинхронных сессий
+# Фабрика асинхронных сессий.
+# expire_on_commit=False — критично для async: иначе после commit()
+# все атрибуты объектов истекают, и первое обращение к связи
+# (user.position и т.п.) триггерит ленивую загрузку, которая падает
+# с MissingGreenlet.
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
     autocommit=False,
     autoflush=False,
+    expire_on_commit=False,
 )
 
 # Базовый класс моделей с поддержкой AsyncAttrs (для awaitable_attrs)

@@ -110,7 +110,11 @@ class AuthService:
         user.locked_until = None
         await self.user_repo.db.commit()
 
+        must_change_password = False
         if using_temp_password:
+            # Пользователь вошёл по временному паролю — требуем смену.
+            must_change_password = True
+            print(f"[auth_service] login: user_id={user_id} logged in with temp_password, must_change_password=True")
             await self.user_repo.clear_temp_password(user_id)
 
         await self.user_repo.update_last_login(user_id)
@@ -119,11 +123,12 @@ class AuthService:
         role_codes = user.get_role_codes()
         position_code = user.position.position_code if user.position else None
 
-        password_updated_at = user.password_updated_at
-        must_change_password = True
-        if password_updated_at:
-            days_since_update = (datetime.now(timezone.utc) - password_updated_at).days
-            must_change_password = days_since_update > self.password_expiry_days
+        if not must_change_password:
+            password_updated_at = user.password_updated_at
+            must_change_password = True
+            if password_updated_at:
+                days_since_update = (datetime.now(timezone.utc) - password_updated_at).days
+                must_change_password = days_since_update > self.password_expiry_days
 
         access_token = self.token_service.create_access_token(
             user_id=user_id,

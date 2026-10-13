@@ -53,7 +53,7 @@ class User(Base):
     created_by = Column(BigInteger, nullable=True)
 
     position = relationship("Position", lazy="joined")
-    department = relationship("Department", back_populates="users", lazy="joined")
+    department = relationship("Department", back_populates="users", lazy="joined", foreign_keys=[dept_id])
     roles = relationship("Role", secondary="users_roles", back_populates="users", lazy="selectin")
     blocked_by_user = relationship("User", remote_side=[user_id], foreign_keys=[blocked_by])
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")

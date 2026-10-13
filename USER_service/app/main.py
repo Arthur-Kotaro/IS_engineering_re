@@ -1,8 +1,11 @@
 # app/main.py
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from app.database import engine
 from sqlalchemy import text
+
+from app.schemas.errors import ValidationError
 
 
 @asynccontextmanager
@@ -26,6 +29,18 @@ app = FastAPI(
     version="3.0.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(ValidationError)
+async def validation_error_handler(request: Request, exc: ValidationError):
+    print(f"[main] ValidationError: {exc.detail}, errors={len(exc.errors)}")
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": exc.detail,
+            "errors": [e.model_dump() for e in exc.errors],
+        },
+    )
 
 
 @app.get("/")

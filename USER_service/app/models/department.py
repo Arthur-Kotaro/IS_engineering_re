@@ -1,6 +1,6 @@
 # app/models/department.py
 import uuid
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, CheckConstraint, Index
+from sqlalchemy import Column, String, Integer, BigInteger, DateTime, ForeignKey, CheckConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -17,12 +17,14 @@ class Department(Base):
     parent_dept_id = Column(UUID(as_uuid=True), ForeignKey("departments.dept_id", ondelete="SET NULL"), nullable=True)
     type = Column(String(20), nullable=False)
     level = Column(Integer, nullable=False)
+    head_user_id = Column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     parent = relationship("Department", remote_side=[dept_id], backref="children")
-    users = relationship("User", back_populates="department")
+    users = relationship("User", back_populates="department", foreign_keys="User.dept_id")
+    head_user = relationship("User", foreign_keys=[head_user_id], post_update=True, lazy="selectin")
 
     __table_args__ = (
         CheckConstraint(
@@ -33,6 +35,7 @@ class Department(Base):
         Index("idx_dept_parent", "parent_dept_id"),
         Index("idx_dept_type", "type"),
         Index("idx_dept_level", "level"),
+        Index("idx_dept_head_user", "head_user_id"),
     )
 
     def __repr__(self):
