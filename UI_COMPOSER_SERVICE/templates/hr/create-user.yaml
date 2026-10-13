@@ -28,24 +28,24 @@ ui:
           field: user_name
           label: "Логин"
           required: true
+          validation: login
         - type: TextField
           field: last_name
           label: "Фамилия"
           required: true
+          validation: name
         - type: TextField
           field: first_name
           label: "Имя"
           required: true
+          validation: name
         - type: TextField
           field: middle_name
           label: "Отчество"
+          validation: name
         - type: EmailField
           field: email
           label: "Email"
-          required: true
-        - type: PasswordField
-          field: password
-          label: "Пароль"
           required: true
         - type: SelectField
           field: dept_id
@@ -69,6 +69,8 @@ ui:
         - type: TextField
           field: phone_work
           label: "Рабочий телефон"
+          validation: phone_work
         - type: TextField
           field: phone_mobile
           label: "Мобильный телефон"
+          validation: phone_mobile

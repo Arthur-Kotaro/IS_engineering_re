@@ -368,6 +368,10 @@ void JsonUiRenderer::renderWidgets(const QJsonArray& widgets, QQuickItem* parent
                         fieldSpec["field"] = field["field"].toString();
                         fieldSpec["placeholder"] = field["placeholder"].toString();
                         fieldSpec["required"] = field["required"].toBool(false);
+                        if (field.contains("validation") && !field["validation"].toString().isEmpty())
+                        {
+                            fieldSpec["validation"] = field["validation"].toString();
+                        }
                         
                         QString widgetType;
                         if (fieldType == "EmailField") {

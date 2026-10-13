@@ -571,7 +571,7 @@ QString generateToolButton(const QJsonObject& spec)
 }
 
 // ============================================================
-// HR ВИДЖЕТЫ
+// HR ВИДЖЕТЫ (с валидацией)
 // ============================================================
 
 QString generateTextField(const QJsonObject& spec)
@@ -579,6 +579,7 @@ QString generateTextField(const QJsonObject& spec)
     QString label = spec["label"].toString("");
     QString placeholder = spec["placeholder"].toString("Введите текст...");
     bool required = spec["required"].toBool(false);
+    QString validation = spec["validation"].toString("");
     QString widgetId = spec["id"].toString();
 
     QString labelPart;
@@ -588,11 +589,13 @@ QString generateTextField(const QJsonObject& spec)
             "Text {\n"
             "    text: \"%1%2\"\n"
             "    color: Colors.text\n"
-            "    font.pixelSize: 14\n"
+            "    font.pixelSize: GlobalSettings.fontSize\n"
             "    Layout.fillWidth: true\n"
             "}\n"
         ).arg(label).arg(required ? " *" : "");
     }
+
+    QString validationType = validation.isEmpty() ? QString("__none__") : validation;
 
     return QString(
         "ColumnLayout {\n"
@@ -606,11 +609,12 @@ QString generateTextField(const QJsonObject& spec)
         "        placeholderTextColor: Colors.textSecondary\n"
         "        Layout.fillWidth: true\n"
         "        Layout.preferredHeight: 36\n"
-        "        color: Colors.text\n"
+        "        color: __isValid ? Colors.text : Colors.error\n"
         "        selectionColor: Colors.primary\n"
+        "        property bool __isValid: true\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
-        "            border.color: Colors.border\n"
+        "            border.color: __isValid ? Colors.border : Colors.error\n"
         "            border.width: 1\n"
         "            radius: 4\n"
         "        }\n"
@@ -619,10 +623,25 @@ QString generateTextField(const QJsonObject& spec)
         "                var input = { 'type': 'text', 'value': text, 'paramName': '%2' }\n"
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
+        "            var r = Validators.validate('%4', text, %5)\n"
+        "            __isValid = r.valid\n"
+        "            errorText_%2.text = r.message\n"
+        "            errorText_%2.visible = !r.valid\n"
         "        }\n"
         "    }\n"
+        "    Text {\n"
+        "        id: errorText_%2\n"
+        "        text: \"\"\n"
+        "        color: Colors.error\n"
+        "        font.pixelSize: GlobalSettings.fontSize - 4\n"
+        "        Layout.fillWidth: true\n"
+        "        visible: false\n"
+        "        wrapMode: Text.WordWrap\n"
+        "    }\n"
         "}\n"
-    ).arg(labelPart).arg(widgetId).arg(placeholder);
+    ).arg(labelPart).arg(widgetId).arg(placeholder)
+     .arg(validationType)
+     .arg(required ? "true" : "false");
 }
 
 QString generateSearchField(const QJsonObject& spec)
@@ -630,6 +649,8 @@ QString generateSearchField(const QJsonObject& spec)
     QString placeholder = spec["placeholder"].toString("Поиск...");
     int minLength = spec["min_length"].toInt(0);
     QString widgetId = spec["id"].toString();
+    QString validation = spec["validation"].toString("");
+    bool required = spec["required"].toBool(false);
     
     return QString(
         "TextField {\n"
@@ -639,14 +660,15 @@ QString generateSearchField(const QJsonObject& spec)
         "    Layout.fillWidth: true\n"
         "    Layout.maximumWidth: 800\n"
         "    Layout.preferredHeight: 36\n"
-        "    color: Colors.text\n"
+        "    color: __isValid ? Colors.text : Colors.error\n"
         "    selectionColor: Colors.primary\n"
         "    focus: true\n"
         "    activeFocusOnTab: true\n"
         "    cursorVisible: true\n"
+        "    property bool __isValid: true\n"
         "    background: Rectangle {\n"
         "        color: Colors.surface\n"
-        "        border.color: Colors.border\n"
+        "        border.color: __isValid ? Colors.border : Colors.error\n"
         "        border.width: 1\n"
         "        radius: 4\n"
         "    }\n"
@@ -659,9 +681,25 @@ QString generateSearchField(const QJsonObject& spec)
         "            }\n"
         "            widgetBridge.sendWidgetInput('%1', input)\n"
         "        }\n"
+        "        if ('%4' !== '') {\n"
+        "            var r = Validators.validate('%4', text, %5)\n"
+        "            __isValid = r.valid\n"
+        "            errorText_%1.text = r.message\n"
+        "            errorText_%1.visible = !r.valid\n"
+        "        }\n"
+        "    }\n"
+        "    Text {\n"
+        "        id: errorText_%1\n"
+        "        text: \"\"\n"
+        "        color: Colors.error\n"
+        "        font.pixelSize: GlobalSettings.fontSize - 4\n"
+        "        Layout.fillWidth: true\n"
+        "        visible: false\n"
+        "        wrapMode: Text.WordWrap\n"
         "    }\n"
         "}\n"
-    ).arg(widgetId).arg(placeholder).arg(minLength);
+    ).arg(widgetId).arg(placeholder).arg(minLength).arg(validation)
+     .arg(required ? "true" : "false");
 }
 
 QString generateEmailField(const QJsonObject& spec)
@@ -669,6 +707,11 @@ QString generateEmailField(const QJsonObject& spec)
     QString label = spec["label"].toString("");
     QString placeholder = spec["placeholder"].toString("email@example.com");
     bool required = spec["required"].toBool(false);
+    QString validation = spec["validation"].toString();
+    if (validation.isEmpty())
+    {
+        validation = "email";
+    }
     QString widgetId = spec["id"].toString();
 
     QString labelPart;
@@ -677,7 +720,7 @@ QString generateEmailField(const QJsonObject& spec)
             "Text {\n"
             "    text: \"%1%2\"\n"
             "    color: Colors.text\n"
-            "    font.pixelSize: 14\n"
+            "    font.pixelSize: GlobalSettings.fontSize\n"
             "    Layout.fillWidth: true\n"
             "}\n"
         ).arg(label).arg(required ? " *" : "");
@@ -695,12 +738,13 @@ QString generateEmailField(const QJsonObject& spec)
         "        placeholderTextColor: Colors.textSecondary\n"
         "        Layout.fillWidth: true\n"
         "        Layout.preferredHeight: 36\n"
-        "        color: Colors.text\n"
+        "        color: __isValid ? Colors.text : Colors.error\n"
         "        selectionColor: Colors.primary\n"
         "        inputMethodHints: Qt.ImhEmailCharactersOnly\n"
+        "        property bool __isValid: true\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
-        "            border.color: Colors.border\n"
+        "            border.color: __isValid ? Colors.border : Colors.error\n"
         "            border.width: 1\n"
         "            radius: 4\n"
         "        }\n"
@@ -709,10 +753,25 @@ QString generateEmailField(const QJsonObject& spec)
         "                var input = { 'type': 'email', 'value': text, 'paramName': '%2' }\n"
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
+        "            var r = Validators.validate('%4', text, %5)\n"
+        "            __isValid = r.valid\n"
+        "            errorText_%2.text = r.message\n"
+        "            errorText_%2.visible = !r.valid\n"
         "        }\n"
         "    }\n"
+        "    Text {\n"
+        "        id: errorText_%2\n"
+        "        text: \"\"\n"
+        "        color: Colors.error\n"
+        "        font.pixelSize: GlobalSettings.fontSize - 4\n"
+        "        Layout.fillWidth: true\n"
+        "        visible: false\n"
+        "        wrapMode: Text.WordWrap\n"
+        "    }\n"
         "}\n"
-    ).arg(labelPart).arg(widgetId).arg(placeholder);
+    ).arg(labelPart).arg(widgetId).arg(placeholder)
+     .arg(validation)
+     .arg(required ? "true" : "false");
 }
 
 QString generatePasswordField(const QJsonObject& spec)
@@ -720,6 +779,7 @@ QString generatePasswordField(const QJsonObject& spec)
     QString label = spec["label"].toString("");
     QString placeholder = spec["placeholder"].toString("Введите пароль...");
     bool required = spec["required"].toBool(false);
+    QString validation = spec["validation"].toString("password");
     QString widgetId = spec["id"].toString();
 
     QString labelPart;
@@ -729,7 +789,7 @@ QString generatePasswordField(const QJsonObject& spec)
             "Text {\n"
             "    text: \"%1%2\"\n"
             "    color: Colors.text\n"
-            "    font.pixelSize: 14\n"
+            "    font.pixelSize: GlobalSettings.fontSize\n"
             "    Layout.fillWidth: true\n"
             "}\n"
         ).arg(label).arg(required ? " *" : "");
@@ -747,12 +807,13 @@ QString generatePasswordField(const QJsonObject& spec)
         "        placeholderTextColor: Colors.textSecondary\n"
         "        Layout.fillWidth: true\n"
         "        Layout.preferredHeight: 36\n"
-        "        color: Colors.text\n"
+        "        color: __isValid ? Colors.text : Colors.error\n"
         "        selectionColor: Colors.primary\n"
         "        echoMode: TextInput.Password\n"
+        "        property bool __isValid: true\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
-        "            border.color: Colors.border\n"
+        "            border.color: __isValid ? Colors.border : Colors.error\n"
         "            border.width: 1\n"
         "            radius: 4\n"
         "        }\n"
@@ -761,10 +822,25 @@ QString generatePasswordField(const QJsonObject& spec)
         "                var input = { 'type': 'password', 'value': text, 'paramName': '%2' }\n"
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
+        "            var r = Validators.validate('%4', text, %5)\n"
+        "            __isValid = r.valid\n"
+        "            errorText_%2.text = r.message\n"
+        "            errorText_%2.visible = !r.valid\n"
         "        }\n"
         "    }\n"
+        "    Text {\n"
+        "        id: errorText_%2\n"
+        "        text: \"\"\n"
+        "        color: Colors.error\n"
+        "        font.pixelSize: GlobalSettings.fontSize - 4\n"
+        "        Layout.fillWidth: true\n"
+        "        visible: false\n"
+        "        wrapMode: Text.WordWrap\n"
+        "    }\n"
         "}\n"
-    ).arg(labelPart).arg(widgetId).arg(placeholder);
+    ).arg(labelPart).arg(widgetId).arg(placeholder)
+     .arg(validation)
+     .arg(required ? "true" : "false");
 }
 
 QString generateSelectField(const QJsonObject& spec)

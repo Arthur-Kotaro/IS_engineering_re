@@ -46,16 +46,20 @@ int main(int argc, char *argv[])
     widgetBridge.setDataManager(core.dataManager());
     widgetBridge.setRenderer(core.renderer());
     
-    // 4. Регистрируем Colors как синглтон
+    // 4. Регистрируем синглтоны
     qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/Colors.qml"), "Styles", 1, 0, "Colors");
     qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/GlobalSettings.qml"), "Styles", 1, 0, "GlobalSettings");
-
-    // Базовые виджеты страниц
-    qmlRegisterType(QUrl("qrc:/ProductionClient/qml/widgets/SearchableListSingle.qml"), "BaseWidgets", 1, 0, "SearchableListSingle");
-    qmlRegisterType(QUrl("qrc:/ProductionClient/qml/widgets/SearchableListMulti.qml"), "BaseWidgets", 1, 0, "SearchableListMulti");
-    qmlRegisterType(QUrl("qrc:/ProductionClient/qml/widgets/SearchableSelect.qml"), "BaseWidgets", 1, 0, "SearchableSelect");
+    qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/utils/Validators.qml"), "Styles", 1, 0, "Validators");
     
-    // 5. Передаём config в QML контекст
+    // 5. Базовые виджеты страниц
+    qmlRegisterType(QUrl("qrc:/ProductionClient/qml/widgets/SearchableListSingle.qml"),
+                    "BaseWidgets", 1, 0, "SearchableListSingle");
+    qmlRegisterType(QUrl("qrc:/ProductionClient/qml/widgets/SearchableListMulti.qml"),
+                    "BaseWidgets", 1, 0, "SearchableListMulti");
+    qmlRegisterType(QUrl("qrc:/ProductionClient/qml/widgets/SearchableSelect.qml"),
+                    "BaseWidgets", 1, 0, "SearchableSelect");
+    
+    // 6. Передаём config в QML контекст
     engine.rootContext()->setContextProperty("appCore", &core);
     engine.rootContext()->setContextProperty("authBridge", &authBridge);
     engine.rootContext()->setContextProperty("mainWindowBridge", &mainWindowBridge);
@@ -64,15 +68,14 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("renderer", core.renderer());
     engine.rootContext()->setContextProperty("configManager", config);
     
-    // 6. Загружаем QML
+    // 7. Загружаем QML
     QString qmlPath = QCoreApplication::applicationDirPath() + "/qml/main.qml";
-    if (!QFile::exists(qmlPath))
-    {
+    if (!QFile::exists(qmlPath)) {
         qmlPath = QDir::currentPath() + "/qml/main.qml";
     }
-    if (!QFile::exists(qmlPath))
-    {
-        qmlPath = QString("%1/../production_client/qml/main.qml").arg(QCoreApplication::applicationDirPath());
+    if (!QFile::exists(qmlPath)) {
+        qmlPath = QString("%1/../production_client/qml/main.qml")
+            .arg(QCoreApplication::applicationDirPath());
     }
     
     qDebug() << "Loading QML from:" << qmlPath;
