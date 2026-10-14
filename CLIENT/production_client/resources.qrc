@@ -1,6 +1,15 @@
 <RCC>
     <qresource prefix="/">
         <file>qml/main.qml</file>
+        <file>assets/images/logo.jpg</file>
+        <file>assets/images/logo.svg</file>
+        <file>assets/images/icons/app_icon.png</file>
+        <file>assets/images/icons/error.svg</file>
+        <file>assets/images/icons/fullscreen.svg</file>
+        <file>assets/images/icons/logo.svg</file>
+        <file>assets/images/icons/logout.svg</file>
+        <file>assets/images/icons/password.svg</file>
+        <file>assets/images/icons/warning.svg</file>
     </qresource>
     <qresource prefix="/interfaces">
         <file>interfaces/dashboard.json</file>

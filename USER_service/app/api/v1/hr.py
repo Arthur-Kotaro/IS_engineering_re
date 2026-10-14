@@ -7,13 +7,15 @@ from typing import List
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.user import UserCreate, UserUpdate, UserResponse, user_to_response
+from app.schemas.user import (
+    UserCreate, UserUpdate, UserResponse, UserCreatedResponse, user_to_response,
+)
+from app.schemas.errors import ValidationError
 from app.services.user_service import UserService
 from app.repositories.user_repo import UserRepository
 from app.repositories.role_repo import RoleRepository
 from app.repositories.department_repo import DepartmentRepository
 from app.repositories.position_repo import PositionRepository
-from app.utils.hasher import hash_password
 
 router = APIRouter(tags=["HR"])
 
@@ -53,6 +55,7 @@ async def get_departments(
             "parent_dept_id": str(d.parent_dept_id) if d.parent_dept_id else None,
             "type": d.type,
             "level": d.level,
+            "head_user_id": d.head_user_id,
         }
         for d in deps
     ]
@@ -138,7 +141,7 @@ async def get_user(
     return user
 
 
-@router.post("/users", response_model=UserResponse)
+@router.post("/users", response_model=UserCreatedResponse)
 async def create_user(
     user_data: UserCreate,
     current_user: User = Depends(get_current_user),
@@ -146,10 +149,8 @@ async def create_user(
 ):
     await check_hr_or_admin(current_user)
     service = _make_service(db)
-    password_hash = hash_password(user_data.password)
     return await service.create_user(
         user_data=user_data,
-        password_hash=password_hash,
         created_by=current_user.user_id,
     )
 

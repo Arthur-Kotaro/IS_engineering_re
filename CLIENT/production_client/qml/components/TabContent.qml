@@ -3,6 +3,7 @@ import QtQuick.Controls 6.0
 import QtQuick.Layouts 6.0
 import QtQuick.Shapes 6.0
 import Styles 1.0
+import "../dialogs"
 
 Rectangle {
     id: root
@@ -23,6 +24,7 @@ Rectangle {
 
     readonly property int backButtonWidth: 48
     readonly property int backButtonRadius: 8
+    readonly property int titleBarHeight: 48
 
     function cancelRequest() {
         loading = false
@@ -145,14 +147,39 @@ Rectangle {
         }
     }
 
+    // ---- Заголовок страницы ----
+    Rectangle {
+        id: titleBar
+        anchors.top: parent.top
+        anchors.left: backButtonBase.right
+        anchors.right: parent.right
+        anchors.leftMargin: root.backButtonRadius
+        anchors.rightMargin: 10
+        anchors.topMargin: 10
+        height: root.titleBarHeight
+        color: "transparent"
+        visible: root.title !== "" && !root.loading
+        z: 5
+
+        Text {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.title
+            color: Colors.text
+            font.pixelSize: Typography.h4
+            font.bold: true
+            elide: Text.ElideRight
+        }
+    }
+
     // ---- Контент ----
     Flickable {
         id: uiFlick
-        anchors.top: parent.top
+        anchors.top: titleBar.visible ? titleBar.bottom : parent.top
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         anchors.left: backButtonBase.right
-        anchors.topMargin: 10
+        anchors.topMargin: titleBar.visible ? 4 : 10
         anchors.bottomMargin: 10
         anchors.rightMargin: 10
         anchors.leftMargin: root.backButtonRadius
@@ -207,6 +234,11 @@ Rectangle {
         text: "Ожидание данных..."
     }
 
+    // ---- Диалог ошибок валидации ----
+    ValidationErrorDialog {
+        id: validationErrorDialog
+    }
+
     function loadData()
     {
         if (!root.endpoint)
@@ -255,6 +287,7 @@ Rectangle {
     Connections {
         target: widgetBridge
         function onHttpResponse(id, status, data) {
+            // --- Ответ на загрузку страницы ---
             if (id === root.callbackId) {
                 root.loading = false
                 if (status === 200) {
@@ -269,6 +302,56 @@ Rectangle {
                     debugText.text = "Ошибка " + status + ": " + data
                     debugText.visible = true
                 }
+                return
+            }
+
+            // --- Ответ на submit формы ---
+            if (id.indexOf("submit_") === 0) {
+                console.log("TabContent: submit response status=" + status)
+
+                if (status === 200) {
+                    // TODO: Блок B — переход на информационную страницу.
+                    console.log("TabContent: user created successfully")
+                    try {
+                        var successResp = JSON.parse(data)
+                        console.log("TabContent: created user_id="
+                                    + (successResp.user ? successResp.user.user_id : "?"))
+                    } catch (e) {
+                        console.log("TabContent: success parse error: " + e)
+                    }
+                    return
+                }
+
+                // --- Ошибка ---
+                var title = "Не удалось создать пользователя"
+                var subtitle = ""
+                var errors = []
+
+                try {
+                    var errResp = JSON.parse(data)
+
+                    if (errResp.errors && errResp.errors.length > 0) {
+                        errors = errResp.errors
+                        subtitle = errResp.detail || ""
+                    } else if (errResp.detail) {
+                        if (typeof errResp.detail === "string") {
+                            errors = [{ message: errResp.detail }]
+                        } else if (Array.isArray(errResp.detail)) {
+                            for (var i = 0; i < errResp.detail.length; i++) {
+                                var d = errResp.detail[i]
+                                var loc = d.loc ? d.loc.join(".") : ""
+                                var msg = d.msg || ""
+                                errors.push({ message: loc + ": " + msg })
+                            }
+                        }
+                    } else {
+                        errors = [{ message: "Неизвестная ошибка. Код " + status }]
+                    }
+                } catch (e) {
+                    errors = [{ message: "Ошибка " + status + ": " + data }]
+                }
+
+                validationErrorDialog.showErrors(title, subtitle, errors)
             }
         }
     }

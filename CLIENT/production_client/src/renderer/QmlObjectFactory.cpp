@@ -7,7 +7,6 @@
 #include <QJsonArray>
 #include <QFile>
 
-// Внешние объявления генераторов
 extern QString generateLabel(const QJsonObject&);
 extern QString generatePushButton(const QJsonObject&);
 extern QString generateComboBox(const QJsonObject&);
@@ -41,7 +40,6 @@ extern QString generateBarChart(const QJsonObject&);
 extern QString generateBarCompareChart(const QJsonObject&);
 extern QString generateLineChart(const QJsonObject&);
 
-// HR виджеты
 extern QString generateTextField(const QJsonObject&);
 extern QString generateSearchField(const QJsonObject&);
 extern QString generateEmailField(const QJsonObject&);
@@ -53,18 +51,11 @@ QmlObjectFactory::QmlObjectFactory(QQmlEngine* engine, QObject* parent)
     : QObject(parent)
     , m_engine(engine)
 {
-    qDebug() << "QmlObjectFactory::QmlObjectFactory()";
     registerBuiltInTypes();
-    qDebug() << "  Registered" << m_qmlGenerators.size() << "widget types";
 }
 
 void QmlObjectFactory::registerBuiltInTypes()
 {
-    qDebug() << "  Registering built-in widget types...";
-
-    // ============================================================
-    // БАЗОВЫЕ ВИДЖЕТЫ
-    // ============================================================
     m_qmlGenerators["QLabel"] = [](const QJsonObject& spec) { return generateLabel(spec); };
     m_qmlGenerators["QPushButton"] = [](const QJsonObject& spec) { return generatePushButton(spec); };
     m_qmlGenerators["QComboBox"] = [](const QJsonObject& spec) { return generateComboBox(spec); };
@@ -88,106 +79,68 @@ void QmlObjectFactory::registerBuiltInTypes()
     m_qmlGenerators["QStackedWidget"] = [](const QJsonObject& spec) { return generateStackedWidget(spec); };
     m_qmlGenerators["QToolButton"] = [](const QJsonObject& spec) { return generateToolButton(spec); };
 
-    // ============================================================
-    // LAYOUT-КОНТЕЙНЕРЫ
-    // ============================================================
     m_qmlGenerators["QVBoxLayout"] = [](const QJsonObject& spec) { return generateVBoxLayout(spec); };
     m_qmlGenerators["QHBoxLayout"] = [](const QJsonObject& spec) { return generateHBoxLayout(spec); };
     m_qmlGenerators["QGridLayout"] = [](const QJsonObject& spec) { return generateGridLayout(spec); };
     m_qmlGenerators["QGroupBox"] = [](const QJsonObject& spec) { return generateGroupBox(spec); };
 
-    // ============================================================
-    // ДИАГРАММЫ
-    // ============================================================
     m_qmlGenerators["ChartPie"] = [](const QJsonObject& spec) { return generatePieChart(spec); };
     m_qmlGenerators["ChartBar"] = [](const QJsonObject& spec) { return generateBarChart(spec); };
     m_qmlGenerators["ChartBarCompare"] = [](const QJsonObject& spec) { return generateBarCompareChart(spec); };
     m_qmlGenerators["ChartLine"] = [](const QJsonObject& spec) { return generateLineChart(spec); };
 
-    // ============================================================
-    // ТАБЛИЦЫ
-    // ============================================================
     m_qmlGenerators["QTableWidget"] = [](const QJsonObject& spec) { return generateTableWidget(spec); };
 
-    // ============================================================
-    // АЛИАСЫ ДЛЯ УДОБСТВА
-    // ============================================================
     m_qmlGenerators["Card"] = [](const QJsonObject& spec) { return generateGroupBox(spec); };
     m_qmlGenerators["Form"] = [](const QJsonObject& spec) { return generateGroupBox(spec); };
     m_qmlGenerators["Button"] = [](const QJsonObject& spec) { return generatePushButton(spec); };
     m_qmlGenerators["ProgressBar"] = [](const QJsonObject& spec) { return generateProgressBar(spec); };
 
-    // ============================================================
-    // HR ВИДЖЕТЫ
-    // ============================================================
     m_qmlGenerators["TextField"] = [](const QJsonObject& spec) { return generateTextField(spec); };
     m_qmlGenerators["SearchField"] = [](const QJsonObject& spec) { return generateSearchField(spec); };
     m_qmlGenerators["EmailField"] = [](const QJsonObject& spec) { return generateEmailField(spec); };
     m_qmlGenerators["PasswordField"] = [](const QJsonObject& spec) { return generatePasswordField(spec); };
     m_qmlGenerators["SelectField"] = [](const QJsonObject& spec) { return generateSelectField(spec); };
     m_qmlGenerators["MultiSelectField"] = [](const QJsonObject& spec) { return generateMultiSelectField(spec); };
-
-    qDebug() << "  All widget types registered. Total:" << m_qmlGenerators.size();
 }
 
 QObject* QmlObjectFactory::create(const QString& type, const QJsonObject& spec, QQuickItem* parent)
 {
-    qDebug() << "    QmlObjectFactory::create(" << type << ") parent=" << (parent ? "valid" : "null")
-             << "parent class:" << (parent ? parent->metaObject()->className() : "null");
-
     if (!m_qmlGenerators.contains(type)) {
-        qWarning() << "      UNKNOWN widget type:" << type;
+        qWarning() << "QmlObjectFactory: UNKNOWN widget type:" << type;
         return nullptr;
     }
 
     QString qmlCode = m_qmlGenerators[type](spec);
 
-    qDebug() << "      QML code length:" << qmlCode.length() << "bytes";
-
-        QString fullQml = QString(
+    QString fullQml = QString(
         "import QtQuick 6.0\n"
         "import QtQuick.Controls 6.0\n"
         "import QtQuick.Layouts 6.0\n"
         "import Styles 1.0\n"
+        "import Utils 1.0\n"
         "import BaseWidgets 1.0\n"
         "%1\n"
     ).arg(qmlCode);
 
-    {
-        QFile f("/tmp/all_qml.log");
-        if (f.open(QIODevice::WriteOnly | QIODevice::Append))
-        {
-            f.write("=== QML ===\n");
-            f.write(fullQml.toUtf8());
-            f.write("\n=== END ===\n\n");
-            f.close();
-        }
-    }
-
     QQmlComponent component(m_engine);
     component.setData(fullQml.toUtf8(), QUrl());
 
-    if (component.isError())
-    {
-        qWarning() << "      QML component error:" << component.errorString();
+    if (component.isError()) {
+        qWarning() << "QmlObjectFactory: QML component error for" << type << ":" << component.errorString();
         return nullptr;
     }
 
     QObject* object = component.create();
     if (!object) {
-        qWarning() << "      Failed to create widget:" << component.errorString();
+        qWarning() << "QmlObjectFactory: Failed to create widget:" << type << component.errorString();
         return nullptr;
     }
 
     QQuickItem* item = qobject_cast<QQuickItem*>(object);
     if (item && parent) {
         item->setParentItem(parent);
-        qDebug() << "      Widget parented to parentItem (setParentItem)";
-    } else if (item) {
-        qDebug() << "      Widget created WITHOUT parent";
     }
-
-    qDebug() << "      Widget created SUCCESSFULLY";
 
     return object;
 }

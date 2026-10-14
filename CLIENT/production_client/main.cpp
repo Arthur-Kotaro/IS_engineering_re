@@ -19,47 +19,40 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     app.setOrganizationName("Engineering");
     app.setApplicationName("EngineeringRE");
-    
-    // 1. Загружаем конфиг ДО создания engine
+
     ConfigManager* config = ConfigManager::instance();
-    
-    // 2. Применяем шрифт к приложению
+
     QFont defaultFont = app.font();
     defaultFont.setPixelSize(config->fontSize());
     app.setFont(defaultFont);
-    
-    // 3. Создаём engine после применения настроек
+
     QQmlApplicationEngine engine;
-    
+
     qmlRegisterType<WidgetBridge>("ProductionClient", 1, 0, "WidgetBridge");
-    
+
     AppCore core(&engine);
     core.init();
-    
+
     auto authService = AppCore::authService();
-    
+
     AuthBridge authBridge(authService);
     MainWindowBridge mainWindowBridge(authService);
     NotificationBridge notificationBridge;
     WidgetBridge widgetBridge;
-    
+
     widgetBridge.setDataManager(core.dataManager());
     widgetBridge.setRenderer(core.renderer());
-    
-    // 4. Регистрируем синглтоны
-    qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/Colors.qml"), "Styles", 1, 0, "Colors");
-    qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/styles/GlobalSettings.qml"), "Styles", 1, 0, "GlobalSettings");
-    qmlRegisterSingletonType(QUrl("qrc:/ProductionClient/qml/utils/Validators.qml"), "Styles", 1, 0, "Validators");
-    
-    // 5. Базовые виджеты страниц
+
     qmlRegisterType(QUrl("qrc:/ProductionClient/qml/widgets/SearchableListSingle.qml"),
                     "BaseWidgets", 1, 0, "SearchableListSingle");
     qmlRegisterType(QUrl("qrc:/ProductionClient/qml/widgets/SearchableListMulti.qml"),
                     "BaseWidgets", 1, 0, "SearchableListMulti");
     qmlRegisterType(QUrl("qrc:/ProductionClient/qml/widgets/SearchableSelect.qml"),
                     "BaseWidgets", 1, 0, "SearchableSelect");
-    
-    // 6. Передаём config в QML контекст
+
+    qmlRegisterType(QUrl("qrc:/ProductionClient/qml/dialogs/ValidationErrorDialog.qml"),
+                    "Dialogs", 1, 0, "ValidationErrorDialog");
+
     engine.rootContext()->setContextProperty("appCore", &core);
     engine.rootContext()->setContextProperty("authBridge", &authBridge);
     engine.rootContext()->setContextProperty("mainWindowBridge", &mainWindowBridge);
@@ -67,8 +60,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("widgetBridge", &widgetBridge);
     engine.rootContext()->setContextProperty("renderer", core.renderer());
     engine.rootContext()->setContextProperty("configManager", config);
-    
-    // 7. Загружаем QML
+
     QString qmlPath = QCoreApplication::applicationDirPath() + "/qml/main.qml";
     if (!QFile::exists(qmlPath)) {
         qmlPath = QDir::currentPath() + "/qml/main.qml";
@@ -77,11 +69,9 @@ int main(int argc, char *argv[])
         qmlPath = QString("%1/../production_client/qml/main.qml")
             .arg(QCoreApplication::applicationDirPath());
     }
-    
+
     qDebug() << "Loading QML from:" << qmlPath;
-    
-    QUrl url = QUrl::fromLocalFile(qmlPath);
-    engine.load(url);
-    
+    engine.load(QUrl::fromLocalFile(qmlPath));
+
     return app.exec();
 }

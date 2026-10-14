@@ -1,0 +1,4 @@
+module Utils
+singleton Validators 1.0 Validators.qml
+singleton DateUtils 1.0 DateUtils.qml
+singleton StringUtils 1.0 StringUtils.qml

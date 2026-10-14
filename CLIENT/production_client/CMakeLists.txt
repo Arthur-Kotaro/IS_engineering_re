@@ -38,6 +38,7 @@ target_include_directories(RendererLib PUBLIC
 )
 target_link_libraries(RendererLib PUBLIC Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Network)
 
+# --- Основной модуль клиента ---
 set(QML_FILES
     qml/main.qml
 
@@ -76,16 +77,9 @@ set(QML_FILES
     qml/dialogs/ConfirmDialog.qml
     qml/dialogs/ErrorDialog.qml
     qml/dialogs/UpdateNotification.qml
+    qml/dialogs/ValidationErrorDialog.qml
 
     qml/styles/AppStyle.qml
-    qml/styles/Colors.qml
-    qml/styles/Typography.qml
-    qml/styles/Button.qml
-    qml/styles/GlobalSettings.qml
-
-    qml/utils/DateUtils.qml
-    qml/utils/StringUtils.qml
-    qml/utils/Validators.qml
 
     qml/ThemeManager.qml
 )
@@ -96,8 +90,46 @@ qt_add_qml_module(ProductionClient
     QML_FILES ${QML_FILES}
 )
 
+# --- Модуль Styles ---
+set_source_files_properties(
+    qml/styles/Colors.qml
+    qml/styles/Typography.qml
+    qml/styles/GlobalSettings.qml
+    PROPERTIES QT_QML_SINGLETON_TYPE TRUE
+)
+
+qt_add_qml_module(StylesModule
+    URI Styles
+    VERSION 1.0
+    OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Styles
+    QML_FILES
+        qml/styles/Colors.qml
+        qml/styles/Typography.qml
+        qml/styles/GlobalSettings.qml
+        qml/styles/Button.qml
+)
+
+# --- Модуль Utils ---
+set_source_files_properties(
+    qml/utils/Validators.qml
+    qml/utils/DateUtils.qml
+    qml/utils/StringUtils.qml
+    PROPERTIES QT_QML_SINGLETON_TYPE TRUE
+)
+
+qt_add_qml_module(UtilsModule
+    URI Utils
+    VERSION 1.0
+    OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Utils
+    QML_FILES
+        qml/utils/Validators.qml
+        qml/utils/DateUtils.qml
+        qml/utils/StringUtils.qml
+)
+
 add_executable(ProductionClientApp
     main.cpp
+    resources.qrc
     src/qml_bridge/AuthBridge.cpp
     src/qml_bridge/MainWindowBridge.cpp
     src/qml_bridge/NotificationBridge.cpp
@@ -110,6 +142,8 @@ add_executable(ProductionClientApp
 target_link_libraries(ProductionClientApp
     PRIVATE
         ProductionClient
+        StylesModule
+        UtilsModule
         RendererLib
         UsersServiceClient
         Qt6::Core

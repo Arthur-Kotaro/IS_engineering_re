@@ -16,6 +16,7 @@ QtObject {
     property color darkBorder0: "#404040"
     property color darkButton0: "#0D47A1"
     property color darkButtonHover0: "#1565C0"
+    property color darkButtonPressed0: "#072B63"
     property color darkError0: "#FF5252"
     property color darkWarning0: "#FFC107"
     property color darkSuccess0: "#4CAF50"
@@ -33,6 +34,7 @@ QtObject {
     property color darkBorder1: "#4CAF50"
     property color darkButton1: "#2E7D32"
     property color darkButtonHover1: "#388E3C"
+    property color darkButtonPressed1: "#1B5620"
     property color darkError1: "#EF5350"
     property color darkWarning1: "#FFD54F"
     property color darkSuccess1: "#66BB6A"
@@ -50,6 +52,7 @@ QtObject {
     property color darkBorder2: "#7B1FA2"
     property color darkButton2: "#6A1B9A"
     property color darkButtonHover2: "#8E24AA"
+    property color darkButtonPressed2: "#4A1268"
     property color darkError2: "#EF5350"
     property color darkWarning2: "#FFD54F"
     property color darkSuccess2: "#66BB6A"
@@ -68,6 +71,7 @@ QtObject {
     property color lightBorder0: "#CCCCCC"
     property color lightButton0: "#2196F3"
     property color lightButtonHover0: "#64B5F6"
+    property color lightButtonPressed0: "#0D47A1"
     property color lightError0: "#F44336"
     property color lightWarning0: "#FF9800"
     property color lightSuccess0: "#4CAF50"
@@ -85,6 +89,7 @@ QtObject {
     property color lightBorder1: "#81C784"
     property color lightButton1: "#43A047"
     property color lightButtonHover1: "#66BB6A"
+    property color lightButtonPressed1: "#2E7D32"
     property color lightError1: "#E53935"
     property color lightWarning1: "#FB8C00"
     property color lightSuccess1: "#388E3C"
@@ -102,6 +107,7 @@ QtObject {
     property color lightBorder2: "#AB47BC"
     property color lightButton2: "#8E24AA"
     property color lightButtonHover2: "#AB47BC"
+    property color lightButtonPressed2: "#6A1B9A"
     property color lightError2: "#E53935"
     property color lightWarning2: "#FB8C00"
     property color lightSuccess2: "#388E3C"
@@ -119,6 +125,7 @@ QtObject {
     property color border: darkBorder0
     property color button: darkButton0
     property color buttonHover: darkButtonHover0
+    property color buttonPressed: darkButtonPressed0
     property color error: darkError0
     property color warning: darkWarning0
     property color success: darkSuccess0
@@ -143,6 +150,7 @@ QtObject {
                 background = darkBg0; surface = darkSurface0; primary = darkPrimary0
                 text = darkText0; textSecondary = darkTextSec0; border = darkBorder0
                 button = darkButton0; buttonHover = darkButtonHover0
+                buttonPressed = darkButtonPressed0
                 error = darkError0; warning = darkWarning0; success = darkSuccess0
                 actionBg = darkActionBg0; actionFg = darkActionFg0
                 actionDisabledBg = darkActionDisabledBg0; actionDisabledFg = darkActionDisabledFg0
@@ -150,6 +158,7 @@ QtObject {
                 background = darkBg1; surface = darkSurface1; primary = darkPrimary1
                 text = darkText1; textSecondary = darkTextSec1; border = darkBorder1
                 button = darkButton1; buttonHover = darkButtonHover1
+                buttonPressed = darkButtonPressed1
                 error = darkError1; warning = darkWarning1; success = darkSuccess1
                 actionBg = darkActionBg1; actionFg = darkActionFg1
                 actionDisabledBg = darkActionDisabledBg1; actionDisabledFg = darkActionDisabledFg1
@@ -157,6 +166,7 @@ QtObject {
                 background = darkBg2; surface = darkSurface2; primary = darkPrimary2
                 text = darkText2; textSecondary = darkTextSec2; border = darkBorder2
                 button = darkButton2; buttonHover = darkButtonHover2
+                buttonPressed = darkButtonPressed2
                 error = darkError2; warning = darkWarning2; success = darkSuccess2
                 actionBg = darkActionBg2; actionFg = darkActionFg2
                 actionDisabledBg = darkActionDisabledBg2; actionDisabledFg = darkActionDisabledFg2
@@ -166,6 +176,7 @@ QtObject {
                 background = lightBg0; surface = lightSurface0; primary = lightPrimary0
                 text = lightText0; textSecondary = lightTextSec0; border = lightBorder0
                 button = lightButton0; buttonHover = lightButtonHover0
+                buttonPressed = lightButtonPressed0
                 error = lightError0; warning = lightWarning0; success = lightSuccess0
                 actionBg = lightActionBg0; actionFg = lightActionFg0
                 actionDisabledBg = lightActionDisabledBg0; actionDisabledFg = lightActionDisabledFg0
@@ -173,6 +184,7 @@ QtObject {
                 background = lightBg1; surface = lightSurface1; primary = lightPrimary1
                 text = lightText1; textSecondary = lightTextSec1; border = lightBorder1
                 button = lightButton1; buttonHover = lightButtonHover1
+                buttonPressed = lightButtonPressed1
                 error = lightError1; warning = lightWarning1; success = lightSuccess1
                 actionBg = lightActionBg1; actionFg = lightActionFg1
                 actionDisabledBg = lightActionDisabledBg1; actionDisabledFg = lightActionDisabledFg1
@@ -180,6 +192,7 @@ QtObject {
                 background = lightBg2; surface = lightSurface2; primary = lightPrimary2
                 text = lightText2; textSecondary = lightTextSec2; border = lightBorder2
                 button = lightButton2; buttonHover = lightButtonHover2
+                buttonPressed = lightButtonPressed2
                 error = lightError2; warning = lightWarning2; success = lightSuccess2
                 actionBg = lightActionBg2; actionFg = lightActionFg2
                 actionDisabledBg = lightActionDisabledBg2; actionDisabledFg = lightActionDisabledFg2

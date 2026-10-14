@@ -2,9 +2,6 @@
 #include <QJsonObject>
 #include <QJsonArray>
 
-// Общая ширина для полей ввода. Инфографика не ограничивается.
-static const char* kFieldMaxWidth = "    Layout.maximumWidth: 800\n";
-
 QString generateLabel(const QJsonObject& spec)
 {
     QString text = spec["text"].toString("Label");
@@ -66,7 +63,8 @@ QString generatePushButton(const QJsonObject& spec)
             "                    body[name] = widgetBridge.getParameter(name)\n"
             "                }\n"
             "            }\n"
-            "            widgetBridge.submitForm('%3', '%4', body, '%5')\n"
+            "            var cbId = 'submit_' + Date.now()\n"
+            "            widgetBridge.submitForm('%3', '%4', body, cbId)\n"
             "        }\n"
             "    }\n"
             "}\n"
@@ -611,7 +609,7 @@ QString generateTextField(const QJsonObject& spec)
         "        Layout.preferredHeight: 36\n"
         "        color: fieldIsValid ? Colors.text : Colors.error\n"
         "        selectionColor: Colors.primary\n"
-        "        property bool fieldIsValid: true\n"
+        "        property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
         "        signal fieldValidationChanged(bool valid)\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
@@ -625,7 +623,6 @@ QString generateTextField(const QJsonObject& spec)
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
         "            var r = Validators.validate('%4', text, %5)\n"
-        "            fieldIsValid = r.valid\n"
         "            errorText_%2.text = r.message\n"
         "            errorText_%2.visible = !r.valid\n"
         "            fieldValidationChanged(r.valid)\n"
@@ -658,12 +655,13 @@ QString generateSearchField(const QJsonObject& spec)
     if (!validation.isEmpty()) {
         validationCheck = QString(
             "            var r = Validators.validate('%1', text, %2)\n"
-            "            fieldIsValid = r.valid\n"
             "            errorText_%3.text = r.message\n"
             "            errorText_%3.visible = !r.valid\n"
             "            fieldValidationChanged(r.valid)\n"
         ).arg(validation).arg(required ? "true" : "false").arg(widgetId);
     }
+
+    QString validationType = validation.isEmpty() ? QString("__none__") : validation;
 
     return QString(
         "TextField {\n"
@@ -678,7 +676,7 @@ QString generateSearchField(const QJsonObject& spec)
         "    focus: true\n"
         "    activeFocusOnTab: true\n"
         "    cursorVisible: true\n"
-        "    property bool fieldIsValid: true\n"
+        "    property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
         "    signal fieldValidationChanged(bool valid)\n"
         "    background: Rectangle {\n"
         "        color: Colors.surface\n"
@@ -695,7 +693,7 @@ QString generateSearchField(const QJsonObject& spec)
         "            }\n"
         "            widgetBridge.sendWidgetInput('%1', input)\n"
         "        }\n"
-        "%4"
+        "%6"
         "    }\n"
         "    Text {\n"
         "        id: errorText_%1\n"
@@ -707,7 +705,8 @@ QString generateSearchField(const QJsonObject& spec)
         "        wrapMode: Text.WordWrap\n"
         "    }\n"
         "}\n"
-    ).arg(widgetId).arg(placeholder).arg(minLength).arg(validationCheck);
+    ).arg(widgetId).arg(placeholder).arg(minLength).arg(validationType)
+     .arg(required ? "true" : "false").arg(validationCheck);
 }
 
 QString generateEmailField(const QJsonObject& spec)
@@ -748,7 +747,7 @@ QString generateEmailField(const QJsonObject& spec)
         "        color: fieldIsValid ? Colors.text : Colors.error\n"
         "        selectionColor: Colors.primary\n"
         "        inputMethodHints: Qt.ImhEmailCharactersOnly\n"
-        "        property bool fieldIsValid: true\n"
+        "        property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
         "        signal fieldValidationChanged(bool valid)\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
@@ -762,7 +761,6 @@ QString generateEmailField(const QJsonObject& spec)
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
         "            var r = Validators.validate('%4', text, %5)\n"
-        "            fieldIsValid = r.valid\n"
         "            errorText_%2.text = r.message\n"
         "            errorText_%2.visible = !r.valid\n"
         "            fieldValidationChanged(r.valid)\n"
@@ -822,7 +820,7 @@ QString generatePasswordField(const QJsonObject& spec)
         "        color: fieldIsValid ? Colors.text : Colors.error\n"
         "        selectionColor: Colors.primary\n"
         "        echoMode: TextInput.Password\n"
-        "        property bool fieldIsValid: true\n"
+        "        property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
         "        signal fieldValidationChanged(bool valid)\n"
         "        background: Rectangle {\n"
         "            color: Colors.surface\n"
@@ -836,7 +834,6 @@ QString generatePasswordField(const QJsonObject& spec)
         "                widgetBridge.sendWidgetInput('%2', input)\n"
         "            }\n"
         "            var r = Validators.validate('%4', text, %5)\n"
-        "            fieldIsValid = r.valid\n"
         "            errorText_%2.text = r.message\n"
         "            errorText_%2.visible = !r.valid\n"
         "            fieldValidationChanged(r.valid)\n"

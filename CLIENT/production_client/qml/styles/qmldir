@@ -1,0 +1,5 @@
+module Styles
+singleton Colors 1.0 Colors.qml
+singleton Typography 1.0 Typography.qml
+singleton GlobalSettings 1.0 GlobalSettings.qml
+Button 1.0 Button.qml
