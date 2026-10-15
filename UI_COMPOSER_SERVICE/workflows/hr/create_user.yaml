@@ -1,0 +1,25 @@
+name: hr_create_user
+initial_endpoint: /page/hr/create-user
+initial_step: create
+
+steps:
+  create:
+    type: navigation
+    template: hr/create-user
+    title: "Создание пользователя"
+    on_event:
+      - widget: create_user_form_submit
+        event_type: click
+        service:
+          name: user_service
+          endpoint: /api/v1/hr/users
+          method: POST
+        on_success:
+          next_step: info
+          data:
+            created_user: "{{result}}"
+
+  info:
+    type: navigation
+    template: hr/user-created
+    title: "Пользователь создан"

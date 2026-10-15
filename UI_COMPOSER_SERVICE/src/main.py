@@ -172,16 +172,24 @@ async def workflow_event(request: Request):
             raise HTTPException(500, f"Service {service_name} not configured")
 
         method = svc.get("method", "GET")
+
+        # Формирование params:
+        # - если svc.params задан явно — использовать его (с подстановкой placeholders);
+        # - если svc.params не задан и метод POST/PUT — передать всё event_data как тело;
+        # - иначе — пусто.
         params = {}
-        for k, v in (svc.get("params") or {}).items():
-            if isinstance(v, str) and v.startswith("{{") and v.endswith("}}"):
-                key = v[2:-2].strip()
-                if key in event_data:
-                    params[k] = event_data[key]
-                elif key in (session.data or {}):
-                    params[k] = session.data[key]
-            else:
-                params[k] = v
+        if svc.get("params"):
+            for k, v in (svc.get("params") or {}).items():
+                if isinstance(v, str) and v.startswith("{{") and v.endswith("}}"):
+                    key = v[2:-2].strip()
+                    if key in event_data:
+                        params[k] = event_data[key]
+                    elif key in (session.data or {}):
+                        params[k] = session.data[key]
+                else:
+                    params[k] = v
+        elif method.upper() in ("POST", "PUT", "PATCH"):
+            params = event_data
 
         headers = {"X-User-ID": user_id}
         if impersonated_by:
@@ -295,6 +303,7 @@ async def workflow_back(request: Request):
             "session_id": session.session_id,
             "current_step": session.current_step,
             "workflow_name": session.workflow_name,
+            "reset_form": True,
         },
     }
 

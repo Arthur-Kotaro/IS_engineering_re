@@ -203,8 +203,19 @@ class UserService:
         user = await self.user_repo.get_by_id(new_user_id)
         user_response = user_to_response(user)
 
-        # 12. Данные руководителя (для информационной страницы)
-        manager_info: Optional[ManagerInfo] = None
+        # 12. Данные руководителя (для информационной страницы).
+        # Если руководитель не назначен — возвращаем заглушку,
+        # чтобы клиент показал осмысленный текст, а не пустые поля.
+        manager_info: ManagerInfo = ManagerInfo(
+            user_id=0,
+            full_name="Руководитель ещё не назначен",
+            position_name_ru=None,
+            dept_name_ru=None,
+            email=None,
+            phone_work=None,
+            phone_mobile=None,
+        )
+
         if user.department and user.department.head_user_id and user.department.head_user_id != new_user_id:
             manager_user = await self.user_repo.get_by_id(user.department.head_user_id, include_deleted=True)
             if manager_user:

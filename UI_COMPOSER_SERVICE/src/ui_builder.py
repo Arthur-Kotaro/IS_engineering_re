@@ -13,6 +13,7 @@ class UIBuilder:
         self._placeholder_pattern = re.compile(r"\{\{\s*([^}]+)\s*\}\}")
 
     def build(self, template: Template, data: Dict[str, Any]) -> Dict[str, Any]:
+        print(f"[ui_builder] build() template={template.name} data keys={list(data.keys())}")
         ui = copy.deepcopy(template.ui)
         widgets = ui.get("widgets", [])
         rendered = self._render_widgets(widgets, data)
@@ -43,6 +44,13 @@ class UIBuilder:
                 src_name = field.get("source")
                 if src_name and isinstance(data, dict) and src_name in data:
                     field["source_data"] = data[src_name]
+
+        # Подстановка плейсхолдеров в text (Label, Button и др.)
+        if "text" in w and isinstance(w["text"], str):
+            original = w["text"]
+            resolved = self._resolve_placeholder(w["text"], data)
+            print(f"[ui_builder] text: '{original}' -> '{resolved}'")
+            w["text"] = resolved
 
         if "data" in w and isinstance(w["data"], dict):
             if "rows" in w["data"]:

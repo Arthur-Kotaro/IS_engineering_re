@@ -1,0 +1,54 @@
+name: hr_user_created
+endpoint: /page/hr/user-created
+title: "Пользователь создан"
+
+sources:
+  - id: created_user
+    service: session
+    endpoint: "session:created_user"
+
+ui:
+  widgets:
+    - type: Card
+      title: "Профиль пользователя"
+      widgets:
+        - type: Label
+          text: "ФИО: {{created_user.user.full_name}}"
+        - type: Label
+          text: "Должность: {{created_user.user.position_name_ru}}"
+        - type: Label
+          text: "Подразделение: {{created_user.user.dept_name_ru}}"
+        - type: Label
+          text: "Email: {{created_user.user.email}}"
+        - type: Label
+          text: "Рабочий телефон: {{created_user.user.phone_work}}"
+          visible: "{{created_user.user.phone_work}}"
+        - type: Label
+          text: "Мобильный телефон: {{created_user.user.phone_mobile}}"
+          visible: "{{created_user.user.phone_mobile}}"
+
+    - type: Card
+      title: "Учётные данные (сохраните, показываются один раз)"
+      widgets:
+        - type: Label
+          text: "Логин: {{created_user.user.user_name}}"
+        - type: Label
+          text: "Временный пароль: {{created_user.temporary_password}}"
+
+    - type: Card
+      title: "Руководитель подразделения"
+      widgets:
+        - type: Label
+          text: "{{created_user.manager.full_name}}"
+        - type: Label
+          text: "Должность: {{created_user.manager.position_name_ru}}"
+          visible: "{{created_user.manager.position_name_ru}}"
+        - type: Label
+          text: "Email: {{created_user.manager.email}}"
+          visible: "{{created_user.manager.email}}"
+        - type: Label
+          text: "Рабочий телефон: {{created_user.manager.phone_work}}"
+          visible: "{{created_user.manager.phone_work}}"
+        - type: Label
+          text: "Мобильный телефон: {{created_user.manager.phone_mobile}}"
+          visible: "{{created_user.manager.phone_mobile}}"

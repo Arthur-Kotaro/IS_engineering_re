@@ -230,8 +230,7 @@ Rectangle {
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                     verticalAlignment: Text.AlignVCenter
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.verticalCenterOffset: 0
+                                    Layout.alignment: Qt.AlignVCenter
                                 }
 
                                 Rectangle {
@@ -241,8 +240,7 @@ Rectangle {
                                     radius: 2
                                     color: closeArea.containsMouse ? Colors.error : "transparent"
                                     z: 2
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.verticalCenterOffset: -2
+                                    Layout.alignment: Qt.AlignVCenter
 
                                     Behavior on color {
                                         ColorAnimation { duration: 150 }
@@ -341,24 +339,25 @@ Rectangle {
                                 Layout.fillWidth: true
                                 wrapMode: Text.WordWrap
                             }
+                        }
 
-                            Rectangle {
-                                visible: modelData.badge_count > 0
-                                anchors.top: parent.top
-                                anchors.right: parent.right
-                                anchors.margins: -5
-                                width: 24
-                                height: 24
-                                radius: 12
-                                color: Colors.error
+                        // Бейдж — вне ColumnLayout, поверх делегата.
+                        Rectangle {
+                            visible: modelData.badge_count !== undefined && modelData.badge_count > 0
+                            anchors.top: parent.top
+                            anchors.right: parent.right
+                            anchors.margins: -5
+                            width: 24
+                            height: 24
+                            radius: 12
+                            color: Colors.error
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.badge_count
-                                    color: Colors.buttonText
-                                    font.pixelSize: 11
-                                    font.bold: true
-                                }
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData.badge_count !== undefined ? String(modelData.badge_count) : ""
+                                color: Colors.buttonText
+                                font.pixelSize: 11
+                                font.bold: true
                             }
                         }
 

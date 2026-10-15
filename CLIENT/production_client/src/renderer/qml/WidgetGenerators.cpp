@@ -1,8 +1,8 @@
-#include <QString>
-#include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonObject>
+#include <QString>
 
-QString generateLabel(const QJsonObject& spec)
+QString generateLabel(const QJsonObject &spec)
 {
     QString text = spec["text"].toString("Label");
     QString color = spec["properties"].toObject()["color"].toString("Colors.text");
@@ -11,29 +11,33 @@ QString generateLabel(const QJsonObject& spec)
     QString alignment = spec["properties"].toObject()["alignment"].toString("left");
 
     QString alignStr = "Text.AlignLeft";
-    if (alignment == "center") alignStr = "Text.AlignHCenter";
-    else if (alignment == "right") alignStr = "Text.AlignRight";
+    if (alignment == "center")
+        alignStr = "Text.AlignHCenter";
+    else if (alignment == "right")
+        alignStr = "Text.AlignRight";
 
-    return QString(
-        "Text {\n"
-        "    text: \"%1\"\n"
-        "    color: %2\n"
-        "    font.pixelSize: %3\n"
-        "    font.bold: %4\n"
-        "    horizontalAlignment: %5\n"
-        "    wrapMode: Text.WordWrap\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.preferredHeight: implicitHeight\n"
-        "}\n"
-    ).arg(text).arg(color).arg(fontSize).arg(bold ? "true" : "false").arg(alignStr);
+    return QString("Text {\n"
+                   "    text: \"%1\"\n"
+                   "    color: %2\n"
+                   "    font.pixelSize: %3\n"
+                   "    font.bold: %4\n"
+                   "    horizontalAlignment: %5\n"
+                   "    wrapMode: Text.WordWrap\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.preferredHeight: implicitHeight\n"
+                   "}\n")
+        .arg(text)
+        .arg(color)
+        .arg(fontSize)
+        .arg(bold ? "true" : "false")
+        .arg(alignStr);
 }
 
-QString generatePushButton(const QJsonObject& spec)
+QString generatePushButton(const QJsonObject &spec)
 {
     QString text = spec["text"].toString("Button");
     QString widgetId = spec["id"].toString();
     QString formEndpoint = spec["form_endpoint"].toString();
-    QString formMethod = spec["form_method"].toString("POST");
 
     QString fieldsJson = "[]";
     if (spec.contains("form_fields") && spec["form_fields"].isArray())
@@ -46,490 +50,493 @@ QString generatePushButton(const QJsonObject& spec)
 
     if (!formEndpoint.isEmpty())
     {
-        return QString(
-            "Button {\n"
-            "    text: \"%1\"\n"
-            "    Layout.fillWidth: true\n"
-            "    Layout.maximumWidth: 800\n"
-            "    Layout.preferredHeight: 36\n"
-            "    onClicked: {\n"
-            "        if (widgetBridge) {\n"
-            "            var fields = %2\n"
-            "            var body = {}\n"
-            "            for (var i = 0; i < fields.length; i++) {\n"
-            "                var f = fields[i]\n"
-            "                var name = f.field\n"
-            "                if (name && name.length > 0) {\n"
-            "                    body[name] = widgetBridge.getParameter(name)\n"
-            "                }\n"
-            "            }\n"
-            "            var cbId = 'submit_' + Date.now()\n"
-            "            widgetBridge.submitForm('%3', '%4', body, cbId)\n"
-            "        }\n"
-            "    }\n"
-            "}\n"
-        ).arg(text).arg(fieldsJson).arg(formEndpoint).arg(formMethod).arg(widgetId);
+        // Submit-кнопка формы: отправляет workflow-событие в UI Composer.
+        // UI Composer сам обращается к бизнес-сервису.
+        return QString("Button {\n"
+                       "    text: \"%1\"\n"
+                       "    Layout.fillWidth: true\n"
+                       "    Layout.maximumWidth: 800\n"
+                       "    Layout.preferredHeight: 36\n"
+                       "    onClicked: {\n"
+                       "        if (widgetBridge) {\n"
+                       "            var fields = %2\n"
+                       "            var data = {}\n"
+                       "            for (var i = 0; i < fields.length; i++) {\n"
+                       "                var f = fields[i]\n"
+                       "                var name = f.field\n"
+                       "                if (name && name.length > 0) {\n"
+                       "                    data[name] = widgetBridge.getParameter(name)\n"
+                       "                }\n"
+                       "            }\n"
+                       "            widgetBridge.sendWorkflowEvent('%3', 'click', data)\n"
+                       "        }\n"
+                       "    }\n"
+                       "}\n")
+            .arg(text)
+            .arg(fieldsJson)
+            .arg(widgetId);
     }
 
     return QString(
-        "Button {\n"
-        "    text: \"%1\"\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    Layout.preferredHeight: 36\n"
-        "    onClicked: {\n"
-        "        if (widgetBridge) {\n"
-        "            var input = { 'type': 'button', 'value': text, 'paramName': '%2' }\n"
-        "            widgetBridge.sendWidgetInput('%2', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(text).arg(widgetId);
+               "Button {\n"
+               "    text: \"%1\"\n"
+               "    Layout.fillWidth: true\n"
+               "    Layout.maximumWidth: 800\n"
+               "    Layout.preferredHeight: 36\n"
+               "    onClicked: {\n"
+               "        if (widgetBridge) {\n"
+               "            var input = { 'type': 'button', 'value': text, 'paramName': '%2' }\n"
+               "            widgetBridge.sendWidgetInput('%2', input)\n"
+               "        }\n"
+               "    }\n"
+               "}\n")
+        .arg(text)
+        .arg(widgetId);
 }
 
-QString generateComboBox(const QJsonObject& spec)
+QString generateComboBox(const QJsonObject &spec)
 {
     QStringList items;
-    if (spec.contains("items") && spec["items"].isArray()) {
+    if (spec.contains("items") && spec["items"].isArray())
+    {
         QJsonArray itemsArray = spec["items"].toArray();
-        for (const QJsonValue& val : itemsArray) {
-            if (val.isObject()) {
+        for (const QJsonValue &val : itemsArray)
+        {
+            if (val.isObject())
+            {
                 items << val.toObject()["label"].toString();
-            } else {
+            }
+            else
+            {
                 items << val.toString();
             }
         }
     }
-    if (items.isEmpty()) {
+    if (items.isEmpty())
+    {
         items << "Option 1" << "Option 2" << "Option 3";
     }
 
     QString widgetId = spec["id"].toString();
     QString modelStr = "[\"" + items.join("\", \"") + "\"]";
-    
-    return QString(
-        "ComboBox {\n"
-        "    id: combo_%1\n"
-        "    model: %2\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    Layout.preferredHeight: 36\n"
-        "    background: Rectangle {\n"
-        "        color: Colors.surface\n"
-        "        border.color: Colors.border\n"
-        "        border.width: 1\n"
-        "        radius: 4\n"
-        "    }\n"
-        "    contentItem: Text {\n"
-        "        text: combo_%1.displayText\n"
-        "        color: Colors.text\n"
-        "        font.pixelSize: 14\n"
-        "        verticalAlignment: Text.AlignVCenter\n"
-        "    }\n"
-        "    onCurrentTextChanged: {\n"
-        "        if (widgetBridge) {\n"
-        "            var input = {\n"
-        "                'type': 'select',\n"
-        "                'value': currentText,\n"
-        "                'paramName': '%1'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%1', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(widgetId).arg(modelStr);
+
+    return QString("ComboBox {\n"
+                   "    id: combo_%1\n"
+                   "    model: %2\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "    Layout.preferredHeight: 36\n"
+                   "    background: Rectangle {\n"
+                   "        color: Colors.surface\n"
+                   "        border.color: Colors.border\n"
+                   "        border.width: 1\n"
+                   "        radius: 4\n"
+                   "    }\n"
+                   "    contentItem: Text {\n"
+                   "        text: combo_%1.displayText\n"
+                   "        color: Colors.text\n"
+                   "        font.pixelSize: 14\n"
+                   "        verticalAlignment: Text.AlignVCenter\n"
+                   "    }\n"
+                   "    onCurrentTextChanged: {\n"
+                   "        if (widgetBridge) {\n"
+                   "            var input = {\n"
+                   "                'type': 'select',\n"
+                   "                'value': currentText,\n"
+                   "                'paramName': '%1'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%1', input)\n"
+                   "        }\n"
+                   "    }\n"
+                   "}\n")
+        .arg(widgetId)
+        .arg(modelStr);
 }
 
-QString generateLineEdit(const QJsonObject& spec)
+QString generateLineEdit(const QJsonObject &spec)
 {
     QString placeholder = spec["placeholder"].toString("Введите текст...");
     QString widgetId = spec["id"].toString();
-    
-    return QString(
-        "TextField {\n"
-        "    id: lineEdit_%1\n"
-        "    placeholderText: \"%2\"\n"
-        "    placeholderTextColor: Colors.textSecondary\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    Layout.preferredHeight: 36\n"
-        "    color: Colors.text\n"
-        "    selectionColor: Colors.primary\n"
-        "    background: Rectangle {\n"
-        "        color: Colors.surface\n"
-        "        border.color: Colors.border\n"
-        "        border.width: 1\n"
-        "        radius: 4\n"
-        "    }\n"
-        "    onTextChanged: {\n"
-        "        if (widgetBridge) {\n"
-        "            var input = {\n"
-        "                'type': 'text',\n"
-        "                'value': text,\n"
-        "                'paramName': '%1'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%1', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(widgetId).arg(placeholder);
+
+    return QString("TextField {\n"
+                   "    id: lineEdit_%1\n"
+                   "    placeholderText: \"%2\"\n"
+                   "    placeholderTextColor: Colors.textSecondary\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "    Layout.preferredHeight: 36\n"
+                   "    color: Colors.text\n"
+                   "    selectionColor: Colors.primary\n"
+                   "    background: Rectangle {\n"
+                   "        color: Colors.surface\n"
+                   "        border.color: Colors.border\n"
+                   "        border.width: 1\n"
+                   "        radius: 4\n"
+                   "    }\n"
+                   "    onTextChanged: {\n"
+                   "        if (widgetBridge) {\n"
+                   "            var input = {\n"
+                   "                'type': 'text',\n"
+                   "                'value': text,\n"
+                   "                'paramName': '%1'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%1', input)\n"
+                   "        }\n"
+                   "    }\n"
+                   "}\n")
+        .arg(widgetId)
+        .arg(placeholder);
 }
 
-QString generateCheckBox(const QJsonObject& spec)
+QString generateCheckBox(const QJsonObject &spec)
 {
     QString text = spec["text"].toString("CheckBox");
     bool checked = spec["checked"].toBool(false);
     QString widgetId = spec["id"].toString();
-    
-    return QString(
-        "CheckBox {\n"
-        "    text: \"%1\"\n"
-        "    checked: %2\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.preferredHeight: implicitHeight\n"
-        "    onCheckedChanged: {\n"
-        "        if (widgetBridge) {\n"
-        "            var input = {\n"
-        "                'type': 'checkbox',\n"
-        "                'value': checked,\n"
-        "                'paramName': '%3'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%3', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(text).arg(checked ? "true" : "false").arg(widgetId);
+
+    return QString("CheckBox {\n"
+                   "    text: \"%1\"\n"
+                   "    checked: %2\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.preferredHeight: implicitHeight\n"
+                   "    onCheckedChanged: {\n"
+                   "        if (widgetBridge) {\n"
+                   "            var input = {\n"
+                   "                'type': 'checkbox',\n"
+                   "                'value': checked,\n"
+                   "                'paramName': '%3'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%3', input)\n"
+                   "        }\n"
+                   "    }\n"
+                   "}\n")
+        .arg(text)
+        .arg(checked ? "true" : "false")
+        .arg(widgetId);
 }
 
-QString generateRadioButton(const QJsonObject& spec)
+QString generateRadioButton(const QJsonObject &spec)
 {
     QString text = spec["text"].toString("RadioButton");
     bool checked = spec["checked"].toBool(false);
     QString widgetId = spec["id"].toString();
-    
-    return QString(
-        "RadioButton {\n"
-        "    text: \"%1\"\n"
-        "    checked: %2\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.preferredHeight: implicitHeight\n"
-        "    onCheckedChanged: {\n"
-        "        if (widgetBridge && checked) {\n"
-        "            var input = {\n"
-        "                'type': 'radio',\n"
-        "                'value': text,\n"
-        "                'paramName': '%3'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%3', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(text).arg(checked ? "true" : "false").arg(widgetId);
+
+    return QString("RadioButton {\n"
+                   "    text: \"%1\"\n"
+                   "    checked: %2\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.preferredHeight: implicitHeight\n"
+                   "    onCheckedChanged: {\n"
+                   "        if (widgetBridge && checked) {\n"
+                   "            var input = {\n"
+                   "                'type': 'radio',\n"
+                   "                'value': text,\n"
+                   "                'paramName': '%3'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%3', input)\n"
+                   "        }\n"
+                   "    }\n"
+                   "}\n")
+        .arg(text)
+        .arg(checked ? "true" : "false")
+        .arg(widgetId);
 }
 
-QString generateProgressBar(const QJsonObject& spec)
+QString generateProgressBar(const QJsonObject &spec)
 {
     int value = spec["value"].toInt(50);
     int min = spec["minimum"].toInt(0);
     int max = spec["maximum"].toInt(100);
-    return QString(
-        "ProgressBar {\n"
-        "    value: %1\n"
-        "    from: %2\n"
-        "    to: %3\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.preferredHeight: 20\n"
-        "}\n"
-    ).arg(value).arg(min).arg(max);
+    return QString("ProgressBar {\n"
+                   "    value: %1\n"
+                   "    from: %2\n"
+                   "    to: %3\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.preferredHeight: 20\n"
+                   "}\n")
+        .arg(value)
+        .arg(min)
+        .arg(max);
 }
 
-QString generateDateEdit(const QJsonObject& spec)
+QString generateDateEdit(const QJsonObject &spec)
 {
     QString date = spec["date"].toString("2026-08-16");
     QString widgetId = spec["id"].toString();
-    
-    return QString(
-        "ComboBox {\n"
-        "    id: date_%1\n"
-        "    model: [\"%2\"]\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    Layout.preferredHeight: 36\n"
-        "    editable: true\n"
-        "    background: Rectangle {\n"
-        "        color: Colors.surface\n"
-        "        border.color: Colors.border\n"
-        "        border.width: 1\n"
-        "        radius: 4\n"
-        "    }\n"
-        "    contentItem: Text {\n"
-        "        text: date_%1.displayText\n"
-        "        color: Colors.text\n"
-        "        font.pixelSize: 14\n"
-        "        verticalAlignment: Text.AlignVCenter\n"
-        "    }\n"
-        "    onCurrentTextChanged: {\n"
-        "        if (widgetBridge) {\n"
-        "            var input = {\n"
-        "                'type': 'date',\n"
-        "                'value': currentText,\n"
-        "                'paramName': '%1'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%1', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(widgetId).arg(date);
+
+    return QString("ComboBox {\n"
+                   "    id: date_%1\n"
+                   "    model: [\"%2\"]\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "    Layout.preferredHeight: 36\n"
+                   "    editable: true\n"
+                   "    background: Rectangle {\n"
+                   "        color: Colors.surface\n"
+                   "        border.color: Colors.border\n"
+                   "        border.width: 1\n"
+                   "        radius: 4\n"
+                   "    }\n"
+                   "    contentItem: Text {\n"
+                   "        text: date_%1.displayText\n"
+                   "        color: Colors.text\n"
+                   "        font.pixelSize: 14\n"
+                   "        verticalAlignment: Text.AlignVCenter\n"
+                   "    }\n"
+                   "    onCurrentTextChanged: {\n"
+                   "        if (widgetBridge) {\n"
+                   "            var input = {\n"
+                   "                'type': 'date',\n"
+                   "                'value': currentText,\n"
+                   "                'paramName': '%1'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%1', input)\n"
+                   "        }\n"
+                   "    }\n"
+                   "}\n")
+        .arg(widgetId)
+        .arg(date);
 }
 
-QString generateDateTimeEdit(const QJsonObject& spec)
+QString generateDateTimeEdit(const QJsonObject &spec)
 {
     QString datetime = spec["datetime"].toString("2026-08-16 10:30");
     QString widgetId = spec["id"].toString();
-    
-    return QString(
-        "ComboBox {\n"
-        "    id: datetime_%1\n"
-        "    model: [\"%2\"]\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    Layout.preferredHeight: 36\n"
-        "    editable: true\n"
-        "    background: Rectangle {\n"
-        "        color: Colors.surface\n"
-        "        border.color: Colors.border\n"
-        "        border.width: 1\n"
-        "        radius: 4\n"
-        "    }\n"
-        "    contentItem: Text {\n"
-        "        text: datetime_%1.displayText\n"
-        "        color: Colors.text\n"
-        "        font.pixelSize: 14\n"
-        "        verticalAlignment: Text.AlignVCenter\n"
-        "    }\n"
-        "    onCurrentTextChanged: {\n"
-        "        if (widgetBridge) {\n"
-        "            var input = {\n"
-        "                'type': 'datetime',\n"
-        "                'value': currentText,\n"
-        "                'paramName': '%1'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%1', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(widgetId).arg(datetime);
+
+    return QString("ComboBox {\n"
+                   "    id: datetime_%1\n"
+                   "    model: [\"%2\"]\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "    Layout.preferredHeight: 36\n"
+                   "    editable: true\n"
+                   "    background: Rectangle {\n"
+                   "        color: Colors.surface\n"
+                   "        border.color: Colors.border\n"
+                   "        border.width: 1\n"
+                   "        radius: 4\n"
+                   "    }\n"
+                   "    contentItem: Text {\n"
+                   "        text: datetime_%1.displayText\n"
+                   "        color: Colors.text\n"
+                   "        font.pixelSize: 14\n"
+                   "        verticalAlignment: Text.AlignVCenter\n"
+                   "    }\n"
+                   "    onCurrentTextChanged: {\n"
+                   "        if (widgetBridge) {\n"
+                   "            var input = {\n"
+                   "                'type': 'datetime',\n"
+                   "                'value': currentText,\n"
+                   "                'paramName': '%1'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%1', input)\n"
+                   "        }\n"
+                   "    }\n"
+                   "}\n")
+        .arg(widgetId)
+        .arg(datetime);
 }
 
-QString generateCalendarWidget(const QJsonObject& spec)
+QString generateCalendarWidget(const QJsonObject &spec)
 {
-    return QString(
-        "Rectangle {\n"
-        "    color: \"transparent\"\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.preferredHeight: 300\n"
-        "    Text {\n"
-        "        anchors.centerIn: parent\n"
-        "        text: \"Календарь\"\n"
-        "        color: Colors.textSecondary\n"
-        "        font.pixelSize: 16\n"
-        "    }\n"
-        "}\n"
-    );
+    return QString("Rectangle {\n"
+                   "    color: \"transparent\"\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.preferredHeight: 300\n"
+                   "    Text {\n"
+                   "        anchors.centerIn: parent\n"
+                   "        text: \"Календарь\"\n"
+                   "        color: Colors.textSecondary\n"
+                   "        font.pixelSize: 16\n"
+                   "    }\n"
+                   "}\n");
 }
 
-QString generateTextEdit(const QJsonObject& spec)
+QString generateTextEdit(const QJsonObject &spec)
 {
     QString widgetId = spec["id"].toString();
-    
-    return QString(
-        "TextArea {\n"
-        "    id: textArea_%1\n"
-        "    placeholderText: \"Введите текст...\"\n"
-        "    placeholderTextColor: Colors.textSecondary\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    Layout.preferredHeight: 100\n"
-        "    color: Colors.text\n"
-        "    selectionColor: Colors.primary\n"
-        "    background: Rectangle {\n"
-        "        color: Colors.surface\n"
-        "        border.color: Colors.border\n"
-        "        border.width: 1\n"
-        "        radius: 4\n"
-        "    }\n"
-        "    onTextChanged: {\n"
-        "        if (widgetBridge) {\n"
-        "            var input = {\n"
-        "                'type': 'textarea',\n"
-        "                'value': text,\n"
-        "                'paramName': '%1'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%1', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(widgetId);
+
+    return QString("TextArea {\n"
+                   "    id: textArea_%1\n"
+                   "    placeholderText: \"Введите текст...\"\n"
+                   "    placeholderTextColor: Colors.textSecondary\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "    Layout.preferredHeight: 100\n"
+                   "    color: Colors.text\n"
+                   "    selectionColor: Colors.primary\n"
+                   "    background: Rectangle {\n"
+                   "        color: Colors.surface\n"
+                   "        border.color: Colors.border\n"
+                   "        border.width: 1\n"
+                   "        radius: 4\n"
+                   "    }\n"
+                   "    onTextChanged: {\n"
+                   "        if (widgetBridge) {\n"
+                   "            var input = {\n"
+                   "                'type': 'textarea',\n"
+                   "                'value': text,\n"
+                   "                'paramName': '%1'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%1', input)\n"
+                   "        }\n"
+                   "    }\n"
+                   "}\n")
+        .arg(widgetId);
 }
 
-QString generateSlider(const QJsonObject& spec)
+QString generateSlider(const QJsonObject &spec)
 {
     int min = spec["minimum"].toInt(0);
     int max = spec["maximum"].toInt(100);
     int value = spec["value"].toInt(50);
     QString widgetId = spec["id"].toString();
-    
-    return QString(
-        "Slider {\n"
-        "    id: slider_%1\n"
-        "    from: %2\n"
-        "    to: %3\n"
-        "    value: %4\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    onValueChanged: {\n"
-        "        if (widgetBridge) {\n"
-        "            var input = {\n"
-        "                'type': 'slider',\n"
-        "                'value': value,\n"
-        "                'paramName': '%1'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%1', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(widgetId).arg(min).arg(max).arg(value);
+
+    return QString("Slider {\n"
+                   "    id: slider_%1\n"
+                   "    from: %2\n"
+                   "    to: %3\n"
+                   "    value: %4\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "    onValueChanged: {\n"
+                   "        if (widgetBridge) {\n"
+                   "            var input = {\n"
+                   "                'type': 'slider',\n"
+                   "                'value': value,\n"
+                   "                'paramName': '%1'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%1', input)\n"
+                   "        }\n"
+                   "    }\n"
+                   "}\n")
+        .arg(widgetId)
+        .arg(min)
+        .arg(max)
+        .arg(value);
 }
 
-QString generateSpinBox(const QJsonObject& spec)
+QString generateSpinBox(const QJsonObject &spec)
 {
     int min = spec["minimum"].toInt(0);
     int max = spec["maximum"].toInt(100);
     int value = spec["value"].toInt(50);
     QString widgetId = spec["id"].toString();
-    
-    return QString(
-        "SpinBox {\n"
-        "    id: spin_%1\n"
-        "    from: %2\n"
-        "    to: %3\n"
-        "    value: %4\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    onValueChanged: {\n"
-        "        if (widgetBridge) {\n"
-        "            var input = {\n"
-        "                'type': 'number',\n"
-        "                'value': value,\n"
-        "                'paramName': '%1'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%1', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(widgetId).arg(min).arg(max).arg(value);
+
+    return QString("SpinBox {\n"
+                   "    id: spin_%1\n"
+                   "    from: %2\n"
+                   "    to: %3\n"
+                   "    value: %4\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "    onValueChanged: {\n"
+                   "        if (widgetBridge) {\n"
+                   "            var input = {\n"
+                   "                'type': 'number',\n"
+                   "                'value': value,\n"
+                   "                'paramName': '%1'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%1', input)\n"
+                   "        }\n"
+                   "    }\n"
+                   "}\n")
+        .arg(widgetId)
+        .arg(min)
+        .arg(max)
+        .arg(value);
 }
 
-QString generateListWidget(const QJsonObject& spec)
+QString generateListWidget(const QJsonObject &spec)
 {
-    return QString(
-        "Rectangle {\n"
-        "    color: Colors.surface\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.preferredHeight: 150\n"
-        "    border.color: Colors.border\n"
-        "    border.width: 1\n"
-        "    radius: 4\n"
-        "    Text {\n"
-        "        anchors.centerIn: parent\n"
-        "        text: \"Список\"\n"
-        "        color: Colors.textSecondary\n"
-        "        font.pixelSize: 14\n"
-        "    }\n"
-        "}\n"
-    );
+    return QString("Rectangle {\n"
+                   "    color: Colors.surface\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.preferredHeight: 150\n"
+                   "    border.color: Colors.border\n"
+                   "    border.width: 1\n"
+                   "    radius: 4\n"
+                   "    Text {\n"
+                   "        anchors.centerIn: parent\n"
+                   "        text: \"Список\"\n"
+                   "        color: Colors.textSecondary\n"
+                   "        font.pixelSize: 14\n"
+                   "    }\n"
+                   "}\n");
 }
 
-QString generateTreeWidget(const QJsonObject& spec)
+QString generateTreeWidget(const QJsonObject &spec)
 {
-    return QString(
-        "Rectangle {\n"
-        "    color: Colors.surface\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.preferredHeight: 150\n"
-        "    border.color: Colors.border\n"
-        "    border.width: 1\n"
-        "    radius: 4\n"
-        "    Text {\n"
-        "        anchors.centerIn: parent\n"
-        "        text: \"Дерево\"\n"
-        "        color: Colors.textSecondary\n"
-        "        font.pixelSize: 14\n"
-        "    }\n"
-        "}\n"
-    );
+    return QString("Rectangle {\n"
+                   "    color: Colors.surface\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.preferredHeight: 150\n"
+                   "    border.color: Colors.border\n"
+                   "    border.width: 1\n"
+                   "    radius: 4\n"
+                   "    Text {\n"
+                   "        anchors.centerIn: parent\n"
+                   "        text: \"Дерево\"\n"
+                   "        color: Colors.textSecondary\n"
+                   "        font.pixelSize: 14\n"
+                   "    }\n"
+                   "}\n");
 }
 
-QString generateFrame(const QJsonObject& spec)
+QString generateFrame(const QJsonObject &spec)
 {
-    return QString(
-        "Rectangle {\n"
-        "    height: 2\n"
-        "    Layout.fillWidth: true\n"
-        "    color: Colors.border\n"
-        "    Layout.margins: 5\n"
-        "}\n"
-    );
+    return QString("Rectangle {\n"
+                   "    height: 2\n"
+                   "    Layout.fillWidth: true\n"
+                   "    color: Colors.border\n"
+                   "    Layout.margins: 5\n"
+                   "}\n");
 }
 
-QString generateSplitter(const QJsonObject& spec)
+QString generateSplitter(const QJsonObject &spec)
 {
-    return QString(
-        "SplitView {\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.fillHeight: true\n"
-        "    orientation: Qt.Horizontal\n"
-        "}\n"
-    );
+    return QString("SplitView {\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.fillHeight: true\n"
+                   "    orientation: Qt.Horizontal\n"
+                   "}\n");
 }
 
-QString generateToolBox(const QJsonObject& spec)
+QString generateToolBox(const QJsonObject &spec)
 {
-    return QString(
-        "TabBar {\n"
-        "    Layout.fillWidth: true\n"
-        "    TabButton { text: \"Вкладка 1\" }\n"
-        "    TabButton { text: \"Вкладка 2\" }\n"
-        "}\n"
-    );
+    return QString("TabBar {\n"
+                   "    Layout.fillWidth: true\n"
+                   "    TabButton { text: \"Вкладка 1\" }\n"
+                   "    TabButton { text: \"Вкладка 2\" }\n"
+                   "}\n");
 }
 
-QString generateTabWidget(const QJsonObject& spec)
+QString generateTabWidget(const QJsonObject &spec)
 {
-    return QString(
-        "ColumnLayout {\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.fillHeight: true\n"
-        "    TabBar {\n"
-        "        id: tabBar\n"
-        "        Layout.fillWidth: true\n"
-        "        TabButton { text: \"Вкладка 1\" }\n"
-        "        TabButton { text: \"Вкладка 2\" }\n"
-        "    }\n"
-        "    StackLayout {\n"
-        "        currentIndex: tabBar.currentIndex\n"
-        "        Layout.fillWidth: true\n"
-        "        Layout.fillHeight: true\n"
-        "        Rectangle { color: Colors.surface\n"
-        "            Text { anchors.centerIn: parent; text: \"Содержимое 1\"; color: Colors.text } }\n"
-        "        Rectangle { color: Colors.surface\n"
-        "            Text { anchors.centerIn: parent; text: \"Содержимое 2\"; color: Colors.text } }\n"
-        "    }\n"
-        "}\n"
-    );
+    return QString("ColumnLayout {\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.fillHeight: true\n"
+                   "    TabBar {\n"
+                   "        id: tabBar\n"
+                   "        Layout.fillWidth: true\n"
+                   "        TabButton { text: \"Вкладка 1\" }\n"
+                   "        TabButton { text: \"Вкладка 2\" }\n"
+                   "    }\n"
+                   "    StackLayout {\n"
+                   "        currentIndex: tabBar.currentIndex\n"
+                   "        Layout.fillWidth: true\n"
+                   "        Layout.fillHeight: true\n"
+                   "        Rectangle { color: Colors.surface\n"
+                   "            Text { anchors.centerIn: parent; text: \"Содержимое 1\"; color: "
+                   "Colors.text } }\n"
+                   "        Rectangle { color: Colors.surface\n"
+                   "            Text { anchors.centerIn: parent; text: \"Содержимое 2\"; color: "
+                   "Colors.text } }\n"
+                   "    }\n"
+                   "}\n");
 }
 
-QString generateStackedWidget(const QJsonObject& spec)
+QString generateStackedWidget(const QJsonObject &spec)
 {
     return QString(
         "StackLayout {\n"
@@ -539,40 +546,39 @@ QString generateStackedWidget(const QJsonObject& spec)
         "        Text { anchors.centerIn: parent; text: \"Страница 1\"; color: Colors.text } }\n"
         "    Rectangle { color: Colors.surface\n"
         "        Text { anchors.centerIn: parent; text: \"Страница 2\"; color: Colors.text } }\n"
-        "}\n"
-    );
+        "}\n");
 }
 
-QString generateToolButton(const QJsonObject& spec)
+QString generateToolButton(const QJsonObject &spec)
 {
     QString text = spec["text"].toString("🔧");
     QString widgetId = spec["id"].toString();
-    
-    return QString(
-        "Button {\n"
-        "    text: \"%1\"\n"
-        "    Layout.preferredWidth: 40\n"
-        "    Layout.preferredHeight: 40\n"
-        "    flat: true\n"
-        "    onClicked: {\n"
-        "        if (widgetBridge) {\n"
-        "            var input = {\n"
-        "                'type': 'button',\n"
-        "                'value': text,\n"
-        "                'paramName': '%2'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%2', input)\n"
-        "        }\n"
-        "    }\n"
-        "}\n"
-    ).arg(text).arg(widgetId);
+
+    return QString("Button {\n"
+                   "    text: \"%1\"\n"
+                   "    Layout.preferredWidth: 40\n"
+                   "    Layout.preferredHeight: 40\n"
+                   "    flat: true\n"
+                   "    onClicked: {\n"
+                   "        if (widgetBridge) {\n"
+                   "            var input = {\n"
+                   "                'type': 'button',\n"
+                   "                'value': text,\n"
+                   "                'paramName': '%2'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%2', input)\n"
+                   "        }\n"
+                   "    }\n"
+                   "}\n")
+        .arg(text)
+        .arg(widgetId);
 }
 
 // ============================================================
 // HR ВИДЖЕТЫ (с валидацией)
 // ============================================================
 
-QString generateTextField(const QJsonObject& spec)
+QString generateTextField(const QJsonObject &spec)
 {
     QString label = spec["label"].toString("");
     QString placeholder = spec["placeholder"].toString("Введите текст...");
@@ -583,67 +589,69 @@ QString generateTextField(const QJsonObject& spec)
     QString labelPart;
     if (!label.isEmpty())
     {
-        labelPart = QString(
-            "Text {\n"
-            "    text: \"%1%2\"\n"
-            "    color: Colors.text\n"
-            "    font.pixelSize: GlobalSettings.fontSize\n"
-            "    Layout.fillWidth: true\n"
-            "}\n"
-        ).arg(label).arg(required ? " *" : "");
+        labelPart = QString("Text {\n"
+                            "    text: \"%1%2\"\n"
+                            "    color: Colors.text\n"
+                            "    font.pixelSize: GlobalSettings.fontSize\n"
+                            "    Layout.fillWidth: true\n"
+                            "}\n")
+                        .arg(label)
+                        .arg(required ? " *" : "");
     }
 
     QString validationType = validation.isEmpty() ? QString("__none__") : validation;
 
     return QString(
-        "ColumnLayout {\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    spacing: 4\n"
-        "%1"
-        "    TextField {\n"
-        "        id: textField_%2\n"
-        "        placeholderText: \"%3\"\n"
-        "        placeholderTextColor: Colors.textSecondary\n"
-        "        Layout.fillWidth: true\n"
-        "        Layout.preferredHeight: 36\n"
-        "        color: fieldIsValid ? Colors.text : Colors.error\n"
-        "        selectionColor: Colors.primary\n"
-        "        property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
-        "        signal fieldValidationChanged(bool valid)\n"
-        "        background: Rectangle {\n"
-        "            color: Colors.surface\n"
-        "            border.color: fieldIsValid ? Colors.border : Colors.error\n"
-        "            border.width: 1\n"
-        "            radius: 4\n"
-        "        }\n"
-        "        onTextChanged: {\n"
-        "            if (widgetBridge) {\n"
-        "                var input = { 'type': 'text', 'value': text, 'paramName': '%2' }\n"
-        "                widgetBridge.sendWidgetInput('%2', input)\n"
-        "            }\n"
-        "            var r = Validators.validate('%4', text, %5)\n"
-        "            errorText_%2.text = r.message\n"
-        "            errorText_%2.visible = !r.valid\n"
-        "            fieldValidationChanged(r.valid)\n"
-        "        }\n"
-        "    }\n"
-        "    Text {\n"
-        "        id: errorText_%2\n"
-        "        text: \"\"\n"
-        "        color: Colors.error\n"
-        "        font.pixelSize: GlobalSettings.fontSize - 4\n"
-        "        Layout.fillWidth: true\n"
-        "        visible: false\n"
-        "        wrapMode: Text.WordWrap\n"
-        "    }\n"
-        "}\n"
-    ).arg(labelPart).arg(widgetId).arg(placeholder)
-     .arg(validationType)
-     .arg(required ? "true" : "false");
+               "ColumnLayout {\n"
+               "    Layout.fillWidth: true\n"
+               "    Layout.maximumWidth: 800\n"
+               "    spacing: 4\n"
+               "%1"
+               "    TextField {\n"
+               "        id: textField_%2\n"
+               "        placeholderText: \"%3\"\n"
+               "        placeholderTextColor: Colors.textSecondary\n"
+               "        Layout.fillWidth: true\n"
+               "        Layout.preferredHeight: 36\n"
+               "        color: fieldIsValid ? Colors.text : Colors.error\n"
+               "        selectionColor: Colors.primary\n"
+               "        property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
+               "        signal fieldValidationChanged(bool valid)\n"
+               "        background: Rectangle {\n"
+               "            color: Colors.surface\n"
+               "            border.color: fieldIsValid ? Colors.border : Colors.error\n"
+               "            border.width: 1\n"
+               "            radius: 4\n"
+               "        }\n"
+               "        onTextChanged: {\n"
+               "            if (widgetBridge) {\n"
+               "                var input = { 'type': 'text', 'value': text, 'paramName': '%2' }\n"
+               "                widgetBridge.sendWidgetInput('%2', input)\n"
+               "            }\n"
+               "            var r = Validators.validate('%4', text, %5)\n"
+               "            errorText_%2.text = r.message\n"
+               "            errorText_%2.visible = !r.valid\n"
+               "            fieldValidationChanged(r.valid)\n"
+               "        }\n"
+               "    }\n"
+               "    Text {\n"
+               "        id: errorText_%2\n"
+               "        text: \"\"\n"
+               "        color: Colors.error\n"
+               "        font.pixelSize: GlobalSettings.fontSize - 4\n"
+               "        Layout.fillWidth: true\n"
+               "        visible: false\n"
+               "        wrapMode: Text.WordWrap\n"
+               "    }\n"
+               "}\n")
+        .arg(labelPart)
+        .arg(widgetId)
+        .arg(placeholder)
+        .arg(validationType)
+        .arg(required ? "true" : "false");
 }
 
-QString generateSearchField(const QJsonObject& spec)
+QString generateSearchField(const QJsonObject &spec)
 {
     QString placeholder = spec["placeholder"].toString("Поиск...");
     int minLength = spec["min_length"].toInt(0);
@@ -652,142 +660,152 @@ QString generateSearchField(const QJsonObject& spec)
     bool required = spec["required"].toBool(false);
 
     QString validationCheck = "";
-    if (!validation.isEmpty()) {
-        validationCheck = QString(
-            "            var r = Validators.validate('%1', text, %2)\n"
-            "            errorText_%3.text = r.message\n"
-            "            errorText_%3.visible = !r.valid\n"
-            "            fieldValidationChanged(r.valid)\n"
-        ).arg(validation).arg(required ? "true" : "false").arg(widgetId);
+    if (!validation.isEmpty())
+    {
+        validationCheck = QString("            var r = Validators.validate('%1', text, %2)\n"
+                                  "            errorText_%3.text = r.message\n"
+                                  "            errorText_%3.visible = !r.valid\n"
+                                  "            fieldValidationChanged(r.valid)\n")
+                              .arg(validation)
+                              .arg(required ? "true" : "false")
+                              .arg(widgetId);
     }
 
     QString validationType = validation.isEmpty() ? QString("__none__") : validation;
 
-    return QString(
-        "TextField {\n"
-        "    id: searchField_%1\n"
-        "    placeholderText: \"🔍 %2\"\n"
-        "    placeholderTextColor: Colors.textSecondary\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    Layout.preferredHeight: 36\n"
-        "    color: fieldIsValid ? Colors.text : Colors.error\n"
-        "    selectionColor: Colors.primary\n"
-        "    focus: true\n"
-        "    activeFocusOnTab: true\n"
-        "    cursorVisible: true\n"
-        "    property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
-        "    signal fieldValidationChanged(bool valid)\n"
-        "    background: Rectangle {\n"
-        "        color: Colors.surface\n"
-        "        border.color: fieldIsValid ? Colors.border : Colors.error\n"
-        "        border.width: 1\n"
-        "        radius: 4\n"
-        "    }\n"
-        "    onTextChanged: {\n"
-        "        if (widgetBridge && text.length >= %3) {\n"
-        "            var input = {\n"
-        "                'type': 'search',\n"
-        "                'value': text,\n"
-        "                'paramName': '%1'\n"
-        "            }\n"
-        "            widgetBridge.sendWidgetInput('%1', input)\n"
-        "        }\n"
-        "%6"
-        "    }\n"
-        "    Text {\n"
-        "        id: errorText_%1\n"
-        "        text: \"\"\n"
-        "        color: Colors.error\n"
-        "        font.pixelSize: GlobalSettings.fontSize - 4\n"
-        "        Layout.fillWidth: true\n"
-        "        visible: false\n"
-        "        wrapMode: Text.WordWrap\n"
-        "    }\n"
-        "}\n"
-    ).arg(widgetId).arg(placeholder).arg(minLength).arg(validationType)
-     .arg(required ? "true" : "false").arg(validationCheck);
+    return QString("TextField {\n"
+                   "    id: searchField_%1\n"
+                   "    placeholderText: \"🔍 %2\"\n"
+                   "    placeholderTextColor: Colors.textSecondary\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "    Layout.preferredHeight: 36\n"
+                   "    color: fieldIsValid ? Colors.text : Colors.error\n"
+                   "    selectionColor: Colors.primary\n"
+                   "    focus: true\n"
+                   "    activeFocusOnTab: true\n"
+                   "    cursorVisible: true\n"
+                   "    property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
+                   "    signal fieldValidationChanged(bool valid)\n"
+                   "    background: Rectangle {\n"
+                   "        color: Colors.surface\n"
+                   "        border.color: fieldIsValid ? Colors.border : Colors.error\n"
+                   "        border.width: 1\n"
+                   "        radius: 4\n"
+                   "    }\n"
+                   "    onTextChanged: {\n"
+                   "        if (widgetBridge && text.length >= %3) {\n"
+                   "            var input = {\n"
+                   "                'type': 'search',\n"
+                   "                'value': text,\n"
+                   "                'paramName': '%1'\n"
+                   "            }\n"
+                   "            widgetBridge.sendWidgetInput('%1', input)\n"
+                   "        }\n"
+                   "%6"
+                   "    }\n"
+                   "    Text {\n"
+                   "        id: errorText_%1\n"
+                   "        text: \"\"\n"
+                   "        color: Colors.error\n"
+                   "        font.pixelSize: GlobalSettings.fontSize - 4\n"
+                   "        Layout.fillWidth: true\n"
+                   "        visible: false\n"
+                   "        wrapMode: Text.WordWrap\n"
+                   "    }\n"
+                   "}\n")
+        .arg(widgetId)
+        .arg(placeholder)
+        .arg(minLength)
+        .arg(validationType)
+        .arg(required ? "true" : "false")
+        .arg(validationCheck);
 }
 
-QString generateEmailField(const QJsonObject& spec)
+QString generateEmailField(const QJsonObject &spec)
 {
     QString label = spec["label"].toString("");
     QString placeholder = spec["placeholder"].toString("email@example.com");
     bool required = spec["required"].toBool(false);
     QString validation = spec["validation"].toString();
-    if (validation.isEmpty()) {
+    if (validation.isEmpty())
+    {
         validation = "email";
     }
     QString widgetId = spec["id"].toString();
 
     QString labelPart;
-    if (!label.isEmpty()) {
-        labelPart = QString(
-            "Text {\n"
-            "    text: \"%1%2\"\n"
-            "    color: Colors.text\n"
-            "    font.pixelSize: GlobalSettings.fontSize\n"
-            "    Layout.fillWidth: true\n"
-            "}\n"
-        ).arg(label).arg(required ? " *" : "");
+    if (!label.isEmpty())
+    {
+        labelPart = QString("Text {\n"
+                            "    text: \"%1%2\"\n"
+                            "    color: Colors.text\n"
+                            "    font.pixelSize: GlobalSettings.fontSize\n"
+                            "    Layout.fillWidth: true\n"
+                            "}\n")
+                        .arg(label)
+                        .arg(required ? " *" : "");
     }
 
     return QString(
-        "ColumnLayout {\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    spacing: 4\n"
-        "%1"
-        "    TextField {\n"
-        "        id: emailField_%2\n"
-        "        placeholderText: \"%3\"\n"
-        "        placeholderTextColor: Colors.textSecondary\n"
-        "        Layout.fillWidth: true\n"
-        "        Layout.preferredHeight: 36\n"
-        "        color: fieldIsValid ? Colors.text : Colors.error\n"
-        "        selectionColor: Colors.primary\n"
-        "        inputMethodHints: Qt.ImhEmailCharactersOnly\n"
-        "        property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
-        "        signal fieldValidationChanged(bool valid)\n"
-        "        background: Rectangle {\n"
-        "            color: Colors.surface\n"
-        "            border.color: fieldIsValid ? Colors.border : Colors.error\n"
-        "            border.width: 1\n"
-        "            radius: 4\n"
-        "        }\n"
-        "        onTextChanged: {\n"
-        "            if (widgetBridge) {\n"
-        "                var input = { 'type': 'email', 'value': text, 'paramName': '%2' }\n"
-        "                widgetBridge.sendWidgetInput('%2', input)\n"
-        "            }\n"
-        "            var r = Validators.validate('%4', text, %5)\n"
-        "            errorText_%2.text = r.message\n"
-        "            errorText_%2.visible = !r.valid\n"
-        "            fieldValidationChanged(r.valid)\n"
-        "        }\n"
-        "    }\n"
-        "    Text {\n"
-        "        id: errorText_%2\n"
-        "        text: \"\"\n"
-        "        color: Colors.error\n"
-        "        font.pixelSize: GlobalSettings.fontSize - 4\n"
-        "        Layout.fillWidth: true\n"
-        "        visible: false\n"
-        "        wrapMode: Text.WordWrap\n"
-        "    }\n"
-        "}\n"
-    ).arg(labelPart).arg(widgetId).arg(placeholder)
-     .arg(validation)
-     .arg(required ? "true" : "false");
+               "ColumnLayout {\n"
+               "    Layout.fillWidth: true\n"
+               "    Layout.maximumWidth: 800\n"
+               "    spacing: 4\n"
+               "%1"
+               "    TextField {\n"
+               "        id: emailField_%2\n"
+               "        placeholderText: \"%3\"\n"
+               "        placeholderTextColor: Colors.textSecondary\n"
+               "        Layout.fillWidth: true\n"
+               "        Layout.preferredHeight: 36\n"
+               "        color: fieldIsValid ? Colors.text : Colors.error\n"
+               "        selectionColor: Colors.primary\n"
+               "        inputMethodHints: Qt.ImhEmailCharactersOnly\n"
+               "        property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
+               "        signal fieldValidationChanged(bool valid)\n"
+               "        background: Rectangle {\n"
+               "            color: Colors.surface\n"
+               "            border.color: fieldIsValid ? Colors.border : Colors.error\n"
+               "            border.width: 1\n"
+               "            radius: 4\n"
+               "        }\n"
+               "        onTextChanged: {\n"
+               "            if (widgetBridge) {\n"
+               "                var input = { 'type': 'email', 'value': text, 'paramName': '%2' }\n"
+               "                widgetBridge.sendWidgetInput('%2', input)\n"
+               "            }\n"
+               "            var r = Validators.validate('%4', text, %5)\n"
+               "            errorText_%2.text = r.message\n"
+               "            errorText_%2.visible = !r.valid\n"
+               "            fieldValidationChanged(r.valid)\n"
+               "        }\n"
+               "    }\n"
+               "    Text {\n"
+               "        id: errorText_%2\n"
+               "        text: \"\"\n"
+               "        color: Colors.error\n"
+               "        font.pixelSize: GlobalSettings.fontSize - 4\n"
+               "        Layout.fillWidth: true\n"
+               "        visible: false\n"
+               "        wrapMode: Text.WordWrap\n"
+               "    }\n"
+               "}\n")
+        .arg(labelPart)
+        .arg(widgetId)
+        .arg(placeholder)
+        .arg(validation)
+        .arg(required ? "true" : "false");
 }
 
-QString generatePasswordField(const QJsonObject& spec)
+QString generatePasswordField(const QJsonObject &spec)
 {
     QString label = spec["label"].toString("");
     QString placeholder = spec["placeholder"].toString("Введите пароль...");
     bool required = spec["required"].toBool(false);
     QString validation = spec["validation"].toString();
-    if (validation.isEmpty()) {
+    if (validation.isEmpty())
+    {
         validation = "password";
     }
     QString widgetId = spec["id"].toString();
@@ -795,66 +813,68 @@ QString generatePasswordField(const QJsonObject& spec)
     QString labelPart;
     if (!label.isEmpty())
     {
-        labelPart = QString(
-            "Text {\n"
-            "    text: \"%1%2\"\n"
-            "    color: Colors.text\n"
-            "    font.pixelSize: GlobalSettings.fontSize\n"
-            "    Layout.fillWidth: true\n"
-            "}\n"
-        ).arg(label).arg(required ? " *" : "");
+        labelPart = QString("Text {\n"
+                            "    text: \"%1%2\"\n"
+                            "    color: Colors.text\n"
+                            "    font.pixelSize: GlobalSettings.fontSize\n"
+                            "    Layout.fillWidth: true\n"
+                            "}\n")
+                        .arg(label)
+                        .arg(required ? " *" : "");
     }
 
-    return QString(
-        "ColumnLayout {\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "    spacing: 4\n"
-        "%1"
-        "    TextField {\n"
-        "        id: passwordField_%2\n"
-        "        placeholderText: \"%3\"\n"
-        "        placeholderTextColor: Colors.textSecondary\n"
-        "        Layout.fillWidth: true\n"
-        "        Layout.preferredHeight: 36\n"
-        "        color: fieldIsValid ? Colors.text : Colors.error\n"
-        "        selectionColor: Colors.primary\n"
-        "        echoMode: TextInput.Password\n"
-        "        property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
-        "        signal fieldValidationChanged(bool valid)\n"
-        "        background: Rectangle {\n"
-        "            color: Colors.surface\n"
-        "            border.color: fieldIsValid ? Colors.border : Colors.error\n"
-        "            border.width: 1\n"
-        "            radius: 4\n"
-        "        }\n"
-        "        onTextChanged: {\n"
-        "            if (widgetBridge) {\n"
-        "                var input = { 'type': 'password', 'value': text, 'paramName': '%2' }\n"
-        "                widgetBridge.sendWidgetInput('%2', input)\n"
-        "            }\n"
-        "            var r = Validators.validate('%4', text, %5)\n"
-        "            errorText_%2.text = r.message\n"
-        "            errorText_%2.visible = !r.valid\n"
-        "            fieldValidationChanged(r.valid)\n"
-        "        }\n"
-        "    }\n"
-        "    Text {\n"
-        "        id: errorText_%2\n"
-        "        text: \"\"\n"
-        "        color: Colors.error\n"
-        "        font.pixelSize: GlobalSettings.fontSize - 4\n"
-        "        Layout.fillWidth: true\n"
-        "        visible: false\n"
-        "        wrapMode: Text.WordWrap\n"
-        "    }\n"
-        "}\n"
-    ).arg(labelPart).arg(widgetId).arg(placeholder)
-     .arg(validation)
-     .arg(required ? "true" : "false");
+    return QString("ColumnLayout {\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "    spacing: 4\n"
+                   "%1"
+                   "    TextField {\n"
+                   "        id: passwordField_%2\n"
+                   "        placeholderText: \"%3\"\n"
+                   "        placeholderTextColor: Colors.textSecondary\n"
+                   "        Layout.fillWidth: true\n"
+                   "        Layout.preferredHeight: 36\n"
+                   "        color: fieldIsValid ? Colors.text : Colors.error\n"
+                   "        selectionColor: Colors.primary\n"
+                   "        echoMode: TextInput.Password\n"
+                   "        property bool fieldIsValid: Validators.validate('%4', text, %5).valid\n"
+                   "        signal fieldValidationChanged(bool valid)\n"
+                   "        background: Rectangle {\n"
+                   "            color: Colors.surface\n"
+                   "            border.color: fieldIsValid ? Colors.border : Colors.error\n"
+                   "            border.width: 1\n"
+                   "            radius: 4\n"
+                   "        }\n"
+                   "        onTextChanged: {\n"
+                   "            if (widgetBridge) {\n"
+                   "                var input = { 'type': 'password', 'value': text, 'paramName': "
+                   "'%2' }\n"
+                   "                widgetBridge.sendWidgetInput('%2', input)\n"
+                   "            }\n"
+                   "            var r = Validators.validate('%4', text, %5)\n"
+                   "            errorText_%2.text = r.message\n"
+                   "            errorText_%2.visible = !r.valid\n"
+                   "            fieldValidationChanged(r.valid)\n"
+                   "        }\n"
+                   "    }\n"
+                   "    Text {\n"
+                   "        id: errorText_%2\n"
+                   "        text: \"\"\n"
+                   "        color: Colors.error\n"
+                   "        font.pixelSize: GlobalSettings.fontSize - 4\n"
+                   "        Layout.fillWidth: true\n"
+                   "        visible: false\n"
+                   "        wrapMode: Text.WordWrap\n"
+                   "    }\n"
+                   "}\n")
+        .arg(labelPart)
+        .arg(widgetId)
+        .arg(placeholder)
+        .arg(validation)
+        .arg(required ? "true" : "false");
 }
 
-QString generateSelectField(const QJsonObject& spec)
+QString generateSelectField(const QJsonObject &spec)
 {
     QString label = spec["label"].toString("");
     bool required = spec["required"].toBool(false);
@@ -863,11 +883,14 @@ QString generateSelectField(const QJsonObject& spec)
     QString labelField = spec["label_field"].toString("label");
 
     QStringList items;
-    if (spec.contains("source_data") && spec["source_data"].isArray()) {
-        for (const QJsonValue& v : spec["source_data"].toArray()) {
+    if (spec.contains("source_data") && spec["source_data"].isArray())
+    {
+        for (const QJsonValue &v : spec["source_data"].toArray())
+        {
             QJsonObject obj = v.toObject();
             QString lbl = obj[labelField].toString();
-            if (lbl.isEmpty()) continue;
+            if (lbl.isEmpty())
+                continue;
             QString val = obj[valueField].toVariant().toString();
 
             QString escapedLbl = lbl;
@@ -880,7 +903,7 @@ QString generateSelectField(const QJsonObject& spec)
             escapedVal.replace("\"", "\\\"");
 
             items << QStringLiteral("{\"value\": \"%1\", \"label\": \"%2\"}")
-                     .arg(escapedVal, escapedLbl);
+                         .arg(escapedVal, escapedLbl);
         }
     }
 
@@ -894,21 +917,20 @@ QString generateSelectField(const QJsonObject& spec)
     escapedId.replace("\\", "\\\\");
     escapedId.replace("\"", "\\\"");
 
-    return QString(
-        "SearchableListSingle {\n"
-        "    label: \"%1\"\n"
-        "    fieldId: \"%2\"\n"
-        "    required: %3\n"
-        "    options: %4\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "}\n"
-    ).arg(escapedLabel, escapedId)
-     .arg(required ? "true" : "false")
-     .arg(optionsStr);
+    return QString("SearchableListSingle {\n"
+                   "    label: \"%1\"\n"
+                   "    fieldId: \"%2\"\n"
+                   "    required: %3\n"
+                   "    options: %4\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "}\n")
+        .arg(escapedLabel, escapedId)
+        .arg(required ? "true" : "false")
+        .arg(optionsStr);
 }
 
-QString generateMultiSelectField(const QJsonObject& spec)
+QString generateMultiSelectField(const QJsonObject &spec)
 {
     QString label = spec["label"].toString("");
     bool required = spec["required"].toBool(false);
@@ -917,11 +939,14 @@ QString generateMultiSelectField(const QJsonObject& spec)
     QString labelField = spec["label_field"].toString("label");
 
     QStringList items;
-    if (spec.contains("source_data") && spec["source_data"].isArray()) {
-        for (const QJsonValue& v : spec["source_data"].toArray()) {
+    if (spec.contains("source_data") && spec["source_data"].isArray())
+    {
+        for (const QJsonValue &v : spec["source_data"].toArray())
+        {
             QJsonObject obj = v.toObject();
             QString lbl = obj[labelField].toString();
-            if (lbl.isEmpty()) continue;
+            if (lbl.isEmpty())
+                continue;
             QString val = obj[valueField].toVariant().toString();
 
             QString escapedLbl = lbl;
@@ -934,7 +959,7 @@ QString generateMultiSelectField(const QJsonObject& spec)
             escapedVal.replace("\"", "\\\"");
 
             items << QStringLiteral("{\"value\": \"%1\", \"label\": \"%2\"}")
-                     .arg(escapedVal, escapedLbl);
+                         .arg(escapedVal, escapedLbl);
         }
     }
 
@@ -948,16 +973,15 @@ QString generateMultiSelectField(const QJsonObject& spec)
     escapedId.replace("\\", "\\\\");
     escapedId.replace("\"", "\\\"");
 
-    return QString(
-        "SearchableListMulti {\n"
-        "    label: \"%1\"\n"
-        "    fieldId: \"%2\"\n"
-        "    required: %3\n"
-        "    options: %4\n"
-        "    Layout.fillWidth: true\n"
-        "    Layout.maximumWidth: 800\n"
-        "}\n"
-    ).arg(escapedLabel, escapedId)
-     .arg(required ? "true" : "false")
-     .arg(optionsStr);
+    return QString("SearchableListMulti {\n"
+                   "    label: \"%1\"\n"
+                   "    fieldId: \"%2\"\n"
+                   "    required: %3\n"
+                   "    options: %4\n"
+                   "    Layout.fillWidth: true\n"
+                   "    Layout.maximumWidth: 800\n"
+                   "}\n")
+        .arg(escapedLabel, escapedId)
+        .arg(required ? "true" : "false")
+        .arg(optionsStr);
 }

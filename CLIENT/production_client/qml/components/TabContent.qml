@@ -271,10 +271,18 @@ Rectangle {
             root.sessionId = response.context.session_id || ""
             root.currentStep = response.context.current_step || ""
             root.canGoBack = response.context.can_go_back === true
+            widgetBridge.setCurrentSessionId(root.sessionId)
         }
+
+        if (response.context && response.context.reset_form === true) {
+            console.log("TabContent: reset_form=true, clearing form parameters")
+            widgetBridge.clearParameters()
+        }
+
         if (response.title) {
             root.title = response.title
         }
+
         if (response.widgets && response.widgets.length > 0) {
             debugText.visible = false
             widgetBridge.renderPage(response, uiContainer)
@@ -284,10 +292,51 @@ Rectangle {
         }
     }
 
+    // Парсит строку вида "Service error: {...}" -> массив ошибок [{message}, ...]
+    function parseServiceError(messageText) {
+        var result = []
+
+        // Ищем первый символ '{' и последний '}'
+        var startIdx = messageText.indexOf("{")
+        var endIdx = messageText.lastIndexOf("}")
+
+        if (startIdx >= 0 && endIdx > startIdx) {
+            var jsonPart = messageText.substring(startIdx, endIdx + 1)
+            try {
+                var parsed = JSON.parse(jsonPart)
+                if (parsed.detail) {
+                    if (typeof parsed.detail === "string") {
+                        result.push({ message: parsed.detail })
+                    } else if (Array.isArray(parsed.detail)) {
+                        for (var i = 0; i < parsed.detail.length; i++) {
+                            var d = parsed.detail[i]
+                            var loc = d.loc ? d.loc.join(".") : ""
+                            var msg = d.msg || JSON.stringify(d)
+                            result.push({ message: (loc ? loc + ": " : "") + msg })
+                        }
+                    }
+                } else if (parsed.errors && parsed.errors.length > 0) {
+                    for (var j = 0; j < parsed.errors.length; j++) {
+                        result.push({ message: parsed.errors[j].message || JSON.stringify(parsed.errors[j]) })
+                    }
+                } else {
+                    result.push({ message: JSON.stringify(parsed) })
+                }
+                return result
+            } catch (e) {
+                // не удалось распарсить — вернуть как есть
+            }
+        }
+
+        result.push({ message: messageText })
+        return result
+    }
+
     Connections {
         target: widgetBridge
+
         function onHttpResponse(id, status, data) {
-            // --- Ответ на загрузку страницы ---
+            // --- Ответ на загрузку страницы / workflow/back ---
             if (id === root.callbackId) {
                 root.loading = false
                 if (status === 200) {
@@ -305,13 +354,41 @@ Rectangle {
                 return
             }
 
-            // --- Ответ на submit формы ---
+            // --- Ошибка workflow-события (sendWorkflowEvent) ---
+            if (id.indexOf("wf_") === 0) {
+                console.log("TabContent: workflow event error, status=" + status)
+
+                var wfTitle = "Не удалось выполнить действие"
+                var wfSubtitle = ""
+                var wfErrors = []
+
+                try {
+                    var wfResp = JSON.parse(data)
+                    if (wfResp.errors && wfResp.errors.length > 0) {
+                        wfErrors = wfResp.errors
+                        wfSubtitle = wfResp.detail || ""
+                    } else if (wfResp.detail) {
+                        if (typeof wfResp.detail === "string") {
+                            // FastAPI-обёртка: detail может содержать "Service error: {...}"
+                            wfErrors = parseServiceError(wfResp.detail)
+                        } else {
+                            wfErrors = [{ message: JSON.stringify(wfResp.detail) }]
+                        }
+                    } else {
+                        wfErrors = [{ message: "Ошибка " + status + ": " + data }]
+                    }
+                } catch (e) {
+                    wfErrors = [{ message: "Ошибка " + status + ": " + data }]
+                }
+
+                validationErrorDialog.showErrors(wfTitle, wfSubtitle, wfErrors)
+                return
+            }
+
+            // --- Ответ на submit-форму (старый путь, оставлен для совместимости) ---
             if (id.indexOf("submit_") === 0) {
                 console.log("TabContent: submit response status=" + status)
-
                 if (status === 200) {
-                    // TODO: Блок B — переход на информационную страницу.
-                    console.log("TabContent: user created successfully")
                     try {
                         var successResp = JSON.parse(data)
                         console.log("TabContent: created user_id="
@@ -322,7 +399,6 @@ Rectangle {
                     return
                 }
 
-                // --- Ошибка ---
                 var title = "Не удалось создать пользователя"
                 var subtitle = ""
                 var errors = []
@@ -335,13 +411,13 @@ Rectangle {
                         subtitle = errResp.detail || ""
                     } else if (errResp.detail) {
                         if (typeof errResp.detail === "string") {
-                            errors = [{ message: errResp.detail }]
+                            errors = parseServiceError(errResp.detail)
                         } else if (Array.isArray(errResp.detail)) {
                             for (var i = 0; i < errResp.detail.length; i++) {
                                 var d = errResp.detail[i]
                                 var loc = d.loc ? d.loc.join(".") : ""
                                 var msg = d.msg || ""
-                                errors.push({ message: loc + ": " + msg })
+                                errors.push({ message: (loc ? loc + ": " : "") + msg })
                             }
                         }
                     } else {
@@ -353,6 +429,11 @@ Rectangle {
 
                 validationErrorDialog.showErrors(title, subtitle, errors)
             }
+        }
+
+        function onWorkflowEventCompleted(response) {
+            console.log("TabContent: workflow event completed")
+            renderResponse(response)
         }
     }
 

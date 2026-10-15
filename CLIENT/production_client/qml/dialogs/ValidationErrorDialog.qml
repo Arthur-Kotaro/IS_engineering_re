@@ -15,10 +15,9 @@ Dialog {
     standardButtons: Dialog.NoButton
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-    width: 520
+    width: 560
     height: Math.min(600, contentColumn.implicitHeight + 120)
 
-    // Центрирование относительно parent-окна
     x: parent ? Math.round((parent.width - width) / 2) : 0
     y: parent ? Math.round((parent.height - height) / 2) : 0
 
@@ -71,6 +70,7 @@ Dialog {
             Layout.preferredHeight: Math.min(errorList.implicitHeight, 400)
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
                 id: errorList
@@ -98,7 +98,7 @@ Dialog {
                             text: modelData.message || modelData
                             color: Colors.text
                             font.pixelSize: Typography.body1
-                            wrapMode: Text.WordWrap
+                            wrapMode: Text.WrapAnywhere
                         }
                     }
                 }
@@ -137,7 +137,6 @@ Dialog {
         }
     }
 
-    // Удобный метод: открыть с массивом errors
     function showErrors(title, subtitle, errors) {
         root.dialogTitle = title
         root.dialogSubtitle = subtitle
@@ -145,7 +144,6 @@ Dialog {
         root.open()
     }
 
-    // Удобный метод: открыть с одной ошибкой
     function showMessage(title, message) {
         root.dialogTitle = title
         root.dialogSubtitle = ""
