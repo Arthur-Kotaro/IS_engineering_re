@@ -3,10 +3,11 @@
 
 #include <QObject>
 
-class NotificationBridge : public QObject {
+class NotificationBridge : public QObject
+{
     Q_OBJECT
-public:
-    explicit NotificationBridge(QObject* parent = nullptr);
+  public:
+    explicit NotificationBridge(QObject *parent = nullptr);
 };
 
 #endif // NOTIFICATIONBRIDGE_H

@@ -1,15 +1,17 @@
 #ifndef MAINWINDOWBRIDGE_H
 #define MAINWINDOWBRIDGE_H
 
+#include "userserviceclient/UserProfile.h"
+
 #include <QObject>
 #include <QVariantList>
 #include <memory>
-#include "userserviceclient/UserProfile.h"
 
 class QNetworkAccessManager;
 
-namespace UsersService {
-    class AuthService;
+namespace UsersService
+{
+class AuthService;
 }
 
 class MainWindowBridge : public QObject
@@ -25,8 +27,9 @@ class MainWindowBridge : public QObject
     Q_PROPERTY(bool passwordExpired READ passwordExpired NOTIFY passwordExpiryChanged)
     Q_PROPERTY(QString accessToken READ accessToken NOTIFY userDataChanged)
 
-public:
-    explicit MainWindowBridge(std::shared_ptr<UsersService::AuthService> authService, QObject *parent = nullptr);
+  public:
+    explicit MainWindowBridge(std::shared_ptr<UsersService::AuthService> authService,
+                              QObject *parent = nullptr);
 
     QString userName() const;
     QString userFullName() const;
@@ -38,29 +41,29 @@ public:
     bool passwordExpired() const;
     QString accessToken() const;
 
-    Q_INVOKABLE void changePassword(const QString& currentPassword, const QString& newPassword);
+    Q_INVOKABLE void changePassword(const QString &currentPassword, const QString &newPassword);
     Q_INVOKABLE void logout();
     Q_INVOKABLE void checkPasswordExpiry();
     Q_INVOKABLE void loadTiles();
 
-signals:
+  signals:
     void userDataChanged();
     void passwordExpiryChanged();
-    void passwordChangeCompleted(bool success, const QString& message);
+    void passwordChangeCompleted(bool success, const QString &message);
     void logoutCompleted();
-    void tilesLoaded(const QVariantList& tiles);
+    void tilesLoaded(const QVariantList &tiles);
 
-private slots:
-    void onProfileFetched(const UsersService::UserProfile& profile);
-    void onPasswordExpiryInfo(int daysRemaining, bool isExpired, const QString& expiresAt);
-    void onPasswordChanged(bool success, const QString& message);
+  private slots:
+    void onProfileFetched(const UsersService::UserProfile &profile);
+    void onPasswordExpiryInfo(int daysRemaining, bool isExpired, const QString &expiresAt);
+    void onPasswordChanged(bool success, const QString &message);
     void onSessionExpired();
 
-private:
+  private:
     std::shared_ptr<UsersService::AuthService> m_authService;
     UsersService::UserProfile m_profile;
     int m_passwordDaysLeft = 0;
-    QNetworkAccessManager* m_networkManager;
+    QNetworkAccessManager *m_networkManager;
     bool m_tilesLoaded = false;
 };
 

@@ -1,12 +1,12 @@
 #ifndef GENERATORHELPERS_H
 #define GENERATORHELPERS_H
 
-#include <QString>
-#include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonObject>
+#include <QString>
 #include <QStringList>
 
-void parseChartData(const QJsonObject& spec, QJsonArray& values, QStringList& labels);
+void parseChartData(const QJsonObject &spec, QJsonArray &values, QStringList &labels);
 QString generateColorArray(int size);
 
 #endif // GENERATORHELPERS_H

@@ -1,8 +1,8 @@
 #ifndef PREVIEWBRIDGE_H
 #define PREVIEWBRIDGE_H
 
-#include <QObject>
 #include <QFileSystemWatcher>
+#include <QObject>
 #include <QStringList>
 #include <memory>
 
@@ -15,38 +15,44 @@ class PreviewBridge : public QObject
     Q_PROPERTY(QString currentFile READ currentFile NOTIFY fileChanged)
     Q_PROPERTY(QStringList sampleFiles READ sampleFiles NOTIFY sampleFilesChanged)
 
-public:
-    explicit PreviewBridge(QQmlEngine* engine, QObject* parent = nullptr);
+  public:
+    explicit PreviewBridge(QQmlEngine *engine, QObject *parent = nullptr);
     ~PreviewBridge();
 
-    QString currentFile() const { return m_currentFile; }
-    QStringList sampleFiles() const { return m_sampleFiles; }
+    QString currentFile() const
+    {
+        return m_currentFile;
+    }
+    QStringList sampleFiles() const
+    {
+        return m_sampleFiles;
+    }
 
-    Q_INVOKABLE void loadFile(const QString& path);
+    Q_INVOKABLE void loadFile(const QString &path);
     Q_INVOKABLE void reload();
     Q_INVOKABLE void refreshSamples();
     Q_INVOKABLE void openFileDialog();
 
-signals:
-    void fileChanged(const QString& path);
+  signals:
+    void fileChanged(const QString &path);
     void renderComplete();
-    void errorOccurred(const QString& message);
+    void errorOccurred(const QString &message);
     void sampleFilesChanged();
     void widgetCountChanged(int count);
     void contentHeightChanged(int height);
 
-private slots:
-    void onFileChanged(const QString& path);
+  private slots:
+    void onFileChanged(const QString &path);
     void onContentHeightChanged(int height);
 
-private:
+  private:
     void renderJson();
     QString findSamplesDirectory() const;
     void scanSamples();
 
-    QQmlEngine* m_engine;
-    JsonUiRenderer* m_renderer;
-    QFileSystemWatcher* m_watcher;
+    QQmlEngine *m_engine;
+    JsonUiRenderer *m_renderer;
+    QFileSystemWatcher *m_watcher;
     QString m_currentFile;
     QStringList m_sampleFiles;
     bool m_isLoading;

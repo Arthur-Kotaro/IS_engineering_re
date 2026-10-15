@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
-TEST(ConfigManagerTest, DummyTest) {
+TEST(ConfigManagerTest, DummyTest)
+{
     EXPECT_TRUE(true);
 }

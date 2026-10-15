@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
-TEST(MastergraphServiceTest, DummyTest) {
+TEST(MastergraphServiceTest, DummyTest)
+{
     EXPECT_TRUE(true);
 }

@@ -1,6 +1,7 @@
 #include "MockApiClient.h"
 
-namespace UsersService {
+namespace UsersService
+{
 
 MockApiClient::MockApiClient() : ApiClient(nullptr) {}
 

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
-TEST(ApiClientTest, DummyTest) {
+TEST(ApiClientTest, DummyTest)
+{
     EXPECT_TRUE(true);
 }

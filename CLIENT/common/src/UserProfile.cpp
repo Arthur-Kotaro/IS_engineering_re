@@ -1,17 +1,24 @@
 #include "userserviceclient/UserProfile.h"
+
 #include <QJsonArray>
 
-namespace UsersService {
+namespace UsersService
+{
 
-QString UserProfile::fullName() const {
+QString UserProfile::fullName() const
+{
     QStringList parts;
-    if (!lastName.isEmpty()) parts << lastName;
-    if (!firstName.isEmpty()) parts << firstName;
-    if (!middleName.isEmpty()) parts << middleName;
+    if (!lastName.isEmpty())
+        parts << lastName;
+    if (!firstName.isEmpty())
+        parts << firstName;
+    if (!middleName.isEmpty())
+        parts << middleName;
     return parts.join(" ");
 }
 
-QJsonObject UserProfile::toJson() const {
+QJsonObject UserProfile::toJson() const
+{
     QJsonObject json;
     json["user_id"] = userId;
     json["user_name"] = userName;
@@ -43,17 +50,20 @@ QJsonObject UserProfile::toJson() const {
     json["is_super_admin"] = isSuperAdmin;
 
     QJsonArray rolesArray;
-    for (const auto& r : roles) rolesArray.append(r);
+    for (const auto &r : roles)
+        rolesArray.append(r);
     json["roles"] = rolesArray;
 
     QJsonArray roleCodesArray;
-    for (const auto& r : roleCodes) roleCodesArray.append(r);
+    for (const auto &r : roleCodes)
+        roleCodesArray.append(r);
     json["role_codes"] = roleCodesArray;
 
     return json;
 }
 
-UserProfile UserProfile::fromJson(const QJsonObject& json) {
+UserProfile UserProfile::fromJson(const QJsonObject &json)
+{
     UserProfile p;
     p.userId = json["user_id"].toInt();
     p.userName = json["user_name"].toString();
@@ -80,11 +90,14 @@ UserProfile UserProfile::fromJson(const QJsonObject& json) {
     p.createdAt = QDateTime::fromString(json["created_at"].toString(), Qt::ISODate);
     p.updatedAt = QDateTime::fromString(json["updated_at"].toString(), Qt::ISODate);
     p.lastLoginAt = QDateTime::fromString(json["last_login_at"].toString(), Qt::ISODate);
-    p.passwordUpdatedAt = QDateTime::fromString(json["password_updated_at"].toString(), Qt::ISODate);
+    p.passwordUpdatedAt =
+        QDateTime::fromString(json["password_updated_at"].toString(), Qt::ISODate);
     p.isSuperAdmin = json["is_super_admin"].toBool();
 
-    for (const auto& v : json["roles"].toArray()) p.roles.append(v.toString());
-    for (const auto& v : json["role_codes"].toArray()) p.roleCodes.append(v.toString());
+    for (const auto &v : json["roles"].toArray())
+        p.roles.append(v.toString());
+    for (const auto &v : json["role_codes"].toArray())
+        p.roleCodes.append(v.toString());
 
     return p;
 }

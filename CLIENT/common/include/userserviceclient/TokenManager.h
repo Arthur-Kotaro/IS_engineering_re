@@ -2,38 +2,46 @@
 #define TOKENMANAGER_H
 
 #include "UsersServiceClient_global.h"
+
+#include <QJsonObject>
 #include <QObject>
 #include <QString>
-#include <QJsonObject>
 
-namespace UsersService {
+namespace UsersService
+{
 
 class USERSERVICECLIENT_EXPORT TokenManager : public QObject
 {
     Q_OBJECT
 
-public:
+  public:
     explicit TokenManager(QObject *parent = nullptr);
-    
-    void setTokens(const QString& accessToken, const QString& refreshToken);
+
+    void setTokens(const QString &accessToken, const QString &refreshToken);
     void clearTokens();
-    void updateRefreshToken(const QString& refreshToken);
-    
-    QString getAccessToken() const { return m_accessToken; }
-    QString getRefreshToken() const { return m_refreshToken; }
+    void updateRefreshToken(const QString &refreshToken);
+
+    QString getAccessToken() const
+    {
+        return m_accessToken;
+    }
+    QString getRefreshToken() const
+    {
+        return m_refreshToken;
+    }
     bool hasValidAccessToken() const;
-    
+
     QJsonObject saveToJson() const;
-    void loadFromJson(const QJsonObject& json);
-    
-signals:
+    void loadFromJson(const QJsonObject &json);
+
+  signals:
     void tokensChanged();
     void tokenExpired();
 
-private:
-    bool isTokenValid(const QString& token) const;
-    
-private:
+  private:
+    bool isTokenValid(const QString &token) const;
+
+  private:
     QString m_accessToken;
     QString m_refreshToken;
 };

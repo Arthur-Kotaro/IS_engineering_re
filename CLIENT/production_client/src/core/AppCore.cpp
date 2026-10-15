@@ -1,23 +1,23 @@
 #include "AppCore.h"
+
 #include "core/DataManager.h"
 #include "renderer/JsonUiRenderer.h"
 #include "userserviceclient/ApiClient.h"
 #include "userserviceclient/AuthService.h"
 #include "userserviceclient/TokenManager.h"
-#include <QQmlEngine>
-#include <QQmlContext>
-#include <QGuiApplication>
-#include <QFont>
+
 #include <QDebug>
+#include <QFont>
+#include <QGuiApplication>
+#include <QQmlContext>
+#include <QQmlEngine>
 
 // Статические экземпляры
 std::shared_ptr<UsersService::ApiClient> AppCore::s_apiClient;
 std::shared_ptr<UsersService::AuthService> AppCore::s_authService;
 std::shared_ptr<UsersService::TokenManager> AppCore::s_tokenManager;
 
-AppCore::AppCore(QQmlEngine* engine, QObject* parent)
-    : QObject(parent)
-    , m_engine(engine)
+AppCore::AppCore(QQmlEngine *engine, QObject *parent) : QObject(parent), m_engine(engine)
 {
     qDebug() << "AppCore created";
 }
@@ -39,11 +39,12 @@ void AppCore::init()
     s_authService = std::make_shared<UsersService::AuthService>(s_apiClient);
 
     m_dataManager = new DataManager(this);
-    
+
     m_renderer = new JsonUiRenderer(m_engine, this);
     m_renderer->setDataManager(m_dataManager);
 
-    if (m_engine) {
+    if (m_engine)
+    {
         m_engine->rootContext()->setContextProperty("renderer", m_renderer);
         qDebug() << "AppCore: renderer set to QML context";
     }
@@ -69,16 +70,18 @@ std::shared_ptr<UsersService::TokenManager> AppCore::tokenManager()
 
 void AppCore::applyFontSize(int fontSize)
 {
-    if (!m_engine) return;
-    
+    if (!m_engine)
+        return;
+
     QFont defaultFont = QGuiApplication::font();
     defaultFont.setPixelSize(fontSize);
     QGuiApplication::setFont(defaultFont);
-    
-    if (m_renderer) {
+
+    if (m_renderer)
+    {
         m_renderer->refreshAllCharts();
         m_renderer->refreshContentHeight();
     }
-    
+
     qDebug() << "AppCore: Font size applied:" << fontSize;
 }

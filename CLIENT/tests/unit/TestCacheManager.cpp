@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
-TEST(CacheManagerTest, DummyTest) {
+TEST(CacheManagerTest, DummyTest)
+{
     EXPECT_TRUE(true);
 }

@@ -2,14 +2,17 @@
 #define USERPROFILE_H
 
 #include "UsersServiceClient_global.h"
-#include <QObject>
+
 #include <QDateTime>
 #include <QJsonObject>
+#include <QObject>
 #include <QStringList>
 
-namespace UsersService {
+namespace UsersService
+{
 
-struct USERSERVICECLIENT_EXPORT UserProfile {
+struct USERSERVICECLIENT_EXPORT UserProfile
+{
     // Идентификация
     int userId = 0;
     QString userName;
@@ -59,11 +62,17 @@ struct USERSERVICECLIENT_EXPORT UserProfile {
     bool isSuperAdmin = false;
 
     QJsonObject toJson() const;
-    static UserProfile fromJson(const QJsonObject& json);
+    static UserProfile fromJson(const QJsonObject &json);
 
     QString fullName() const;
-    bool isActive() const { return status == "active" && !isBlocked && !isDeleted; }
-    bool hasRole(const QString& roleCode) const { return roleCodes.contains(roleCode); }
+    bool isActive() const
+    {
+        return status == "active" && !isBlocked && !isDeleted;
+    }
+    bool hasRole(const QString &roleCode) const
+    {
+        return roleCodes.contains(roleCode);
+    }
 };
 
 } // namespace UsersService

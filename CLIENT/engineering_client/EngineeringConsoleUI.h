@@ -7,14 +7,14 @@ class EngineeringConsoleUI : public QObject
 {
     Q_OBJECT
 
-public:
-    explicit EngineeringConsoleUI(const QString& host, int port, QObject* parent = nullptr);
+  public:
+    explicit EngineeringConsoleUI(const QString &host, int port, QObject *parent = nullptr);
     ~EngineeringConsoleUI();
 
-public slots:
+  public slots:
     void run();
 
-private:
+  private:
     QString m_host;
     int m_port;
 };
