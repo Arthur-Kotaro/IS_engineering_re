@@ -32,7 +32,7 @@ class NotificationResponse(BaseModel):
     data: Optional[Dict[str, Any]]
     created_at: datetime
     read_at: Optional[datetime]
-    
+
     class Config:
         from_attributes = True
 
