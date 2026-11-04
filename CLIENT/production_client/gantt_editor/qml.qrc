@@ -1,0 +1,67 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file>qml/main.qml</file>
+        <file>qml/GanttEditorWindow.qml</file>
+        <file>qml/ExportView.qml</file>
+        <file>qml/InfoPanel.qml</file>
+        <file>qml/AppToolBar.qml</file>
+        <file>qml/LeftPanel.qml</file>
+        <file>qml/LocalTaskList.qml</file>
+        <file>qml/GridArea.qml</file>
+        <file>qml/BackgroundCanvas.qml</file>
+        <file>qml/DependencyCanvas.qml</file>
+        <file>qml/TaskRow.qml</file>
+        <file>qml/TaskBar.qml</file>
+        <file>qml/TaskNode.qml</file>
+        <file>qml/TaskTooltip.qml</file>
+        <file>qml/CalendarHeader.qml</file>
+        <file>qml/CalendarPopup.qml</file>
+        <file>qml/WelcomeScreen.qml</file>
+        <file>qml/GroupDelegate.qml</file>
+        <file>qml/GroupContextMenu.qml</file>
+        <file>qml/MilestoneBar.qml</file>
+        <file>qml/CurrentTimeLine.qml</file>
+        <file>qml/TargetDatesLine.qml</file>
+        <file>qml/RenameGroupDialog.qml</file>
+        <file>qml/NewProjectDialog.qml</file>
+        <file>qml/EditTaskDialog.qml</file>
+        <file>qml/EditForecastDatesDialog.qml</file>
+        <file>qml/SaveAsDialog.qml</file>
+        <file>qml/SettingsDialog.qml</file>
+        <file>qml/AboutDialog.qml</file>
+        <file>qml/HelpDialog.qml</file>
+        <file>qml/DependencyDialog.qml</file>
+        <file>qml/CascadeDialog.qml</file>
+        <file>qml/ListDialog.qml</file>
+        <file>qml/CompleteTaskDialog.qml</file>
+        <file>qml/NewTaskDialog.qml</file>
+        <file>qml/CommentDialog.qml</file>
+        <file>qml/ResponsibleDialog.qml</file>
+        <file>qml/RenameTaskDialog.qml</file>
+        <file>qml/ExportDialog.qml</file>
+        <file>qml/LocalGraphExistsDialog.qml</file>
+        <file>qml/DetachLocalGraphDialog.qml</file>
+        <file>qml/ConfirmRemoveTaskDialog.qml</file>
+        <file>qml/SetProgressDialog.qml</file>
+        <file>qml/TaskContextMenu.qml</file>
+        <file>qml/utils/GridLayoutBuilder.js</file>
+        <file>qml/utils/RowBuilder.js</file>
+        <file>qml/utils/DateUtils.js</file>
+        <file>qml/utils/GridRange.js</file>
+        <file>qml/utils/NodeLayout.js</file>
+        <file>qml/icons/new.svg</file>
+        <file>qml/icons/open.svg</file>
+        <file>qml/icons/save.svg</file>
+        <file>qml/icons/export.svg</file>
+        <file>qml/icons/settings.svg</file>
+        <file>qml/icons/lock.svg</file>
+        <file>qml/icons/unlock.svg</file>
+        <file>qml/icons/collapse.svg</file>
+        <file>qml/icons/expand.svg</file>
+        <file>qml/icons/refresh.svg</file>
+        <file alias="default_typologies.json">resources/default_typologies.json</file>
+        <file alias="default_tasks.json">resources/default_tasks.json</file>
+        <file alias="default_holidays.json">resources/default_holidays.json</file>
+    </qresource>
+</RCC>

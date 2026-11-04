@@ -1,0 +1,16 @@
+{
+    "task_groups": [
+        {"name": "Подготовка к вехе", "tooltip": "Milestones preparing", "tasks": []},
+        {"name": "Входной билет", "tooltip": "QCDP", "tasks": []},
+        {"name": "Документация", "tooltip": "Конструкторская документация и ИС", "tasks": []},
+        {"name": "Архитектура", "tooltip": "Architecture", "tasks": []},
+        {"name": "Логистика", "tooltip": "Supply chain", "tasks": []},
+        {"name": "Послепродажное обслуживание", "tooltip": "After sales", "tasks": []},
+        {"name": "Номинация поставщиков", "tooltip": "Инжиниринг продукта, СМС", "tasks": []},
+        {"name": "Прототипы", "tooltip": "Prototyping", "tasks": []},
+        {"name": "Валидация", "tooltip": "Validation", "tasks": []},
+        {"name": "Калибровки", "tooltip": "Calibration", "tasks": []},
+        {"name": "Подготовка производства", "tooltip": "Process/Процесс", "tasks": []}
+    ]
+}
+

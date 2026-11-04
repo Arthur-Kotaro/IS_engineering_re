@@ -29,6 +29,9 @@ set(RENDERER_HEADERS
     src/core/DataManager.h
 )
 
+# Gantt Editor (GDERE) - статическая библиотека + QML-модуль GanttEditor
+add_subdirectory(gantt_editor)
+
 add_library(RendererLib STATIC ${RENDERER_SOURCES} ${RENDERER_HEADERS})
 target_include_directories(RendererLib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -141,6 +144,7 @@ add_executable(ProductionClientApp
 
 target_link_libraries(ProductionClientApp
     PRIVATE
+        GanttEditorLib
         ProductionClient
         StylesModule
         UtilsModule

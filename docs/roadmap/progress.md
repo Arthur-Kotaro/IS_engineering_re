@@ -1,7 +1,6 @@
 # Прогресс: фазы и спирали
 
 > Живой документ. Даты появляются по мере работы.
-> Прочерк — дата ещё не наступила или не зафиксирована.
 
 ## Проекция «Фазы × Спирали»
 
@@ -23,54 +22,51 @@
 | 2026-09-26 | Завершена спираль 6. Документация | 6 | 0 |
 | 2026-10-04 | Завершена спираль 6.5. Секреты + env. Тег `spiral-6.5-done` | 6.5 | 0 |
 | 2026-10-12 | Спираль 6.6: клиент — BaseWidgets 1.0, кнопка «Назад», скроллбар вкладки, ограничение ширины полей. | 6.6 | 0 |
-| 2026-10-25 | Начата Спираль 7. Создан каркас `MG_service` (БД, API, проверка прав). Начата интеграция GDERE. | 7 | 1 |
+| 2026-10-25 | **Спираль 7 (MG Service + GDERE) начата.** Создан каркас `MG_service` (БД, API, права). Начата интеграция GDERE. | 7 | 1 |
 
 ## Детали спиралей
 
-### Спираль 1. Gateway + Blacklist
-Завершена 2026-09-26. Тег `spiral-1-done`.
-
-### Спираль 2. Синхронизация слоёв — User, Auth
-Завершена 2026-09-26. Тег `spiral-2-done`.
-
-### Спираль 3. Delegation + Project (два типа делегирования, access model)
-Завершена 2026-09-26. Отменена в Спирали 6.6.
-
-### Спираль 4. Имперсонация
-Завершена 2026-09-26. Тег `spiral-4-done`. Требует доработки после 6.6.
-
-### Спираль 5. Workflow (UI Composer engine, HR-сценарий)
-Завершена 2026-09-26. Тег `spiral-5-done`.
-
-### Спираль 6. Документация
-Завершена 2026-09-26.
-
-### Спираль 6.5. Секреты + env
-Завершена 2026-10-04. Тег `spiral-6.5-done`.
-
-### Спираль 6.6. Roles & Positions & Departments
-Цель: переработка модели ролей и структуры подразделений.
+### Спираль 6.6. Roles & Positions & Departments (завершена)
 - **Клиент (порция 2026-10-12):**
   - Компонентный подход к рендерингу — библиотека `BaseWidgets 1.0`.
   - Семантический слой цветов `action*` в `Colors.qml` (ADR 0012).
   - Кнопка «Назад» в `TabContent.qml` с `context.can_go_back` (ADR 0011).
   - Скроллбар вкладки, ограничение ширины полей (ADR 0013).
-  - **Архитектурные решения:**
-    - `Styles` и `Utils` стали полноценными QML-модулями.
-    - PRE (Page Rendering Engine) выделен как отдельный движок.
-    - Определены термины BDERE (Block Diagram Editor Rendering Engine) и GDERE (Gantt Diagram Editor Rendering Engine).
-  - **Реализовано:**
-    - **MG Service (каркас):** БД, API, права через `project_service`.
-    - **PRE:** виджет `ProjectList` (кастомный генератор), интеграция с `WidgetBridge`.
-    - **Клиент:** `GanttEditorWindow` (каркас), открытие по сигналу `ganttEditorRequested`.
+- **Архитектурные решения:**
+  - `Styles` и `Utils` стали полноценными QML-модулями.
+  - PRE (Page Rendering Engine) выделен как отдельный движок.
+  - Определены термины BDERE (Block Diagram Editor Rendering Engine) и GDERE (Gantt Diagram Editor Rendering Engine).
+- **Реализовано:**
+  - **MG Service (каркас):** БД, API, права через `project_service`.
+  - **PRE:** виджет `ProjectList` (кастомный генератор), интеграция с `WidgetBridge`.
+  - **Клиент:** `GanttEditorWindow` (каркас), открытие по сигналу `ganttEditorRequested`.
 
-### Спираль 7. MG Service (мастерграфики)
-**В работе.**
-- Создан `MG_service` (порт 8003, БД PostgreSQL).
-- Реализованы таблицы `mastergraphs`, `task_groups`, `mg_tasks`, `mg_dependencies`.
-- Настроена проверка прав через `project_service`.
-- Реализованы тестовые данные (6 групп, 1 МГ, 3 задачи, 2 зависимости).
-- **Следующие шаги:** интеграция GDERE (загрузка МГ по REST, рендеринг в окне).
+### Спираль 7. MG Service (мастерграфики) + GDERE (в работе)
+**Цель:** Реализовать сервис МГ и интегрировать полноценный редактор диаграмм Ганта в ERP.
+
+- **MG Service (бэкенд):**
+  - [x] Каркас `MG_service` (порт 8003, БД PostgreSQL).
+  - [x] Таблицы: `mastergraphs`, `task_groups`, `mg_tasks`, `mg_dependencies`.
+  - [x] Проверка прав через `project_service`.
+  - [x] Тестовые данные (6 групп, 1 МГ, 3 задачи, 2 зависимости).
+  - [x] API: `GET /api/v1/mastergraphs`, `GET /api/v1/mastergraphs/{mg_id}`, `GET /api/v1/mastergraphs/{mg_id}/access`.
+  - [ ] API: `POST /api/v1/mastergraphs` (создание).
+  - [ ] API: `PUT /api/v1/mastergraphs/{mg_id}` (diff).
+  - [ ] WebSocket: `/ws/mastergraphs/{mg_id}`.
+
+- **GDERE (Клиент):**
+  - [x] Создана независимая структура `gantt_editor/` (include, src, qml).
+  - [x] Перенесены модели (`TaskModel`, `GroupModel`, `MilestoneModel`, `DependencyModel`, `HistoryEntry`) в `namespace GanttEditor`.
+  - [x] Создан `ProjectData` (сетевой, без файлов).
+  - [x] Создан `GanttApiClient` (REST).
+  - [x] Создан `ProjectController` (заготовка для сети).
+  - [x] Перенесены все QML-файлы (GridArea, TaskRow, AppToolBar и т.д.).
+  - [x] `GanttEditorWindow.qml` адаптирован (убраны файловые диалоги).
+  - [x] **Сборка клиента:** ошибок нет.
+  - [ ] **Исправление путей QML:** Устранить ошибку `"../components": no such directory` в `GanttEditorWindow.qml` (заменить относительные импорты на прямые).
+  - [ ] **Реализация `ProjectController::loadFromServer`:** реальный запрос к MG Service, парсинг JSON, заполнение `ProjectData`.
+  - [ ] **Интеграция `WidgetBridge` → `GanttEditorWindow`:** передача `projectId`, `mgId`, `token` из UI Composer.
+  - [ ] **WebSocket-клиент** для real-time.
 
 ### Спираль 8. Макет MG → ERP
 Откладывается (зависит от Спирали 7).
@@ -81,14 +77,6 @@
 ### Спираль 10. Прод-готовность
 Откладывается.
 
-## Отменено
-
-- **Модель `owner/manager/editor/viewer`** в Project Service — **выдуманная**.
-- **`head_id` у пользователя** — не нужен. Иерархия — через `departments.parent_dept_id`.
-- **Композиция `direct OR subordinate OR delegated`** — не реализована.
-- **Роль X («Директор по менеджменту проектов»)** — заменена на `project_management_director`.
-- **`upp_head`** — дубликат `proto_production_head`, удалён.
-
 ## Правило спирали
 
 **Спираль 6.6 — фундаментальная переработка.** После неё:
@@ -98,10 +86,8 @@
 - Auth Service: `X-User-Position` + `X-User-Role`.
 - Client: обновить под новую модель.
 
-**Только после этого — MG Service.** (Спираль 7 стартовала, так как 6.6 стабилизирована для MVP).
+**Только после этого — MG Service.** (Спираль 7 начата, так как 6.6 стабилизирована для MVP).
 
 ## Возможное будущее
 
-**Фаза 3** — реализация бизнес-логики конкретного предприятия
-(например, ВАЗ/УПП) поверх платформы. Упомянута как возможность,
-в дорожную карту пока не вводится. См. `strategy.md`.
+**Фаза 3** — реализация бизнес-логики конкретного предприятия (например, ВАЗ/УПП) поверх платформы.

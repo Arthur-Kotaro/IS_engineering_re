@@ -1,0 +1,13 @@
+name: mastergraphs
+endpoint: /page/mastergraphs
+title: "Выбор мастерграфика"
+
+sources: []
+
+ui:
+  widgets:
+    - type: ProjectList
+      id: mastergraphs_list
+      api_endpoint: "http://localhost:8001/api/v1/projects/list-with-access"
+      permission_edit: "edit_mastergraphic"
+      permission_view: "view_project"

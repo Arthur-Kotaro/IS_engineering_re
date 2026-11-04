@@ -1,6 +1,7 @@
 #ifndef WIDGETBRIDGE_H
 #define WIDGETBRIDGE_H
 
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QMap>
 #include <QObject>
@@ -20,14 +21,8 @@ class WidgetBridge : public QObject
     explicit WidgetBridge(QObject *parent = nullptr);
     ~WidgetBridge();
 
-    DataManager *dataManager() const
-    {
-        return m_dataManager;
-    }
-    JsonUiRenderer *renderer() const
-    {
-        return m_renderer;
-    }
+    DataManager *dataManager() const { return m_dataManager; }
+    JsonUiRenderer *renderer() const { return m_renderer; }
 
   public slots:
     void setDataManager(DataManager *dataManager);
@@ -56,14 +51,16 @@ class WidgetBridge : public QObject
                                 const QJsonObject &body, const QString &callbackId);
 
     Q_INVOKABLE void setCurrentSessionId(const QString &sessionId);
-    Q_INVOKABLE QString currentSessionId() const
-    {
-        return m_currentSessionId;
-    }
+    Q_INVOKABLE QString currentSessionId() const { return m_currentSessionId; }
     Q_INVOKABLE void clearParameters();
 
     Q_INVOKABLE void sendWorkflowEvent(const QString &widgetId, const QString &eventType,
                                        const QJsonObject &data);
+
+    Q_INVOKABLE void openGanttEditor(int projectId, bool isReadOnly);
+
+    // --- Загрузка списка проектов (для ProjectList) ---
+    Q_INVOKABLE void loadProjectList(const QString &callbackId);
 
   signals:
     void interfaceLoaded(const QString &title);
@@ -71,12 +68,17 @@ class WidgetBridge : public QObject
     void widgetInputSent(const QString &widgetId, bool success, const QString &message);
     void httpResponse(const QString &callbackId, int status, const QString &data);
     void workflowEventCompleted(const QJsonObject &response);
+    void ganttEditorRequested(int projectId, bool isReadOnly);
+
+    // --- Сигнал с результатом загрузки проектов ---
+    void projectListLoaded(const QString &callbackId, const QJsonArray &editable, const QJsonArray &viewable);
 
   private slots:
     void onNetworkReplyFinished(QNetworkReply *reply);
 
   private:
     QJsonObject normalizeArrayValues(const QJsonObject &body);
+    int extractUserIdFromToken() const;
 
     QNetworkAccessManager *m_networkManager = nullptr;
     DataManager *m_dataManager = nullptr;

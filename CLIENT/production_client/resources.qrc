@@ -1,15 +1,26 @@
 <RCC>
     <qresource prefix="/">
         <file>qml/main.qml</file>
-        <file>assets/images/logo.jpg</file>
-        <file>assets/images/logo.svg</file>
-        <file>assets/images/icons/app_icon.png</file>
-        <file>assets/images/icons/error.svg</file>
-        <file>assets/images/icons/fullscreen.svg</file>
-        <file>assets/images/icons/logo.svg</file>
-        <file>assets/images/icons/logout.svg</file>
-        <file>assets/images/icons/password.svg</file>
-        <file>assets/images/icons/warning.svg</file>
+
+        <!-- Gantt Editor QML -->
+        <file>gantt_editor/qml/GanttEditorWindow.qml</file>
+        <file>gantt_editor/qml/AppToolBar.qml</file>
+        <file>gantt_editor/qml/LeftPanel.qml</file>
+        <file>gantt_editor/qml/InfoPanel.qml</file>
+        <file>gantt_editor/qml/CalendarHeader.qml</file>
+        <file>gantt_editor/qml/GridArea.qml</file>
+        <file>gantt_editor/qml/BackgroundCanvas.qml</file>
+        <file>gantt_editor/qml/DependencyCanvas.qml</file>
+        <file>gantt_editor/qml/TaskRow.qml</file>
+        <file>gantt_editor/qml/GanttBar.qml</file>
+        <file>gantt_editor/qml/MilestoneBar.qml</file>
+        <file>gantt_editor/qml/GroupDelegate.qml</file>
+        <file>gantt_editor/qml/CurrentTimeLine.qml</file>
+        <file>gantt_editor/qml/TargetDatesLine.qml</file>
+        <file>gantt_editor/qml/TaskContextMenu.qml</file>
+        <file>gantt_editor/qml/MenuButton.qml</file>
+        <file>gantt_editor/qml/DatePicker.qml</file>
+        <file>gantt_editor/qml/LocalTaskList.qml</file>
     </qresource>
     <qresource prefix="/interfaces">
         <file>interfaces/dashboard.json</file>

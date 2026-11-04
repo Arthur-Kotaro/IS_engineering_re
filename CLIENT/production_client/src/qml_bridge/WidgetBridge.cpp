@@ -468,3 +468,120 @@ void WidgetBridge::clearParameters()
         qDebug() << "WidgetBridge: parameters cleared";
     }
 }
+
+void WidgetBridge::openGanttEditor(int projectId, bool isReadOnly)
+{
+    qDebug() << "WidgetBridge: openGanttEditor projectId=" << projectId << "readonly=" << isReadOnly;
+    emit ganttEditorRequested(projectId, isReadOnly);
+}
+
+// Извлекает user_id из JWT (payload.user_id). Без проверки подписи — только для X-User-ID.
+int WidgetBridge::extractUserIdFromToken() const
+{
+    if (m_currentToken.isEmpty()) return 0;
+    QStringList parts = m_currentToken.split('.');
+    if (parts.size() != 3) return 0;
+
+    QByteArray payloadB64 = parts[1].toUtf8();
+    // Base64url -> Base64
+    payloadB64.replace('-', '+').replace('_', '/');
+    while (payloadB64.size() % 4) payloadB64.append('=');
+
+    QByteArray payload = QByteArray::fromBase64(payloadB64);
+    QJsonParseError err;
+    QJsonDocument doc = QJsonDocument::fromJson(payload, &err);
+    if (err.error != QJsonParseError::NoError || !doc.isObject()) return 0;
+
+    return doc.object().value("user_id").toInt(0);
+}
+
+void WidgetBridge::loadProjectList(const QString &callbackId)
+{
+    qDebug() << "WidgetBridge: loadProjectList callbackId=" << callbackId;
+
+    int userId = extractUserIdFromToken();
+    qDebug() << "loadProjectList: userId=" << userId << "tokenLen=" << m_currentToken.length();
+    
+    if (userId == 0) {
+        qWarning() << "WidgetBridge: cannot extract user_id from token";
+        emit projectListLoaded(callbackId, QJsonArray(), QJsonArray());
+        return;
+    }
+
+    const QString baseUrl = "http://localhost:8001/api/v1/projects/list-with-access";
+
+    // Создаём отдельный QNAM только для этого запроса, чтобы 
+    // глобальный onNetworkReplyFinished не съел данные.
+    QNetworkAccessManager *localNam = new QNetworkAccessManager(this);
+    
+    auto makeRequest = [this, localNam, userId](const QString &url) -> QNetworkReply* {
+        QNetworkRequest req{QUrl(url)};
+        if (!m_currentToken.isEmpty())
+            req.setRawHeader("Authorization", ("Bearer " + m_currentToken).toUtf8());
+        req.setRawHeader("X-User-ID", QByteArray::number(userId));
+        return localNam->get(req);
+    };
+
+    QNetworkReply* replyEdit = makeRequest(baseUrl + "?permission=edit_mastergraphic");
+
+    connect(replyEdit, &QNetworkReply::finished, this,
+            [this, localNam, replyEdit, baseUrl, callbackId]() {
+        
+        QByteArray replyEditData = replyEdit->readAll();
+        qDebug() << "replyEdit: status=" << replyEdit->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+                 << "size=" << replyEditData.size()
+                 << "preview=" << replyEditData.left(150);
+                 
+        int userId = extractUserIdFromToken();
+                 
+        QJsonArray editable;
+        if (replyEdit->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(replyEditData);
+            if (doc.isArray()) editable = doc.array();
+        } else {
+            qWarning() << "loadProjectList edit error: " << replyEdit->errorString();
+        }
+        
+        replyEdit->deleteLater();
+
+        QNetworkRequest req2{QUrl(baseUrl + "?permission=view_project")};
+        if (!m_currentToken.isEmpty())
+            req2.setRawHeader("Authorization", ("Bearer " + m_currentToken).toUtf8());
+        req2.setRawHeader("X-User-ID", QByteArray::number(userId));
+
+        QNetworkReply* replyView = localNam->get(req2);
+        connect(replyView, &QNetworkReply::finished, this,
+                [this, localNam, replyView, editable, callbackId]() {
+            
+            QByteArray replyViewData = replyView->readAll();
+            qDebug() << "replyView: status=" << replyView->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+                     << "size=" << replyViewData.size()
+                     << "preview=" << replyViewData.left(150);
+
+            QJsonArray all;
+            if (replyView->error() == QNetworkReply::NoError) {
+                QJsonDocument doc = QJsonDocument::fromJson(replyViewData);
+                if (doc.isArray()) all = doc.array();
+            } else {
+                qWarning() << "loadProjectList view error: " << replyView->errorString();
+            }
+
+            QSet<int> editIds;
+            for (const auto &v : editable)
+                editIds.insert(v.toObject().value("project_id").toInt());
+
+            QJsonArray viewable;
+            for (const auto &v : all) {
+                if (!editIds.contains(v.toObject().value("project_id").toInt()))
+                    viewable.append(v);
+            }
+
+            qDebug() << "WidgetBridge: projectListLoaded editable=" << editable.size()
+                     << "viewable=" << viewable.size();
+            emit projectListLoaded(callbackId, editable, viewable);
+            
+            replyView->deleteLater();
+            localNam->deleteLater(); // Удаляем временный менеджер
+        });
+    });
+}

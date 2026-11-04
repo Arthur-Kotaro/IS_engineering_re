@@ -1,0 +1,64 @@
+{
+    "typologies": [
+        {
+            "typology_name": "grandmother",
+            "name": "Бабушка",
+            "milestones": [
+                {"m_name": "Старт проекта", "m_id": 1, "m_week": 0, "abbreviation": "SP", "tooltip": "Старт проекта"},
+                {"m_name": "Контракт", "m_id": 2, "m_week": 25, "abbreviation": "CO", "tooltip": "Контракт"},
+                {"m_name": "Одобрение оснастки", "m_id": 3, "m_week": 35, "abbreviation": "TGA", "tooltip": "Одобрение изготовления оснастки"},
+                {"m_name": "Проверка производства 1", "m_id": 4, "m_week": 77, "abbreviation": "ABPT1", "tooltip": "Проверка производства 1"},
+                {"m_name": "PPC", "m_id": 5, "m_week": 80, "abbreviation": "PPC", "tooltip": ""},
+                {"m_name": "Одобрение производства", "m_id": 6, "m_week": 82, "abbreviation": "MA", "tooltip": "Одобрение производства"}
+            ]
+        },
+        {
+            "typology_name": "mother",
+            "name": "Мать",
+            "milestones": [
+                {"m_name": "Старт проекта", "m_id": 1, "m_week": 0, "abbreviation": "SP", "tooltip": "Старт проекта"},
+                {"m_name": "Контракт", "m_id": 2, "m_week": 25, "abbreviation": "CO", "tooltip": "Контракт"},
+                {"m_name": "Одобрение оснастки", "m_id": 3, "m_week": 35, "abbreviation": "TGA", "tooltip": "Одобрение изготовления оснастки"},
+                {"m_name": "Проверка производства 1", "m_id": 4, "m_week": 77, "abbreviation": "ABPT1", "tooltip": "Проверка производства 1"},
+                {"m_name": "PPC", "m_id": 5, "m_week": 80, "abbreviation": "PPC", "tooltip": ""},
+                {"m_name": "Одобрение производства", "m_id": 6, "m_week": 82, "abbreviation": "MA", "tooltip": "Одобрение производства"}
+            ]
+        },
+        {
+            "typology_name": "child",
+            "name": "Ребёнок",
+            "milestones": [
+                {"m_name": "Старт проекта", "m_id": 1, "m_week": 0, "abbreviation": "SP", "tooltip": "Старт проекта"},
+                {"m_name": "Контракт", "m_id": 2, "m_week": 25, "abbreviation": "CO", "tooltip": "Контракт"},
+                {"m_name": "Одобрение оснастки", "m_id": 3, "m_week": 35, "abbreviation": "TGA", "tooltip": "Одобрение изготовления оснастки"},
+                {"m_name": "Проверка производства 1", "m_id": 4, "m_week": 77, "abbreviation": "ABPT1", "tooltip": "Проверка производства 1"},
+                {"m_name": "PPC", "m_id": 5, "m_week": 80, "abbreviation": "PPC", "tooltip": ""},
+                {"m_name": "Одобрение производства", "m_id": 6, "m_week": 82, "abbreviation": "MA", "tooltip": "Одобрение производства"}
+            ]
+        },
+        {
+            "typology_name": "brother",
+            "name": "Брат",
+            "milestones": [
+                {"m_name": "Старт проекта", "m_id": 1, "m_week": 0, "abbreviation": "SP", "tooltip": "Старт проекта"},
+                {"m_name": "Контракт", "m_id": 2, "m_week": 25, "abbreviation": "CO", "tooltip": "Контракт"},
+                {"m_name": "Одобрение оснастки", "m_id": 3, "m_week": 35, "abbreviation": "TGA", "tooltip": "Одобрение изготовления оснастки"},
+                {"m_name": "Проверка производства 1", "m_id": 4, "m_week": 77, "abbreviation": "ABPT1", "tooltip": "Проверка производства 1"},
+                {"m_name": "PPC", "m_id": 5, "m_week": 80, "abbreviation": "PPC", "tooltip": ""},
+                {"m_name": "Одобрение производства", "m_id": 6, "m_week": 82, "abbreviation": "MA", "tooltip": "Одобрение производства"}
+            ]
+        },
+        {
+            "typology_name": "derivative",
+            "name": "Производная",
+            "milestones": [
+                {"m_name": "Старт проекта", "m_id": 1, "m_week": 0, "abbreviation": "SP", "tooltip": "Старт проекта"},
+                {"m_name": "Контракт", "m_id": 2, "m_week": 25, "abbreviation": "CO", "tooltip": "Контракт"},
+                {"m_name": "Одобрение оснастки", "m_id": 3, "m_week": 35, "abbreviation": "TGA", "tooltip": "Одобрение изготовления оснастки"},
+                {"m_name": "Проверка производства 1", "m_id": 4, "m_week": 77, "abbreviation": "ABPT1", "tooltip": "Проверка производства 1"},
+                {"m_name": "PPC", "m_id": 5, "m_week": 80, "abbreviation": "PPC", "tooltip": ""},
+                {"m_name": "Одобрение производства", "m_id": 6, "m_week": 82, "abbreviation": "MA", "tooltip": "Одобрение производства"}
+            ]
+        }
+    ]
+}

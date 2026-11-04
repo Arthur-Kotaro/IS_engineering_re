@@ -49,8 +49,9 @@ extern QString generatePasswordField(const QJsonObject &);
 extern QString generateSelectField(const QJsonObject &);
 extern QString generateMultiSelectField(const QJsonObject &);
 
-QmlObjectFactory::QmlObjectFactory(QQmlEngine *engine, QObject *parent)
-    : QObject(parent), m_engine(engine)
+extern QString generateProjectList(const QJsonObject&);
+
+QmlObjectFactory::QmlObjectFactory(QQmlEngine *engine, QObject *parent): QObject(parent), m_engine(engine)
 {
     registerBuiltInTypes();
 }
@@ -126,6 +127,7 @@ void QmlObjectFactory::registerBuiltInTypes()
     { return generateSelectField(spec); };
     m_qmlGenerators["MultiSelectField"] = [](const QJsonObject &spec)
     { return generateMultiSelectField(spec); };
+    m_qmlGenerators["ProjectList"] = [](const QJsonObject& spec) { return generateProjectList(spec); };
 }
 
 QObject *QmlObjectFactory::create(const QString &type, const QJsonObject &spec, QQuickItem *parent)
@@ -152,16 +154,14 @@ QObject *QmlObjectFactory::create(const QString &type, const QJsonObject &spec, 
 
     if (component.isError())
     {
-        qWarning() << "QmlObjectFactory: QML component error for" << type << ":"
-                   << component.errorString();
+        qWarning() << "QmlObjectFactory: QML component error for" << type << ":" << component.errorString();
         return nullptr;
     }
 
     QObject *object = component.create();
     if (!object)
     {
-        qWarning() << "QmlObjectFactory: Failed to create widget:" << type
-                   << component.errorString();
+        qWarning() << "QmlObjectFactory: Failed to create widget:" << type << component.errorString();
         return nullptr;
     }
 
