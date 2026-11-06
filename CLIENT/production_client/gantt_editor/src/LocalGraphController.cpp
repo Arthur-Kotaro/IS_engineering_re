@@ -1,5 +1,11 @@
 #include "LocalGraphController.h"
 #include <QDebug>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QUrl>
 
 LocalGraphController::LocalGraphController(ProjectData* projectData,
                                            ResourceManager* resourceManager,
@@ -16,8 +22,15 @@ LocalGraphController::LocalGraphController(ProjectData* projectData,
     connect(m_apiClient, &GanttApiClient::forecastRecalculated, this, &LocalGraphController::onForecastRecalculated);
 }
 
+void LocalGraphController::setLocalGraphContext(const QString& lgId, const QString& busUrl)
+{
+    m_lgId = lgId;
+    m_busUrl = busUrl;
+}
+
 QString LocalGraphController::getBusUrlForTask(const QString& taskId) const
 {
+    if (!m_busUrl.isEmpty()) return m_busUrl;
     QVariantMap task = m_projectData->get_taskModel()->getTask(taskId);
     if (task.isEmpty()) return QString();
     QString groupId = task["groupId"].toString();
@@ -58,7 +71,6 @@ bool LocalGraphController::createLocalGraph(const QString& taskId)
         return false;
     }
 
-    // Предшественник
     QDate predecessorEnd;
     QStringList predIds = m_projectData->get_dependencyModel()->getPredecessors(taskId);
     for (const QString& pid : predIds) {
@@ -74,7 +86,7 @@ bool LocalGraphController::createLocalGraph(const QString& taskId)
     m_pendingTaskId = taskId;
 
     QVariantMap payload;
-    payload["project_id"] = 0;  // TODO: project_id из контекста
+    payload["project_id"] = 0;
     payload["task_id"] = taskId;
     payload["responsible_id"] = task["responsible"].toString().toInt();
     payload["title"] = task["title"].toString();
@@ -84,22 +96,6 @@ bool LocalGraphController::createLocalGraph(const QString& taskId)
         payload["predecessor_end"] = predecessorEnd.toString(Qt::ISODate);
 
     m_apiClient->createLocalGraph(taskId, busUrl, payload);
-    return true;
-}
-
-bool LocalGraphController::createLocalGraphOverwrite(const QString& taskId)
-{
-    return createLocalGraph(taskId);
-}
-
-bool LocalGraphController::attachExistingLocalGraph(const QString& taskId)
-{
-    if (m_settingsManager->editingLocked()) {
-        emit errorOccurred("Редактирование заблокировано");
-        return false;
-    }
-    m_projectData->get_taskModel()->setLocalGraphState(taskId, static_cast<int>(GanttDefines::LocalGraphState::Attached));
-    m_projectData->set_Modified(true);
     return true;
 }
 
@@ -115,7 +111,6 @@ void LocalGraphController::detachLocalGraph(const QString& taskId, bool deleteFi
 
     m_projectData->get_taskModel()->setLocalGraphState(taskId, 0);
     m_projectData->set_Modified(true);
-    // TODO: DELETE /internal/local-graphs/{lg_id} в BUS (позже)
 }
 
 void LocalGraphController::refreshLocalGraphForecast(const QString& taskId)
@@ -148,6 +143,97 @@ void LocalGraphController::refreshLocalGraphForecast(const QString& taskId)
 
     m_apiClient->recalcForecast(taskId, busUrl, payload);
 }
+
+// ---- CRUD для задач ЛГ ----
+
+void LocalGraphController::addLocalTask(const QString& title, const QString& responsible, const QDate& startDate, const QDate& endDate)
+{
+    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) return;
+
+    QVariantMap payload;
+    payload["title"] = title;
+    payload["responsible_id"] = responsible.toInt();
+    if (startDate.isValid()) payload["start_date"] = startDate.toString(Qt::ISODate);
+    if (endDate.isValid()) payload["end_date"] = endDate.toString(Qt::ISODate);
+
+    QNetworkAccessManager mgr;
+    QNetworkRequest req(QUrl(m_busUrl + "/internal/local-graphs/" + m_lgId + "/tasks"));
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    QJsonDocument doc = QJsonDocument::fromVariant(payload);
+    QNetworkReply* reply = mgr.post(req, doc.toJson(QJsonDocument::Compact));
+    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() == QNetworkReply::NoError) {
+            emit localTasksReloaded();
+        } else {
+            emit errorOccurred("addLocalTask: " + reply->errorString());
+        }
+    });
+}
+
+void LocalGraphController::updateLocalTaskDates(const QString& taskId, const QDate& newStart, const QDate& newEnd)
+{
+    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) return;
+
+    QVariantMap payload;
+    if (newStart.isValid()) payload["start_date"] = newStart.toString(Qt::ISODate);
+    if (newEnd.isValid()) payload["end_date"] = newEnd.toString(Qt::ISODate);
+
+    QNetworkAccessManager mgr;
+    QNetworkRequest req(QUrl(m_busUrl + "/internal/local-graphs/" + m_lgId + "/tasks/" + taskId));
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    QJsonDocument doc = QJsonDocument::fromVariant(payload);
+    QNetworkReply* reply = mgr.put(req, doc.toJson(QJsonDocument::Compact));
+    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() == QNetworkReply::NoError) {
+            emit localTasksReloaded();
+        } else {
+            emit errorOccurred("updateLocalTaskDates: " + reply->errorString());
+        }
+    });
+}
+
+void LocalGraphController::setLocalTaskStatus(const QString& taskId, int status)
+{
+    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) return;
+
+    QVariantMap payload;
+    payload["status"] = status;
+
+    QNetworkAccessManager mgr;
+    QNetworkRequest req(QUrl(m_busUrl + "/internal/local-graphs/" + m_lgId + "/tasks/" + taskId));
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    QJsonDocument doc = QJsonDocument::fromVariant(payload);
+    QNetworkReply* reply = mgr.put(req, doc.toJson(QJsonDocument::Compact));
+    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() == QNetworkReply::NoError) {
+            emit localTasksReloaded();
+        } else {
+            emit errorOccurred("setLocalTaskStatus: " + reply->errorString());
+        }
+    });
+}
+
+void LocalGraphController::removeLocalTask(const QString& taskId)
+{
+    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) return;
+
+    QNetworkAccessManager mgr;
+    QNetworkRequest req(QUrl(m_busUrl + "/internal/local-graphs/" + m_lgId + "/tasks/" + taskId));
+    QNetworkReply* reply = mgr.deleteResource(req);
+    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() == QNetworkReply::NoError) {
+            emit localTasksReloaded();
+        } else {
+            emit errorOccurred("removeLocalTask: " + reply->errorString());
+        }
+    });
+}
+
+// ---- Слоты ----
 
 void LocalGraphController::onLocalGraphCreated(const QVariantMap& result)
 {

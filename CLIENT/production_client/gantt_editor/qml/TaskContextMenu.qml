@@ -5,10 +5,8 @@ Menu
 {
     id: root
     property string taskId: ""
-
     property var onAddTaskAboveCallback: null
     property var onAddTaskBelowCallback: null
-
     property bool canAcceptForecast: false
     property bool canEditForecast: true
     property bool canSetProgress: false
@@ -124,12 +122,20 @@ Menu
 
     MenuItem {
         text: "Открыть локальный график"
+        visible: !root.isLocalGraph
         enabled: true
         onTriggered: {
             if (!root.taskId || !projectController) return
-            console.log("Open local graph for task:", root.taskId)
-            if (typeof mainWindow !== "undefined" && mainWindow.openLocalGraphEditor)
-                mainWindow.openLocalGraphEditor(root.taskId)
+            var task = projectController.projectData.taskModel.getTask(root.taskId)
+            if (task) {
+                var groupId = task.groupId
+                var busUrl = projectController.projectData.groupModel.getBusUrl(groupId)
+                if (busUrl) {
+                    projectController.openLocalGraphProcess(root.taskId, busUrl)
+                } else {
+                    console.log("BUS URL not found for group", groupId)
+                }
+            }
         }
     }
 

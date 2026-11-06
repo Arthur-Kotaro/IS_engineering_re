@@ -6,6 +6,12 @@
 #include <QFile>
 #include <QDebug>
 #include <QQuickWindow>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QEventLoop>
 
 #include "ProjectController.h"
 #include "TaskModel.h"
@@ -56,8 +62,6 @@ int main(int argc, char *argv[])
         if (f.open(QIODevice::ReadOnly)) {
             token = QString::fromUtf8(f.readAll()).trimmed();
             f.close();
-        } else {
-            qWarning() << "Cannot read token file:" << tokenFile;
         }
     }
 
@@ -72,7 +76,6 @@ int main(int argc, char *argv[])
     qmlRegisterType<HistoryEntry>("GanttEditor", 1, 0, "HistoryEntry");
 
     ProjectController controller;
-
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("projectController", &controller);
     engine.rootContext()->setContextProperty("argMode", mode);
@@ -82,7 +85,50 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("argBusUrl", busUrl);
     engine.rootContext()->setContextProperty("argToken", token);
 
-    const QUrl url(QStringLiteral("qrc:/qml/GanttEditorWindow.qml"));
+    QUrl url;
+    if (mode == "local") {
+        url = QUrl(QStringLiteral("qrc:/qml/LocalGraphEditorWindow.qml"));
+
+        // Синхронно грузим данные ЛГ перед загрузкой QML
+        QNetworkAccessManager mgr;
+        QNetworkRequest req(QUrl(busUrl + "/internal/local-graphs/by-task/" + taskId));
+        QNetworkReply* reply = mgr.get(req);
+        QEventLoop loop;
+        QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+        loop.exec();
+
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            if (doc.isObject()) {
+                QVariantMap lgData = doc.object().toVariantMap();
+                QString lgId = lgData.value("lg_id").toString();
+                
+                // Передаём контекст в LocalGraphController
+                controller.get_localGraphController()->setLocalGraphContext(lgId, busUrl);
+
+                QNetworkRequest tReq(QUrl(busUrl + "/internal/local-graphs/" + lgId + "/tasks"));
+                QNetworkReply* tReply = mgr.get(tReq);
+                QEventLoop tLoop;
+                QObject::connect(tReply, &QNetworkReply::finished, &tLoop, &QEventLoop::quit);
+                tLoop.exec();
+
+                QVariantList tasks;
+                if (tReply->error() == QNetworkReply::NoError) {
+                    QJsonDocument tDoc = QJsonDocument::fromJson(tReply->readAll());
+                    if (tDoc.isObject()) {
+                        tasks = tDoc.object().value("tasks").toArray().toVariantList();
+                    }
+                }
+                tReply->deleteLater();
+
+                controller.initLocalGraphData(lgData, tasks, busUrl);
+            }
+        }
+        reply->deleteLater();
+    } else {
+        url = QUrl(QStringLiteral("qrc:/qml/GanttEditorWindow.qml"));
+    }
+
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app,
                      [url](QObject *obj, const QUrl &objUrl) {
         if (!obj && url == objUrl)

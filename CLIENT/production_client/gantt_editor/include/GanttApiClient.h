@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QVariantMap>
+#include <QVariantList>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 
@@ -24,6 +25,9 @@ public:
     // BUS (REST)
     void createLocalGraph(const QString& taskId, const QString& busUrl, const QVariantMap& payload);
     void recalcForecast(const QString& taskId, const QString& busUrl, const QVariantMap& payload);
+    
+    // BUS: Load Local Graph
+    void loadLocalGraph(const QString& taskId, const QString& busUrl);
 
 signals:
     void mastergraphLoaded(const QVariantMap& data);
@@ -31,6 +35,7 @@ signals:
     void holidaysLoaded(const QVariantList& holidays);
     void localGraphCreated(const QVariantMap& result);
     void forecastRecalculated(const QVariantMap& result);
+    void localGraphLoaded(const QVariantMap& lgData, const QVariantList& tasks);
     void errorOccurred(const QString& message);
 
 private:
@@ -39,4 +44,4 @@ private:
     QString m_token;
 };
 
-#endif
+#endif // GANTTAPICLIENT_H

@@ -5,6 +5,9 @@
 #include <QDate>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QProcess>
+#include <QFile>
+#include <QCoreApplication>
 
 ProjectController::ProjectController(QObject *parent)
     : QObject(parent)
@@ -32,6 +35,7 @@ ProjectController::ProjectController(QObject *parent)
     connect(m_apiClient, &GanttApiClient::mastergraphLoaded, this, &ProjectController::onMastergraphLoaded);
     connect(m_apiClient, &GanttApiClient::accessLoaded, this, &ProjectController::onAccessLoaded);
     connect(m_apiClient, &GanttApiClient::holidaysLoaded, this, &ProjectController::onHolidaysLoaded);
+    connect(m_apiClient, &GanttApiClient::localGraphLoaded, this, &ProjectController::onLocalGraphLoaded);
     connect(m_apiClient, &GanttApiClient::errorOccurred, this, &ProjectController::onApiError);
 
     connect(m_webSocket, &WebSocketClient::snapshotReceived, this, &ProjectController::onWsSnapshot);
@@ -53,7 +57,6 @@ bool ProjectController::get_inEditMode() const { return m_inEditMode; }
 
 void ProjectController::set_InEditMode(bool editMode)
 {
-    qDebug() << "=== set_InEditMode:" << editMode;
     if (m_inEditMode != editMode) {
         m_inEditMode = editMode;
         emit inEditModeChanged();
@@ -67,15 +70,80 @@ void ProjectController::loadFromServer(const QString& mgId, const QString& token
         emit errorOccurred("MG ID is empty");
         return;
     }
+    m_token = token;
     m_apiClient->setToken(token);
     m_apiClient->loadMastergraph(mgId);
     m_apiClient->loadHolidays();
 
-    // WebSocket
     m_webSocket->connectToServer(
         QString("ws://localhost:8080/ws/mastergraphs/%1").arg(mgId),
         token
     );
+}
+
+void ProjectController::openLocalGraphProcess(const QString& taskId, const QString& busUrl)
+{
+    qDebug() << "=== openLocalGraphProcess:" << taskId << busUrl;
+
+    QString program = QCoreApplication::applicationFilePath();
+    QStringList arguments;
+    arguments << "--mode=local"
+              << "--task-id=" + taskId
+              << "--bus-url=" + busUrl;
+
+    if (!m_token.isEmpty()) {
+        QString tokenFile = "/tmp/gantt_token_" + taskId + ".txt";
+        QFile f(tokenFile);
+        if (f.open(QIODevice::WriteOnly)) {
+            f.write(m_token.toUtf8());
+            f.close();
+            arguments << "--token-file=" + tokenFile;
+        }
+    }
+
+    QProcess::startDetached(program, arguments);
+}
+
+void ProjectController::initLocalGraphData(const QVariantMap& lgData, const QVariantList& tasks, const QString& busUrl)
+{
+    qDebug() << "=== initLocalGraphData: tasks=" << tasks.size();
+    m_busUrl = busUrl;
+    m_projectData->clear();
+    m_projectData->set_GraphKind(GanttDefines::GraphKind::Local);
+    m_projectData->set_LinkedMasterTaskId(lgData.value("task_id").toString());
+    m_projectData->set_ProjectName(lgData.value("title").toString());
+    
+    QString ts = lgData.value("target_start").toString();
+    QString te = lgData.value("target_end").toString();
+    if (!ts.isEmpty()) m_projectData->set_LinkedTargetStart(QDate::fromString(ts, Qt::ISODate));
+    if (!te.isEmpty()) m_projectData->set_LinkedTargetEnd(QDate::fromString(te, Qt::ISODate));
+
+    QString pe = lgData.value("predecessor_end").toString();
+    if (!pe.isEmpty()) m_projectData->set_LinkedPredecessorEndDate(QDate::fromString(pe, Qt::ISODate));
+
+    if (m_projectData->get_groupModel()->rowCount() == 0) {
+        m_projectData->get_groupModel()->addGroupWithId("default", "Задачи ЛГ");
+    }
+
+    for (const QVariant& tv : tasks) {
+        QVariantMap t = tv.toMap();
+        QString taskId = t.value("lg_task_id").toString();
+        QString title = t.value("title").toString();
+        QString responsible = QString::number(t.value("responsible_id").toInt());
+        QDate startDate = QDate::fromString(t.value("start_date").toString(), Qt::ISODate);
+        QDate endDate = QDate::fromString(t.value("end_date").toString(), Qt::ISODate);
+        int status = t.value("status").toInt();
+
+        m_projectData->get_taskModel()->addTaskWithId(
+            taskId, "default", title, responsible,
+            startDate, endDate, startDate, endDate,
+            status, -1, -1, 0
+        );
+    }
+
+    m_projectData->recalculateEndDate();
+    m_projectData->set_Modified(false);
+    set_InEditMode(true);
 }
 
 void ProjectController::onMastergraphLoaded(const QVariantMap& data)
@@ -90,9 +158,15 @@ void ProjectController::onMastergraphLoaded(const QVariantMap& data)
     emit projectDataChanged();
 }
 
+void ProjectController::onLocalGraphLoaded(const QVariantMap& lgData, const QVariantList& tasks)
+{
+    initLocalGraphData(lgData, tasks, m_busUrl);
+    emit projectLoaded();
+    emit projectDataChanged();
+}
+
 void ProjectController::onHolidaysLoaded(const QVariantList& holidays)
 {
-    qDebug() << "=== onHolidaysLoaded: count=" << holidays.size();
     if (m_settingsManager)
         m_settingsManager->setHolidaysFromJson(holidays);
 }
@@ -112,25 +186,38 @@ void ProjectController::onApiError(const QString& message)
 
 void ProjectController::onWsSnapshot(const QJsonObject& snapshot)
 {
-    qDebug() << "=== onWsSnapshot (ignored — REST is source of truth)";
     Q_UNUSED(snapshot)
-    // WS snapshot НЕ перезаписывает ProjectData.
-    // REST (loadMastergraph) — источник истины с responsible_name / local_graph_state / bus_url.
-    // WS используется для diff (onWsDiff — TODO).
 }
 
 void ProjectController::onWsDiff(const QJsonObject& diff)
 {
-    qDebug() << "=== onWsDiff";
-    // TODO: применить diff к ProjectData
     QJsonArray changes = diff.value("changes").toArray();
     for (const QJsonValue& ch : changes) {
         QJsonObject change = ch.toObject();
         QString op = change.value("op").toString();
         QString entity = change.value("entity").toString();
         QString id = change.value("id").toString();
-        qDebug() << "  diff:" << op << entity << id;
-        // TODO: применить к TaskModel / DependencyModel
+
+        if (entity == "task" && op == "update") {
+            QJsonObject fields = change.value("fields").toObject();
+            QVariantMap task = m_projectData->get_taskModel()->getTask(id);
+            if (task.isEmpty()) continue;
+
+            QDate forecastStart = QDate::fromString(fields.value("forecast_start").toString(), Qt::ISODate);
+            QDate forecastEnd = QDate::fromString(fields.value("forecast_end").toString(), Qt::ISODate);
+
+            if (forecastStart.isValid() && forecastEnd.isValid())
+                m_projectData->get_taskModel()->updateForecastDates(id, forecastStart, forecastEnd);
+
+            int pc = fields.value("progress_current").toInt(-1);
+            int pt = fields.value("progress_total").toInt(-1);
+            if (pt > 0)
+                m_projectData->get_taskModel()->setTaskProgress(id, pc, pt);
+
+            int st = fields.value("status").toInt(-1);
+            if (st >= 0)
+                m_projectData->get_taskModel()->setTaskStatus(id, static_cast<GanttDefines::TaskStatus>(st));
+        }
     }
     emit projectDataChanged();
 }
@@ -159,4 +246,10 @@ void ProjectController::exportToPng(const QString& filePath)
 void ProjectController::exportToPdf(const QString& filePath)
 {
     m_exportManager->exportToPdf(m_projectData, filePath, QDate::currentDate());
+}
+
+void ProjectController::saveProject()
+{
+    // TODO: отправить накопленные diff в MG Service / BUS через WebSocket
+    qDebug() << "=== saveProject: (заглушка, diff отправлять пока некуда)";
 }

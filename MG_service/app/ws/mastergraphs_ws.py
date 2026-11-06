@@ -16,6 +16,7 @@ router = APIRouter(tags=["WebSocket"])
 
 @router.websocket("/ws/mastergraphs/{mg_id}")
 async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)):
+    print(f"[WS ENDPOINT] connection request for mg={mg_id}", flush=True)
     await manager.connect(mg_id, ws)
     try:
         async with AsyncSessionLocal() as session:
@@ -74,14 +75,16 @@ async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)
                 ],
             }
             await ws.send_json(snapshot)
+            print(f"[WS ENDPOINT] snapshot sent for mg={mg_id}", flush=True)
 
         while True:
             data = await ws.receive_json()
-            logger.info(f"WS received: {data}")
+            print(f"[WS ENDPOINT] received: {data}", flush=True)
             await ws.send_json({"type": "ack", "received": data.get("type")})
 
     except WebSocketDisconnect:
         await manager.disconnect(mg_id, ws)
     except Exception as e:
+        print(f"[WS ENDPOINT] error: {e}", flush=True)
         logger.error(f"WS error: {e}")
         await manager.disconnect(mg_id, ws)

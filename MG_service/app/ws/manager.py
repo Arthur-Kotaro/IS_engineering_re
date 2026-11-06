@@ -16,7 +16,9 @@ class ConnectionManager:
         await ws.accept()
         async with self._lock:
             self._connections.setdefault(mg_id, set()).add(ws)
-        logger.info(f"WS connected: mg={mg_id}, total={len(self._connections[mg_id])}")
+            total = len(self._connections[mg_id])
+        print(f"[WS MANAGER] connected: mg={mg_id}, total={total}", flush=True)
+        logger.info(f"WS connected: mg={mg_id}, total={total}")
 
     async def disconnect(self, mg_id: str, ws: WebSocket):
         async with self._lock:
@@ -24,16 +26,20 @@ class ConnectionManager:
                 self._connections[mg_id].discard(ws)
                 if not self._connections[mg_id]:
                     del self._connections[mg_id]
+        print(f"[WS MANAGER] disconnected: mg={mg_id}", flush=True)
         logger.info(f"WS disconnected: mg={mg_id}")
 
     async def broadcast(self, mg_id: str, message: dict):
         async with self._lock:
             conns = list(self._connections.get(mg_id, set()))
+        print(f"[WS MANAGER] broadcast to mg={mg_id}, connections={len(conns)}", flush=True)
         dead = []
         for ws in conns:
             try:
                 await ws.send_json(message)
+                print(f"[WS MANAGER] sent to one client", flush=True)
             except Exception as e:
+                print(f"[WS MANAGER] send failed: {e}", flush=True)
                 logger.warning(f"WS send failed: {e}")
                 dead.append(ws)
         for ws in dead:

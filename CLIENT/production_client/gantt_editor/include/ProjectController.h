@@ -42,6 +42,11 @@ public:
     void set_InEditMode(bool editMode);
 
     Q_INVOKABLE void loadFromServer(const QString& mgId, const QString& token);
+    Q_INVOKABLE void openLocalGraphProcess(const QString& taskId, const QString& busUrl);
+    
+    // Для инициализации в --mode=local (до загрузки QML)
+    void initLocalGraphData(const QVariantMap& lgData, const QVariantList& tasks, const QString& busUrl);
+
     Q_INVOKABLE void exportToPng(const QString& filePath);
     Q_INVOKABLE void exportToPdf(const QString& filePath);
 
@@ -49,6 +54,7 @@ public:
     Q_INVOKABLE void setCursorShape(int shape);
     Q_INVOKABLE void notifyTaskCompleted();
     Q_INVOKABLE void notifyMilestoneCompleted();
+    Q_INVOKABLE void saveProject();
 
 signals:
     void inEditModeChanged();
@@ -64,6 +70,7 @@ private slots:
     void onApiError(const QString& message);
     void onWsSnapshot(const QJsonObject& snapshot);
     void onWsDiff(const QJsonObject& diff);
+    void onLocalGraphLoaded(const QVariantMap& lgData, const QVariantList& tasks);
 
 private:
     ProjectData* m_projectData;
@@ -79,6 +86,8 @@ private:
     WebSocketClient* m_webSocket;
 
     bool m_inEditMode;
+    QString m_token;
+    QString m_busUrl;
 };
 
-#endif
+#endif // PROJECTCONTROLLER_H

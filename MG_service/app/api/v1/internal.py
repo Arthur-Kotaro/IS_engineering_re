@@ -26,6 +26,7 @@ class ForecastUpdateRequest(BaseModel):
 
 @router.post("/forecast-update")
 async def forecast_update(data: ForecastUpdateRequest, db: AsyncSession = Depends(get_db)):
+    print(f"[FORECAST-UPDATE] task={data.task_id}, forecast_end={data.forecast_end}", flush=True)
     result = await db.execute(select(MgTask).where(MgTask.task_id == data.task_id))
     task = result.scalar_one_or_none()
     if not task:
@@ -40,6 +41,7 @@ async def forecast_update(data: ForecastUpdateRequest, db: AsyncSession = Depend
     task.status = data.status
 
     await db.commit()
+    print(f"[FORECAST-UPDATE] task saved to DB, mg_id={task.mg_id}", flush=True)
 
     diff = {
         "type": "diff",

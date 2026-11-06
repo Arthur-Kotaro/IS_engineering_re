@@ -123,10 +123,11 @@ Rectangle
         // Разделитель
         Rectangle { width: 1; height: 24; color: "#b0b0b0"; Layout.alignment: Qt.AlignVCenter }
 
-        // ---- Каскад, Список ----
+        // ---- Каскад, Список (только для МГ) ----
         Button
         {
             text: "Добавить каскад"
+            visible: !appToolBar.isLocalMode
             Layout.preferredWidth: 150
             font.pixelSize: 11
             onClicked: if (mainWindow.cascadeDialog) mainWindow.cascadeDialog.open()
@@ -134,9 +135,23 @@ Rectangle
         Button
         {
             text: "Добавить список"
+            visible: !appToolBar.isLocalMode
             Layout.preferredWidth: 150
             font.pixelSize: 11
             onClicked: if (mainWindow.listDialog) mainWindow.listDialog.open()
+        }
+        
+        // ---- Добавить задачу (только для ЛГ) ----
+        Button
+        {
+            text: "Добавить задачу"
+            visible: appToolBar.isLocalMode
+            Layout.preferredWidth: 150
+            font.pixelSize: 11
+            onClicked: {
+                var title = "Новая задача ЛГ"
+                projectController.localGraphController.addLocalTask(title, "0", new Date(), new Date())
+            }
         }
 
         Rectangle { width: 1; height: 24; color: "#b0b0b0"; Layout.alignment: Qt.AlignVCenter }
@@ -224,6 +239,7 @@ Rectangle
         Button
         {
             text: "Переносы"
+            visible: !appToolBar.isLocalMode
             checked: mainWindow.hasGridArea() ? mainWindow.gridArea.showTaskHistory : true
             checkable: true
             Layout.preferredWidth: 95
@@ -233,6 +249,7 @@ Rectangle
         Button
         {
             text: "Комментарии"
+            visible: !appToolBar.isLocalMode
             checked: mainWindow.hasGridArea() ? mainWindow.gridArea.showComments : true
             checkable: true
             Layout.preferredWidth: 125
@@ -254,7 +271,6 @@ Rectangle
             }
         }
 
-        // Растяжка — один раз, чтобы прижать правую группу
         Item { Layout.fillWidth: true; Layout.minimumWidth: 4 }
 
         Button

@@ -30,6 +30,38 @@ class LocalGraphResponse(BaseModel):
         from_attributes = True
 
 
+class LgTaskResponse(BaseModel):
+    lg_task_id: UUID
+    lg_id: UUID
+    title: str
+    responsible_id: Optional[int]
+    status: int
+    start_date: Optional[date]
+    end_date: Optional[date]
+    sort_order: int
+    version: int
+
+    class Config:
+        from_attributes = True
+
+
+class LgTaskCreate(BaseModel):
+    title: str
+    responsible_id: Optional[int] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    sort_order: int = 0
+
+
+class LgTaskUpdate(BaseModel):
+    title: Optional[str] = None
+    responsible_id: Optional[int] = None
+    status: Optional[int] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    sort_order: Optional[int] = None
+
+
 class ForecastRecalcRequest(BaseModel):
     project_id: int
     task_id: UUID

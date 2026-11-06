@@ -48,9 +48,13 @@ void WebSocketClient::onDisconnected()
 void WebSocketClient::onTextMessage(const QString& message)
 {
     QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8());
-    if (doc.isNull() || !doc.isObject()) return;
+    if (doc.isNull() || !doc.isObject()) {
+        qDebug() << "=== WebSocketClient: invalid JSON";
+        return;
+    }
     QJsonObject obj = doc.object();
     QString type = obj.value("type").toString();
+    qDebug() << "=== WebSocketClient: message type =" << type;
     if (type == "snapshot")
         emit snapshotReceived(obj);
     else if (type == "diff")

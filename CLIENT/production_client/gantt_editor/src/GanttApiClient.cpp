@@ -150,3 +150,50 @@ void GanttApiClient::recalcForecast(const QString& taskId, const QString& busUrl
         emit forecastRecalculated(doc.object().toVariantMap());
     });
 }
+
+void GanttApiClient::loadLocalGraph(const QString& taskId, const QString& busUrl)
+{
+    if (busUrl.isEmpty() || taskId.isEmpty()) {
+        emit errorOccurred("BUS URL or Task ID is empty");
+        return;
+    }
+
+    QUrl url(QString("%1/internal/local-graphs/by-task/%2").arg(busUrl, taskId));
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QNetworkReply* reply = m_manager->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, busUrl]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit errorOccurred(QString("loadLocalGraph by-task (%1): %2").arg(reply->errorString(), reply->readAll()));
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (doc.isNull() || !doc.isObject()) {
+            emit errorOccurred("Invalid JSON (loadLocalGraph)");
+            return;
+        }
+        
+        QVariantMap lgData = doc.object().toVariantMap();
+        QString lgId = lgData.value("lg_id").toString();
+
+        QUrl tasksUrl(QString("%1/internal/local-graphs/%2/tasks").arg(busUrl, lgId));
+        QNetworkRequest tasksRequest(tasksUrl);
+        QNetworkReply* tasksReply = m_manager->get(tasksRequest);
+        
+        connect(tasksReply, &QNetworkReply::finished, this, [this, tasksReply, lgData]() {
+            tasksReply->deleteLater();
+            QVariantList tasks;
+            if (tasksReply->error() == QNetworkReply::NoError) {
+                QJsonDocument tasksDoc = QJsonDocument::fromJson(tasksReply->readAll());
+                if (tasksDoc.isObject()) {
+                    tasks = tasksDoc.object().value("tasks").toArray().toVariantList();
+                }
+            } else {
+                emit errorOccurred(QString("loadLocalGraph tasks: %1").arg(tasksReply->errorString()));
+            }
+            emit localGraphLoaded(lgData, tasks);
+        });
+    });
+}

@@ -5,66 +5,195 @@ import GanttEditor 1.0
 
 ApplicationWindow
 {
-    id: lgWindow
-    width: 1200
-    height: 600
-    visible: false
-    title: "Локальный график"
+    id: mainWindow
+    width: 1800
+    height: 750
+    minimumWidth: 1800
+    minimumHeight: 750
+    visible: true
+    title: "Локальный график: " + (projectController.projectData ? projectController.projectData.projectName : "")
 
-    property string taskId: ""
-    property string busUrl: ""
+    property string taskId: argTaskId
+    property string busUrl: argBusUrl
 
-    function loadFromBus() {
-        if (!busUrl || !taskId) return
-        console.log("LocalGraphEditor: load from", busUrl, "task", taskId)
+    property bool inEditMode: true
+    property int leftPanelWidth: 525
 
-        var xhr = new XMLHttpRequest()
-        xhr.open("GET", busUrl + "/internal/local-graphs/by-task/" + taskId)
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    var data = JSON.parse(xhr.responseText)
-                    console.log("LocalGraphEditor: loaded", data)
-                    title = "Локальный график: " + (data.title || "")
-                    lgIdLabel.text = "LG ID: " + (data.lg_id || "—")
-                    targetStartLabel.text = "Цель: " + (data.target_start || "—")
-                    targetEndLabel.text = " — " + (data.target_end || "—")
-                    responsibleLabel.text = "Ответственный ID: " + (data.responsible_id || "—")
-                } else {
-                    lgIdLabel.text = "Ошибка: " + xhr.status
+    function hasGridArea() { return typeof mainWindow.gridArea !== "undefined" && mainWindow.gridArea !== null; }
+
+    property alias gridArea: gridArea
+    property alias leftPanel: leftPanel
+    property alias calendarHeader: calendarHeader
+    property alias cascadeDialog: cascadeDialog
+    property alias listDialog: listDialog
+    property alias newTaskDialog: newTaskDialog
+    property alias editTaskDialog: editTaskDialog
+    property alias editForecastDatesDialog: editForecastDatesDialog
+    property alias responsibleDialog: responsibleDialog
+    property alias commentDialog: commentDialog
+    property alias setProgressDialog: setProgressDialog
+    property alias completeTaskDialog: completeTaskDialog
+    property alias dependencyDialog: dependencyDialog
+    property alias detachLocalGraphDialog: detachLocalGraphDialog
+    property alias localGraphExistsDialog: localGraphExistsDialog
+    property alias confirmRemoveTaskDialog: confirmRemoveTaskDialog
+    property alias renameTaskDialog: renameTaskDialog
+    property alias renameGroupDialog: renameGroupDialog
+    property alias settingsDialog: settingsDialog
+    property alias aboutDialog: aboutDialog
+    property alias helpDialog: helpDialog
+    property alias exportDialog: exportDialog
+    property alias taskContextMenu: taskContextMenu
+
+    Component.onCompleted: {
+        if (mainWindow.hasGridArea()) mainWindow.gridArea.updateData()
+        if (calendarHeader) calendarHeader.refresh()
+    }
+
+    AppToolBar { id: appToolBar; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right }
+
+    Item
+    {
+        id: contentArea
+        anchors.top: appToolBar.bottom
+        anchors.bottom: infoPanel.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+
+        Row
+        {
+            visible: inEditMode
+            anchors.fill: parent
+            spacing: 0
+
+            LeftPanel
+            {
+                flickableRight: flickableRight
+                id: leftPanel
+                width: leftPanelWidth
+                height: parent.height
+            }
+
+            Rectangle
+            {
+                id: splitter
+                width: 6
+                height: parent.height
+                color: "#888888"
+                MouseArea
+                {
+                    anchors.fill: parent
+                    anchors.leftMargin: -4
+                    anchors.rightMargin: -4
+                    cursorShape: Qt.SizeHorCursor
+                    drag.target: splitter
+                    drag.axis: Drag.XAxis
+                    drag.minimumX: 525
+                    drag.maximumX: 800
+                    onPositionChanged: { if (drag.active) leftPanelWidth = splitter.x }
+                }
+            }
+
+            Rectangle
+            {
+                width: parent.width - leftPanelWidth - 6
+                height: parent.height
+                color: "white"
+                clip: true
+
+                CalendarHeader
+                {
+                    id: calendarHeader
+                    x: -flickableRight.contentX
+                    width: calendarHeader.contentWidth
+                }
+
+                Flickable
+                {
+                    id: flickableRight
+                    anchors.top: calendarHeader.bottom
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    contentWidth: gridArea.width
+                    contentHeight: gridArea.height
+                    boundsBehavior: Flickable.StopAtBounds
+                    clip: true
+                    ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AlwaysOn }
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
+
+                    GridArea
+                    {
+                        id: gridArea
+                        externalFlickable: flickableRight
+                        width: calendarHeader.contentWidth
+                        taskContextMenu: taskContextMenu
+                    }
                 }
             }
         }
-        xhr.send()
     }
 
-    onVisibleChanged: { if (visible) loadFromBus() }
+    InfoPanel { id: infoPanel; anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right }
+
+    MouseArea
+    {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        z: 100
+        onWheel: function(wheel)
+        {
+            var flick = flickableRight
+            if (!flick) return
+            if (wheel.modifiers & Qt.ControlModifier) {
+                if (wheel.angleDelta.y > 0) projectController.settingsManager.setZoomLevel(0)
+                else projectController.settingsManager.setZoomLevel(1)
+                wheel.accepted = true
+                return
+            }
+            if (wheel.modifiers & Qt.ShiftModifier) flick.contentX = Math.max(0, Math.min(flick.contentX - wheel.angleDelta.y, flick.contentWidth - flick.width))
+            else flick.contentY = Math.max(0, Math.min(flick.contentY - wheel.angleDelta.y, flick.contentHeight - flick.height))
+            wheel.accepted = true
+        }
+    }
+
+    TaskContextMenu { id: taskContextMenu }
+    CascadeDialog { id: cascadeDialog }
+    ListDialog { id: listDialog }
+    NewTaskDialog { id: newTaskDialog }
+    EditTaskDialog { id: editTaskDialog }
+    EditForecastDatesDialog { id: editForecastDatesDialog }
+    ResponsibleDialog { id: responsibleDialog }
+    CommentDialog { id: commentDialog }
+    SetProgressDialog { id: setProgressDialog }
+    CompleteTaskDialog { id: completeTaskDialog; toastRef: toast }
+    DependencyDialog { id: dependencyDialog }
+    DetachLocalGraphDialog { id: detachLocalGraphDialog }
+    LocalGraphExistsDialog { id: localGraphExistsDialog }
+    ConfirmRemoveTaskDialog { id: confirmRemoveTaskDialog }
+    RenameTaskDialog { id: renameTaskDialog }
+    RenameGroupDialog { id: renameGroupDialog }
+    SettingsDialog { id: settingsDialog }
+    AboutDialog { id: aboutDialog }
+    HelpDialog { id: helpDialog }
+    ExportDialog { id: exportDialog }
 
     Rectangle {
-        anchors.fill: parent
-        color: "#f8f8f8"
-
-        Column {
-            anchors.fill: parent
-            anchors.margins: 20
-            spacing: 10
-
-            Label { id: lgIdLabel; text: "Загрузка..."; font.pixelSize: 14; font.bold: true }
-            Label { id: targetStartLabel; text: ""; font.pixelSize: 13 }
-            Label { id: targetEndLabel; text: ""; font.pixelSize: 13 }
-            Label { id: responsibleLabel; text: ""; font.pixelSize: 13 }
-
-            Rectangle {
-                width: parent.width
-                height: 2
-                color: "#cccccc"
-            }
-
-            Label {
-                text: "(TODO: редактор ЛГ — задачи, зависимости, статусы)"
-                font.pixelSize: 12
-                color: "#666666"
-            }
-        }
+        id: toast
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 60
+        width: Math.min(parent.width - 40, toastText.implicitWidth + 40)
+        height: toastText.implicitHeight + 24
+        color: "#d32f2f"
+        radius: 6
+        opacity: 0
+        visible: opacity > 0
+        z: 200
+        Text { id: toastText; anchors.centerIn: parent; color: "white"; font.pixelSize: 14; wrapMode: Text.WordWrap; width: parent.width - 32; horizontalAlignment: Text.AlignHCenter }
+        Timer { id: toastTimer; interval: 3000; onTriggered: toastHide.start() }
+        NumberAnimation { id: toastShow; target: toast; property: "opacity"; to: 1.0; duration: 200 }
+        NumberAnimation { id: toastHide; target: toast; property: "opacity"; to: 0.0; duration: 300 }
+        function show(message) { toastText.text = message; toastShow.start(); toastTimer.restart() }
     }
 }
