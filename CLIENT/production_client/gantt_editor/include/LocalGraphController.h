@@ -5,34 +5,43 @@
 #include "ProjectData.h"
 #include "ResourceManager.h"
 #include "SettingsManager.h"
+#include "GanttApiClient.h"
 
 class LocalGraphController : public QObject
 {
     Q_OBJECT
 public:
-    explicit LocalGraphController(ProjectData* projectData, ResourceManager* resourceManager, SettingsManager* settingsManager, QObject *parent = nullptr);
+    explicit LocalGraphController(ProjectData* projectData,
+                                   ResourceManager* resourceManager,
+                                   SettingsManager* settingsManager,
+                                   GanttApiClient* apiClient,
+                                   QObject *parent = nullptr);
 
     Q_INVOKABLE void markTaskRequiresLocalGraph(const QString& taskId);
     Q_INVOKABLE bool createLocalGraph(const QString& taskId);
     Q_INVOKABLE bool createLocalGraphOverwrite(const QString& taskId);
     Q_INVOKABLE bool attachExistingLocalGraph(const QString& taskId);
-    Q_INVOKABLE QString getLocalGraphPath(const QString& taskId) const;
-    Q_INVOKABLE bool localGraphFileExists(const QString& taskId) const;
     Q_INVOKABLE void detachLocalGraph(const QString& taskId, bool deleteFile);
-    Q_INVOKABLE void refreshLocalGraphForecast(const QString& taskId, const QString& localGraphPath, bool markModified);
+    Q_INVOKABLE void refreshLocalGraphForecast(const QString& taskId);
 
 signals:
     void errorOccurred(const QString& message);
+    void localGraphCreated(const QString& taskId);
+    void localGraphRefreshed(const QString& taskId);
 
-public:
-    void refreshAllLocalGraphForecasts();
+private slots:
+    void onLocalGraphCreated(const QVariantMap& result);
+    void onForecastRecalculated(const QVariantMap& result);
 
 private:
     ProjectData* m_projectData;
     ResourceManager* m_resourceManager;
     SettingsManager* m_settingsManager;
+    GanttApiClient* m_apiClient;
 
-    QString localGraphDirectory() const;
+    QString m_pendingTaskId;
+
+    QString getBusUrlForTask(const QString& taskId) const;
 };
 
 #endif

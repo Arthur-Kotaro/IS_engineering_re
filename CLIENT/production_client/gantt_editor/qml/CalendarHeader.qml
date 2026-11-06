@@ -93,9 +93,6 @@ Rectangle
 
     function updateDisplayRange()
     {
-        console.log("=== updateDisplayRange START ===")
-        console.log("  projectController: " + (projectController ? "yes" : "no"))
-
         var localMode = (projectController && projectController.projectData
         && projectController.projectData.graphKind === 1)
 
@@ -129,30 +126,16 @@ Rectangle
 
             displayStart = s
             displayEnd = e
-            console.log("  LOCAL: displayStart=" + s + " displayEnd=" + e)
-            console.log("=== updateDisplayRange END (local) ===")
             return
         }
 
         var earliest = projectController?.projectData?.getEarliestDate()
         var latest = projectController?.projectData?.getLatestDate()
-        console.log("  earliest: " + earliest)
-        console.log("  latest: " + latest)
-
-        if (!earliest || !latest) {
-            console.log("  ERROR: earliest or latest is null/undefined")
-            console.log("=== updateDisplayRange END (no dates) ===")
-            return
-        }
-
-        var start = getMondayBefore(earliest, 4)
-        var end = getSecondSundayAfter(latest)
-        if (displayStart.toDateString() !== start.toDateString()) displayStart = start
-            if (displayEnd.toDateString() !== end.toDateString()) displayEnd = end
-
-                console.log("  displayStart: " + displayStart)
-                console.log("  displayEnd: " + displayEnd)
-                console.log("=== updateDisplayRange END ===")
+        if (!earliest || !latest) return
+            var start = getMondayBefore(earliest, 4)
+            var end = getSecondSundayAfter(latest)
+            if (displayStart.toDateString() !== start.toDateString()) displayStart = start
+                if (displayEnd.toDateString() !== end.toDateString()) displayEnd = end
     }
 
     property int dayWidth: projectController && projectController.settingsManager.zoomLevel === 1 ? 10 : 30

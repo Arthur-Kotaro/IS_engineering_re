@@ -205,15 +205,12 @@ QVariantMap ProjectData::toJson() const
 
 bool ProjectData::fromJson(const QVariantMap& json)
 {
-    qDebug() << "=== fromJson called (MG Service format)";
     clear();
 
     set_ProjectName(json.value("name").toString());
     set_ProjectType("");
 
     QVariantList tasks = json.value("tasks").toList();
-    qDebug() << "=== fromJson: tasks count =" << tasks.size();
-
     QDate minStart;
     for (const QVariant& tv : tasks) {
         QVariantMap t = tv.toMap();
@@ -221,7 +218,11 @@ bool ProjectData::fromJson(const QVariantMap& json)
         QString groupId = t.value("group_id").toString();
         QString title = t.value("title").toString();
         int responsibleId = t.value("responsible_id").toInt();
-        QString responsible = QString::number(responsibleId);
+
+        QString responsible = t.value("responsible_name").toString();
+        if (responsible.isEmpty())
+            responsible = QString::number(responsibleId);
+
         QDate startDate = QDate::fromString(t.value("start_date").toString(), Qt::ISODate);
         QDate endDate = QDate::fromString(t.value("end_date").toString(), Qt::ISODate);
         QDate forecastStart = QDate::fromString(t.value("forecast_start").toString(), Qt::ISODate);
@@ -229,14 +230,11 @@ bool ProjectData::fromJson(const QVariantMap& json)
         int status = t.value("status").toInt();
         int progressCurrent = t.value("progress_current").toInt();
         int progressTotal = t.value("progress_total").toInt();
-
-        qDebug() << "=== fromJson task:" << taskId
-        << "start:" << startDate << "valid:" << startDate.isValid()
-        << "end:" << endDate << "valid:" << endDate.isValid();
+        int localGraphState = t.value("local_graph_state").toInt(0);
 
         m_taskModel->addTaskWithId(taskId, groupId, title, responsible,
                                    startDate, endDate, forecastStart, forecastEnd,
-                                   status, progressCurrent, progressTotal, 0);
+                                   status, progressCurrent, progressTotal, localGraphState);
 
         if (startDate.isValid() && (!minStart.isValid() || startDate < minStart))
             minStart = startDate;
@@ -261,21 +259,20 @@ bool ProjectData::fromJson(const QVariantMap& json)
         QVariantMap g = gv.toMap();
         QString groupId = g.value("group_id").toString();
         QString name = g.value("name").toString();
-        m_groupModel->addGroupWithId(groupId, name);
+        QString busUrl = g.value("bus_url").toString();
+        m_groupModel->addGroupWithIdAndBusUrl(groupId, name, busUrl);
     }
 
     recalculateEndDate();
     set_Modified(false);
     qDebug() << "=== fromJson OK, tasks:" << m_taskModel->rowCount()
-    << "groups:" << m_groupModel->rowCount();
+             << "groups:" << m_groupModel->rowCount();
     return true;
 }
 
 QDate ProjectData::getEarliestDate() const
 {
     QDate earliest = QDate::currentDate();
-    qDebug() << "=== getEarliestDate: rowCount=" << m_taskModel->rowCount()
-    << "initial earliest=" << earliest;
 
     for (int i = 0; i < m_milestoneModel->rowCount(); ++i)
     {
@@ -298,15 +295,10 @@ QDate ProjectData::getEarliestDate() const
         QModelIndex idx = m_taskModel->index(i);
 
         QDate startDate = idx.data(GanttDefines::StartDateRole).toDate();
-        QDate forecastStart = idx.data(GanttDefines::ForecastStartRole).toDate();
-
-        qDebug() << "=== getEarliestDate task" << i
-        << "startDate=" << startDate << "valid=" << startDate.isValid()
-        << "forecastStart=" << forecastStart << "valid=" << forecastStart.isValid();
-
         if (startDate.isValid() && startDate < earliest)
             earliest = startDate;
 
+        QDate forecastStart = idx.data(GanttDefines::ForecastStartRole).toDate();
         if (forecastStart.isValid() && forecastStart < earliest)
             earliest = forecastStart;
 
@@ -322,15 +314,12 @@ QDate ProjectData::getEarliestDate() const
         }
     }
 
-    qDebug() << "=== getEarliestDate: final earliest=" << earliest;
     return earliest;
 }
 
 QDate ProjectData::getLatestDate() const
 {
     QDate latest = QDate(1900, 1, 1);
-    qDebug() << "=== getLatestDate: rowCount=" << m_taskModel->rowCount()
-    << "initial latest=" << latest;
 
     for (int i = 0; i < m_milestoneModel->rowCount(); ++i)
     {
@@ -371,7 +360,7 @@ QDate ProjectData::getLatestDate() const
                 latest = oldEnd;
         }
     }
-    qDebug() << "=== getLatestDate: final latest=" << latest;
+
     return latest;
 }
 

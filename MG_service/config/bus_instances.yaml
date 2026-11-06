@@ -1,19 +1,22 @@
 instances:
   documentation:
     bus_id: "bus_documentation_01"
-    url: "http://localhost:8006"
+    url: "http://localhost:8013"
   architecture:
     bus_id: "bus_architecture_01"
-    url: "http://localhost:8007"
+    url: "http://localhost:8014"
   supplier_nomination:
     bus_id: "bus_supplier_01"
-    url: "http://localhost:8008"
+    url: "http://localhost:8015"
   prototypes:
     bus_id: "bus_prototypes_01"
-    url: "http://localhost:8009"
+    url: "http://localhost:8016"
   validation:
     bus_id: "bus_validation_01"
-    url: "http://localhost:8010"
+    url: "http://localhost:8017"
   calibration:
     bus_id: "bus_calibration_01"
-    url: "http://localhost:8011"
+    url: "http://localhost:8018"
+  other_bus:
+    bus_id: "bus_other_01"
+    url: "http://localhost:8019"

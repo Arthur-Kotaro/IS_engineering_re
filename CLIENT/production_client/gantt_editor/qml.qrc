@@ -63,5 +63,6 @@
         <file alias="default_typologies.json">resources/default_typologies.json</file>
         <file alias="default_tasks.json">resources/default_tasks.json</file>
         <file alias="default_holidays.json">resources/default_holidays.json</file>
+        <file>qml/LocalGraphEditorWindow.qml</file>
     </qresource>
 </RCC>

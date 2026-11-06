@@ -16,18 +16,22 @@ public:
     void setBaseUrl(const QString& url);
     void setToken(const QString& token);
 
-    // GET /api/v1/mastergraphs/{mg_id}
+    // MG Service (REST)
     void loadMastergraph(const QString& mgId);
-
-    // GET /api/v1/mastergraphs/{mg_id}/access
     void checkAccess(const QString& mgId);
     void loadHolidays();
+
+    // BUS (REST)
+    void createLocalGraph(const QString& taskId, const QString& busUrl, const QVariantMap& payload);
+    void recalcForecast(const QString& taskId, const QString& busUrl, const QVariantMap& payload);
 
 signals:
     void mastergraphLoaded(const QVariantMap& data);
     void accessLoaded(bool canEdit, bool canView, const QString& reason);
-    void errorOccurred(const QString& message);
     void holidaysLoaded(const QVariantList& holidays);
+    void localGraphCreated(const QVariantMap& result);
+    void forecastRecalculated(const QVariantMap& result);
+    void errorOccurred(const QString& message);
 
 private:
     QNetworkAccessManager* m_manager;
@@ -35,4 +39,4 @@ private:
     QString m_token;
 };
 
-#endif // GANTTAPICLIENT_H
+#endif

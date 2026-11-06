@@ -1,5 +1,18 @@
 #!/bin/bash
 # status.sh — Проверка статуса всех сервисов
+#
+# Использование:
+#   ./status.sh [--bus-only]
+
+BUS_ONLY=false
+for arg in "$@"; do
+    case $arg in
+        --bus-only) BUS_ONLY=true ;;
+        -h|--help)
+            echo "Usage: ./status.sh [--bus-only]"
+            exit 0 ;;
+    esac
+done
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -8,9 +21,6 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
-
-echo -e "${BLUE}📊 Статус сервисов:${NC}"
-echo "==================="
 
 check_service() {
     local name=$1
@@ -22,7 +32,17 @@ check_service() {
     fi
 }
 
-# --- Инфраструктура ---
+if [ "$BUS_ONLY" = true ]; then
+    echo -e "${BLUE}📊 Статус BUS:${NC}"
+    check_service "BUS (:8005)"  8005
+    for port in 8013 8014 8015 8016 8017 8018 8019; do
+        check_service "BUS (:${port})" $port
+    done
+    exit 0
+fi
+
+echo -e "${BLUE}📊 Статус сервисов:${NC}"
+
 check_service "User Service"         8000
 check_service "Project Service"      8001
 check_service "Navigation Service"   8009
@@ -31,27 +51,23 @@ check_service "Delegation Service"   8011
 check_service "Notification Service" 8012
 check_service "UI Composer Service"  8020
 
-# --- Бизнес-сервисы ---
 echo -e "${YELLOW}--- Бизнес-сервисы ---${NC}"
 check_service "PJP Service"          8002
 check_service "MG Service"           8003
+check_service "BUS Service (:8005)"  8005
+for port in 8013 8014 8015 8016 8017 8018 8019; do
+    check_service "BUS (:${port})" $port
+done
 check_service "PROTO Service"        8004
 
-# --- Gateway (nginx) ---
 echo -e "${YELLOW}--- Gateway ---${NC}"
 if systemctl is-active --quiet nginx 2>/dev/null; then
-    echo -e "${GREEN}✅ Nginx Gateway (systemd) - RUNNING${NC}"
+    echo -e "${GREEN}✅ Nginx Gateway - RUNNING${NC}"
 else
-    echo -e "${RED}❌ Nginx Gateway (systemd) - STOPPED${NC}"
+    echo -e "${RED}❌ Nginx Gateway - STOPPED${NC}"
 fi
-# Дополнительно проверим, что 8080 реально отвечает
 check_service "Gateway (HTTP)"       8080
 
-echo ""
-echo -e "${BLUE}🔍 Процессы uvicorn:${NC}"
-ps aux | grep "uvicorn.*--port" | grep -v grep || echo "Нет запущенных uvicorn процессов"
-
-echo ""
 echo -e "${BLUE}🔍 PID-файлы:${NC}"
 if ls "$PROJECT_ROOT/logs"/*.pid >/dev/null 2>&1; then
     for pid_file in "$PROJECT_ROOT/logs"/*.pid; do

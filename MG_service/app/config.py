@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     MAX_OVERFLOW: int = 10
 
     PROJECT_SERVICE_URL: str = "http://localhost:8001"
+    USER_SERVICE_URL: str = "http://localhost:8000"
+    INTERNAL_API_KEY: str = "dev-internal-key"
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
 
@@ -34,6 +36,3 @@ def load_bus_instances() -> dict:
     with open(path, "r") as f:
         data = yaml.safe_load(f)
     return data.get("instances", {})
-
-
-BUS_INSTANCES = load_bus_instances()

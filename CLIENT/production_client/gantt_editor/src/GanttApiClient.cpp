@@ -106,3 +106,47 @@ void GanttApiClient::loadHolidays()
         emit holidaysLoaded(doc.object().value("holidays").toArray().toVariantList());
     });
 }
+
+void GanttApiClient::createLocalGraph(const QString& taskId, const QString& busUrl, const QVariantMap& payload)
+{
+    if (busUrl.isEmpty()) { emit errorOccurred("BUS URL is empty"); return; }
+
+    QUrl url(QString("%1/internal/local-graphs/init").arg(busUrl));
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QJsonDocument doc = QJsonDocument::fromVariant(payload);
+    QNetworkReply* reply = m_manager->post(request, doc.toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, taskId, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit errorOccurred(QString("createLocalGraph (%1): %2").arg(taskId, reply->errorString()));
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (doc.isNull() || !doc.isObject()) { emit errorOccurred("Invalid JSON (createLocalGraph)"); return; }
+        emit localGraphCreated(doc.object().toVariantMap());
+    });
+}
+
+void GanttApiClient::recalcForecast(const QString& taskId, const QString& busUrl, const QVariantMap& payload)
+{
+    if (busUrl.isEmpty()) { emit errorOccurred("BUS URL is empty"); return; }
+
+    QUrl url(QString("%1/internal/local-graphs/forecast-recalc").arg(busUrl));
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QJsonDocument doc = QJsonDocument::fromVariant(payload);
+    QNetworkReply* reply = m_manager->post(request, doc.toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, taskId, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit errorOccurred(QString("recalcForecast (%1): %2").arg(taskId, reply->errorString()));
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (doc.isNull() || !doc.isObject()) { emit errorOccurred("Invalid JSON (recalcForecast)"); return; }
+        emit forecastRecalculated(doc.object().toVariantMap());
+    });
+}

@@ -81,7 +81,6 @@ bool DependencyModel::addDependency(const QString& predecessorId, const QString&
     dep.successorId = successorId;
     dep.type = GanttDefines::DependencyType::FinishToStart;
     m_dependencies.append(dep);
-    qDebug() << "Dependency added:" << predecessorId << "->" << successorId;
     endInsertRows();
     
     emit dependencyAdded(predecessorId, successorId);

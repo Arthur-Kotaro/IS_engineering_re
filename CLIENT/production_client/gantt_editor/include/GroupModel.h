@@ -14,6 +14,7 @@ public:
         QString id;
         QString name;
         bool expanded;
+        QString busUrl;
     };
 
     explicit GroupModel(QObject *parent = nullptr);
@@ -24,6 +25,7 @@ public:
 
     Q_INVOKABLE void addGroup(const QString& name);
     Q_INVOKABLE void addGroupWithId(const QString& id, const QString& name);
+    Q_INVOKABLE void addGroupWithIdAndBusUrl(const QString& id, const QString& name, const QString& busUrl);
     Q_INVOKABLE void addGroupAt(int position, const QString& name);
     Q_INVOKABLE void removeGroup(const QString& groupId);
     Q_INVOKABLE void renameGroup(const QString& groupId, const QString& newName);
@@ -31,8 +33,8 @@ public:
     Q_INVOKABLE void moveGroup(const QString& groupId, int newPosition);
     Q_INVOKABLE QVariantMap getGroup(const QString& groupId) const;
     Q_INVOKABLE QStringList getGroupIds() const;
+    Q_INVOKABLE QString getBusUrl(const QString& groupId) const;
 
-    // Новые методы для доступа из QML
     Q_INVOKABLE QString getGroupId(int index) const;
     Q_INVOKABLE QString getGroupName(int index) const;
     Q_INVOKABLE bool isExpanded(int index) const;

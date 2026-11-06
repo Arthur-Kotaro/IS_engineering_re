@@ -32,6 +32,22 @@ ApplicationWindow
         return typeof mainWindow.gridArea !== "undefined" && mainWindow.gridArea !== null
     }
 
+    function openLocalGraphEditor(tId) {
+        if (!tId) return
+        var task = projectController.projectData.taskModel.getTask(tId)
+        if (!task) return
+        var groupId = task.groupId
+        var busUrl = projectController.projectData.groupModel.getBusUrl(groupId)
+        if (!busUrl) {
+            if (toast) toast.show("BUS URL не найден для группы " + groupId)
+            return
+        }
+        console.log("Opening LocalGraphEditor:", tId, busUrl)
+        localGraphEditorLoader.taskId = tId
+        localGraphEditorLoader.busUrl = busUrl
+        localGraphEditorLoader.active = true
+    }
+
     property alias gridArea: gridArea
     property alias leftPanel: leftPanel
     property alias calendarHeader: calendarHeader
@@ -226,6 +242,20 @@ ApplicationWindow
     AboutDialog { id: aboutDialog }
     HelpDialog { id: helpDialog }
     ExportDialog { id: exportDialog }
+
+    // ---------- LocalGraphEditor (Loader) ----------
+    Loader {
+        id: localGraphEditorLoader
+        active: false
+        property string taskId: ""
+        property string busUrl: ""
+        source: "qrc:/qml/LocalGraphEditorWindow.qml"
+        onLoaded: {
+            item.taskId = taskId
+            item.busUrl = busUrl
+            item.show()
+        }
+    }
 
     // ---------- Toast (уведомления) ----------
     Rectangle

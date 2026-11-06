@@ -37,6 +37,7 @@ set(GANTT_SOURCES
     src/ResourceManager.cpp
     src/ExportManager.cpp
     src/GanttApiClient.cpp
+    src/WebSocketClient.cpp
 )
 
 set(GANTT_HEADERS
@@ -57,6 +58,7 @@ set(GANTT_HEADERS
     include/ResourceManager.h
     include/ExportManager.h
     include/GanttApiClient.h
+    include/WebSocketClient.h
 )
 
 add_library(GanttEditorLib STATIC ${GANTT_SOURCES} ${GANTT_HEADERS})

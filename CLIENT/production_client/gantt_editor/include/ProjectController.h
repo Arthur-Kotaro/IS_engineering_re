@@ -1,7 +1,6 @@
 #ifndef PROJECTCONTROLLER_H
 #define PROJECTCONTROLLER_H
 
-#include <QGuiApplication>
 #include <QObject>
 #include <QSet>
 #include "ProjectData.h"
@@ -12,6 +11,7 @@
 #include "LocalGraphController.h"
 #include "DependencyController.h"
 #include "GanttApiClient.h"
+#include "WebSocketClient.h"
 
 class ProjectController : public QObject
 {
@@ -23,6 +23,7 @@ class ProjectController : public QObject
     Q_PROPERTY(TaskController* taskController READ get_taskController CONSTANT)
     Q_PROPERTY(LocalGraphController* localGraphController READ get_localGraphController CONSTANT)
     Q_PROPERTY(DependencyController* dependencyController READ get_dependencyController CONSTANT)
+    Q_PROPERTY(WebSocketClient* webSocket READ get_webSocket CONSTANT)
     Q_PROPERTY(bool inEditMode READ get_inEditMode WRITE set_InEditMode NOTIFY inEditModeChanged)
 
 public:
@@ -35,18 +36,19 @@ public:
     TaskController* get_taskController() const;
     LocalGraphController* get_localGraphController() const;
     DependencyController* get_dependencyController() const;
+    WebSocketClient* get_webSocket() const;
 
     bool get_inEditMode() const;
     void set_InEditMode(bool editMode);
 
     Q_INVOKABLE void loadFromServer(const QString& mgId, const QString& token);
+    Q_INVOKABLE void exportToPng(const QString& filePath);
+    Q_INVOKABLE void exportToPdf(const QString& filePath);
 
     Q_INVOKABLE void notifyEditingLocked();
     Q_INVOKABLE void setCursorShape(int shape);
     Q_INVOKABLE void notifyTaskCompleted();
     Q_INVOKABLE void notifyMilestoneCompleted();
-    Q_INVOKABLE void exportToPng(const QString& filePath);
-    Q_INVOKABLE void exportToPdf(const QString& filePath);
 
 signals:
     void inEditModeChanged();
@@ -57,9 +59,11 @@ signals:
 
 private slots:
     void onMastergraphLoaded(const QVariantMap& data);
+    void onHolidaysLoaded(const QVariantList& holidays);
     void onAccessLoaded(bool canEdit, bool canView, const QString& reason);
     void onApiError(const QString& message);
-    void onHolidaysLoaded(const QVariantList& holidays);
+    void onWsSnapshot(const QJsonObject& snapshot);
+    void onWsDiff(const QJsonObject& diff);
 
 private:
     ProjectData* m_projectData;
@@ -72,6 +76,7 @@ private:
     DependencyController* m_dependencyController;
 
     GanttApiClient* m_apiClient;
+    WebSocketClient* m_webSocket;
 
     bool m_inEditMode;
 };

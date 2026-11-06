@@ -293,5 +293,4 @@ void MilestoneModel::clear()
     m_originalFirstDate = QDate();
     endResetModel();
     emit milestonesChanged();
-    qDebug() << "MilestoneModel::clear";
 }

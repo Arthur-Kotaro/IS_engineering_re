@@ -12,6 +12,8 @@ class MgTaskResponse(BaseModel):
     parent_task_id: Optional[UUID]
     title: str
     responsible_id: Optional[int]
+    responsible_name: Optional[str] = None       # ← добавить
+    local_graph_state: int = 0                    # ← добавить
     status: int
     start_date: Optional[date]
     end_date: Optional[date]
@@ -43,6 +45,7 @@ class TaskGroupResponse(BaseModel):
     name: str
     description: Optional[str]
     bus_instance_id: str
+    bus_url: Optional[str] = None
 
     class Config:
         from_attributes = True

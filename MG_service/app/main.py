@@ -2,8 +2,8 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.database import engine
-from app.api.v1 import mastergraphs, internal
 from app.api.v1 import mastergraphs, internal, holidays
+from app.ws import mastergraphs_ws
 
 
 @asynccontextmanager
@@ -28,5 +28,6 @@ async def health_check():
 
 
 app.include_router(mastergraphs.router, prefix="/api/v1")
-app.include_router(internal.router, prefix="/internal")
 app.include_router(holidays.router, prefix="/api/v1")
+app.include_router(internal.router, prefix="/internal")
+app.include_router(mastergraphs_ws.router)

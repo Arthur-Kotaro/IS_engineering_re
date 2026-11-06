@@ -7,6 +7,7 @@ from app.models.mastergraph import Mastergraph
 from app.models.mg_task import MgTask
 from app.models.mg_dependency import MgDependency
 from app.models.task_group import TaskGroup
+from app.config import load_bus_instances
 
 
 class MastergraphRepository:
@@ -45,13 +46,24 @@ class MastergraphRepository:
         )
         return result.scalars().all()
 
-    async def get_groups_for_mg(self, mg_id: UUID) -> List[TaskGroup]:
-        """Возвращает группы, которые есть в МГ."""
+    async def get_groups_for_mg(self, mg_id: UUID) -> List[dict]:
+        """Возвращает группы, которые есть в МГ, с bus_url (актуальный конфиг)."""
+        bus_instances = load_bus_instances()
         result = await self.db.execute(
             select(TaskGroup).join(MgTask, MgTask.group_id == TaskGroup.group_id)
             .where(MgTask.mg_id == mg_id).distinct()
         )
-        return result.scalars().all()
+        groups = result.scalars().all()
+        return [
+            {
+                "group_id": g.group_id,
+                "name": g.name,
+                "description": g.description,
+                "bus_instance_id": g.bus_instance_id,
+                "bus_url": bus_instances.get(g.group_id, {}).get("url"),
+            }
+            for g in groups
+        ]
 
     async def create(self, project_id: int, name: str, created_by: Optional[int]) -> Mastergraph:
         mg = Mastergraph(project_id=project_id, name=name, created_by=created_by, version=1)
