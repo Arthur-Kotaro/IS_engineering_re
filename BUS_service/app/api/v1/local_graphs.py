@@ -1,19 +1,22 @@
 # app/api/v1/local_graphs.py
+import json
 import logging
-import aiohttp
 from uuid import UUID
 from datetime import date, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+import aiohttp
 
 from app.database import get_db
-from app.models.local_graph import LocalGraph, LgTask
+from app.models.local_graph import LocalGraph, LgTask, LocalGraphState
+from app.models.lg_event import LgEvent, LgEventType, LgEntityType
 from app.schemas.local_graph import (
     LocalGraphInitRequest, LocalGraphResponse,
     LgTaskResponse, LgTaskCreate, LgTaskUpdate,
     ForecastRecalcRequest, ForecastRecalcResponse,
 )
+from app.ws.manager import manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/internal/local-graphs", tags=["LocalGraphs"])
@@ -21,10 +24,116 @@ router = APIRouter(prefix="/internal/local-graphs", tags=["LocalGraphs"])
 MG_SERVICE_URL = "http://localhost:8003"
 
 
-# ---------- LocalGraph ----------
+def _user_id(request: Request) -> int:
+    uid = request.headers.get("X-User-ID")
+    if not uid:
+        raise HTTPException(401, "Missing X-User-ID")
+    return int(uid)
+
+
+def _try_user_id(request: Request) -> int:
+    uid = request.headers.get("X-User-ID")
+    if not uid:
+        return 0
+    try:
+        return int(uid)
+    except ValueError:
+        return 0
+
+
+async def _check_edit_access(lg: LocalGraph, user_id: int):
+    if lg.responsible_id is None:
+        raise HTTPException(403, "No responsible assigned")
+    if lg.responsible_id != user_id:
+        raise HTTPException(403, "Only responsible can edit local graph")
+
+
+async def _log_event(db, lg_id, entity_type, entity_id, event_type, field=None, old_value=None, new_value=None, reason=None, actor_id=None):
+    ev = LgEvent(
+        lg_id=lg_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        event_type=event_type,
+        field=field,
+        old_value=json.dumps(old_value) if old_value is not None else None,
+        new_value=json.dumps(new_value) if new_value is not None else None,
+        reason=reason,
+        actor_id=actor_id,
+    )
+    db.add(ev)
+    await db.flush()
+    return ev
+
+
+async def _recalc_state(lg: LocalGraph, db: AsyncSession):
+    if lg.responsible_id is None:
+        lg.local_graph_state = LocalGraphState.NOT_REQUIRED
+        return
+    result = await db.execute(
+        select(func.count(LgTask.lg_task_id)).where(
+            LgTask.lg_id == lg.lg_id,
+            LgTask.is_deleted == 0,
+            LgTask.start_date.isnot(None),
+            LgTask.end_date.isnot(None),
+        )
+    )
+    count = result.scalar() or 0
+    if count > 0:
+        lg.local_graph_state = LocalGraphState.ATTACHED
+    else:
+        lg.local_graph_state = LocalGraphState.REQUIRED
+
+
+async def _build_snapshot(lg_id: UUID, db: AsyncSession) -> dict:
+    result = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0))
+    lg = result.scalar_one_or_none()
+    if not lg:
+        return {}
+    tasks_result = await db.execute(
+        select(LgTask).where(LgTask.lg_id == lg_id, LgTask.is_deleted == 0).order_by(LgTask.sort_order)
+    )
+    tasks = tasks_result.scalars().all()
+    tasks_count = await db.execute(
+        select(func.count(LgTask.lg_task_id)).where(LgTask.lg_id == lg_id, LgTask.is_deleted == 0)
+    )
+    is_pure = (tasks_count.scalar() or 0) == 0
+    return {
+        "type": "snapshot",
+        "lg_id": str(lg.lg_id),
+        "project_id": lg.project_id,
+        "task_id": str(lg.task_id),
+        "responsible_id": lg.responsible_id,
+        "title": lg.title,
+        "target_start": lg.target_start.isoformat() if lg.target_start else None,
+        "target_end": lg.target_end.isoformat() if lg.target_end else None,
+        "predecessor_end": lg.predecessor_end.isoformat() if lg.predecessor_end else None,
+        "version": lg.version,
+        "local_graph_state": lg.local_graph_state,
+        "is_pure": is_pure,
+        "tasks": [
+            {"lg_task_id": str(t.lg_task_id), "lg_id": str(t.lg_id),
+             "title": t.title, "responsible_id": t.responsible_id, "status": t.status,
+             "start_date": t.start_date.isoformat() if t.start_date else None,
+             "end_date": t.end_date.isoformat() if t.end_date else None,
+             "sort_order": t.sort_order, "version": t.version}
+            for t in tasks
+        ],
+    }
+
+
+async def _broadcast_snapshot(lg_id: UUID, db: AsyncSession):
+    snapshot = await _build_snapshot(lg_id, db)
+    if snapshot:
+        await manager.broadcast(str(lg_id), snapshot)
+
+
+# ---------------- LocalGraph ----------------
+
 @router.post("/init", response_model=LocalGraphResponse)
 async def init_local_graph(data: LocalGraphInitRequest, db: AsyncSession = Depends(get_db)):
-    existing = await db.execute(select(LocalGraph).where(LocalGraph.task_id == data.task_id))
+    existing = await db.execute(
+        select(LocalGraph).where(LocalGraph.task_id == data.task_id, LocalGraph.is_deleted == 0)
+    )
     lg = existing.scalar_one_or_none()
     if lg:
         lg.responsible_id = data.responsible_id
@@ -44,105 +153,201 @@ async def init_local_graph(data: LocalGraphInitRequest, db: AsyncSession = Depen
             predecessor_end=data.predecessor_end,
         )
         db.add(lg)
+    await db.flush()
+    await _recalc_state(lg, db)
     await db.commit()
     await db.refresh(lg)
-    logger.info(f"init_local_graph: task={data.task_id}, lg={lg.lg_id}")
-    return lg
+
+    tasks_count = await db.execute(
+        select(func.count(LgTask.lg_task_id)).where(LgTask.lg_id == lg.lg_id, LgTask.is_deleted == 0)
+    )
+    is_pure = (tasks_count.scalar() or 0) == 0
+
+    # WS broadcast: снапшот обновился (границы и т.д.)
+    await _broadcast_snapshot(lg.lg_id, db)
+
+    return {
+        "lg_id": lg.lg_id, "project_id": lg.project_id, "task_id": lg.task_id,
+        "responsible_id": lg.responsible_id, "title": lg.title,
+        "target_start": lg.target_start, "target_end": lg.target_end,
+        "predecessor_end": lg.predecessor_end, "version": lg.version,
+        "local_graph_state": lg.local_graph_state, "is_pure": is_pure,
+        "can_edit": False,
+    }
 
 
 @router.get("/by-task/{task_id}", response_model=LocalGraphResponse)
-async def get_by_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(LocalGraph).where(LocalGraph.task_id == task_id))
+async def get_by_task(task_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = _try_user_id(request)
+    result = await db.execute(
+        select(LocalGraph).where(LocalGraph.task_id == task_id, LocalGraph.is_deleted == 0)
+    )
     lg = result.scalar_one_or_none()
     if not lg:
         raise HTTPException(404, "LocalGraph not found")
-    return lg
+
+    tasks_count = await db.execute(
+        select(func.count(LgTask.lg_task_id)).where(LgTask.lg_id == lg.lg_id, LgTask.is_deleted == 0)
+    )
+    is_pure = (tasks_count.scalar() or 0) == 0
+    can_edit = (lg.responsible_id is not None and lg.responsible_id == user_id)
+
+    return {
+        "lg_id": lg.lg_id, "project_id": lg.project_id, "task_id": lg.task_id,
+        "responsible_id": lg.responsible_id, "title": lg.title,
+        "target_start": lg.target_start, "target_end": lg.target_end,
+        "predecessor_end": lg.predecessor_end, "version": lg.version,
+        "local_graph_state": lg.local_graph_state, "is_pure": is_pure,
+        "can_edit": can_edit,
+    }
 
 
-# ---------- LgTask CRUD ----------
+@router.get("/{lg_id}/access")
+async def get_access(lg_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = _user_id(request)
+    result = await db.execute(
+        select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0)
+    )
+    lg = result.scalar_one_or_none()
+    if not lg:
+        raise HTTPException(404, "LocalGraph not found")
+    can_edit = (lg.responsible_id is not None and lg.responsible_id == user_id)
+    return {
+        "lg_id": str(lg.lg_id), "can_edit": can_edit, "can_view": True,
+        "responsible_id": lg.responsible_id,
+        "local_graph_state": lg.local_graph_state, "is_approved": None,
+    }
+
+
+# ---------------- LgTask CRUD ----------------
+
 @router.get("/{lg_id}/tasks")
 async def get_lg_tasks(lg_id: UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(LgTask).where(LgTask.lg_id == lg_id).order_by(LgTask.sort_order))
+    result = await db.execute(
+        select(LgTask).where(LgTask.lg_id == lg_id, LgTask.is_deleted == 0).order_by(LgTask.sort_order)
+    )
     tasks = result.scalars().all()
     return {
         "lg_id": str(lg_id),
         "tasks": [
             {
-                "lg_task_id": str(t.lg_task_id),
-                "lg_id": str(t.lg_id),
-                "title": t.title,
-                "responsible_id": t.responsible_id,
-                "status": t.status,
+                "lg_task_id": str(t.lg_task_id), "lg_id": str(t.lg_id),
+                "title": t.title, "responsible_id": t.responsible_id, "status": t.status,
                 "start_date": t.start_date.isoformat() if t.start_date else None,
                 "end_date": t.end_date.isoformat() if t.end_date else None,
-                "sort_order": t.sort_order,
-                "version": t.version,
+                "sort_order": t.sort_order, "version": t.version,
             } for t in tasks
         ],
     }
 
 
 @router.post("/{lg_id}/tasks", response_model=LgTaskResponse, status_code=201)
-async def create_lg_task(lg_id: UUID, data: LgTaskCreate, db: AsyncSession = Depends(get_db)):
-    lg = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id))
-    if not lg.scalar_one_or_none():
+async def create_lg_task(lg_id: UUID, data: LgTaskCreate, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = _user_id(request)
+    lg_res = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0))
+    lg = lg_res.scalar_one_or_none()
+    if not lg:
         raise HTTPException(404, "LocalGraph not found")
+    await _check_edit_access(lg, user_id)
 
     task = LgTask(
-        lg_id=lg_id,
-        title=data.title,
-        responsible_id=data.responsible_id,
-        start_date=data.start_date,
-        end_date=data.end_date,
-        sort_order=data.sort_order,
+        lg_id=lg_id, title=data.title, responsible_id=data.responsible_id,
+        start_date=data.start_date, end_date=data.end_date, sort_order=data.sort_order,
     )
     db.add(task)
+    await db.flush()
+
+    await _log_event(db, lg_id, LgEntityType.TASK, task.lg_task_id, LgEventType.CREATE,
+                     new_value={"title": task.title, "start_date": str(task.start_date), "end_date": str(task.end_date)},
+                     actor_id=user_id)
+
+    await _recalc_state(lg, db)
     await db.commit()
     await db.refresh(task)
-    logger.info(f"create_lg_task: lg={lg_id}, task={task.lg_task_id}")
+
+    await _broadcast_snapshot(lg_id, db)
+    await _recalc_and_push(lg_id, db)
     return task
 
 
 @router.put("/{lg_id}/tasks/{task_id}", response_model=LgTaskResponse)
-async def update_lg_task(lg_id: UUID, task_id: UUID, data: LgTaskUpdate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(LgTask).where(LgTask.lg_task_id == task_id, LgTask.lg_id == lg_id))
+async def update_lg_task(lg_id: UUID, task_id: UUID, data: LgTaskUpdate, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = _user_id(request)
+    lg_res = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0))
+    lg = lg_res.scalar_one_or_none()
+    if not lg:
+        raise HTTPException(404, "LocalGraph not found")
+    await _check_edit_access(lg, user_id)
+
+    result = await db.execute(select(LgTask).where(LgTask.lg_task_id == task_id, LgTask.lg_id == lg_id, LgTask.is_deleted == 0))
     task = result.scalar_one_or_none()
     if not task:
         raise HTTPException(404, "LgTask not found")
 
-    if data.title is not None: task.title = data.title
-    if data.responsible_id is not None: task.responsible_id = data.responsible_id
-    if data.status is not None: task.status = data.status
-    if data.start_date is not None: task.start_date = data.start_date
-    if data.end_date is not None: task.end_date = data.end_date
-    if data.sort_order is not None: task.sort_order = data.sort_order
+    changes = []
+    if data.title is not None and task.title != data.title:
+        changes.append(("title", task.title, data.title)); task.title = data.title
+    if data.responsible_id is not None and task.responsible_id != data.responsible_id:
+        changes.append(("responsible_id", task.responsible_id, data.responsible_id)); task.responsible_id = data.responsible_id
+    if data.status is not None and task.status != data.status:
+        changes.append(("status", task.status, data.status)); task.status = data.status
+    if data.start_date is not None and task.start_date != data.start_date:
+        changes.append(("start_date", str(task.start_date), str(data.start_date))); task.start_date = data.start_date
+    if data.end_date is not None and task.end_date != data.end_date:
+        changes.append(("end_date", str(task.end_date), str(data.end_date))); task.end_date = data.end_date
+    if data.sort_order is not None and task.sort_order != data.sort_order:
+        changes.append(("sort_order", task.sort_order, data.sort_order)); task.sort_order = data.sort_order
     task.version += 1
 
+    for field, old, new in changes:
+        await _log_event(db, lg_id, LgEntityType.TASK, task.lg_task_id, LgEventType.UPDATE,
+                         field=field, old_value=old, new_value=new, actor_id=user_id)
+
+    await _recalc_state(lg, db)
     await db.commit()
     await db.refresh(task)
-    logger.info(f"update_lg_task: task={task_id}, status={task.status}")
 
-    # При изменении статуса — пересчитать прогноз
-    await _recalc_and_push(lg_id, db)
+    await _broadcast_snapshot(lg_id, db)
+    if changes:
+        await _recalc_and_push(lg_id, db)
     return task
 
 
 @router.delete("/{lg_id}/tasks/{task_id}", status_code=204)
-async def delete_lg_task(lg_id: UUID, task_id: UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(LgTask).where(LgTask.lg_task_id == task_id, LgTask.lg_id == lg_id))
+async def delete_lg_task(lg_id: UUID, task_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = _user_id(request)
+    lg_res = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0))
+    lg = lg_res.scalar_one_or_none()
+    if not lg:
+        raise HTTPException(404, "LocalGraph not found")
+    await _check_edit_access(lg, user_id)
+
+    result = await db.execute(select(LgTask).where(LgTask.lg_task_id == task_id, LgTask.lg_id == lg_id, LgTask.is_deleted == 0))
     task = result.scalar_one_or_none()
     if not task:
         raise HTTPException(404, "LgTask not found")
-    await db.delete(task)
+
+    task.is_deleted = 1
+    task.deleted_at = func.now()
+    task.deleted_by = user_id
+    task.version += 1
+
+    await _log_event(db, lg_id, LgEntityType.TASK, task.lg_task_id, LgEventType.DELETE,
+                     old_value={"title": task.title}, actor_id=user_id)
+
+    await _recalc_state(lg, db)
     await db.commit()
+
+    await _broadcast_snapshot(lg_id, db)
     await _recalc_and_push(lg_id, db)
     return None
 
 
-# ---------- Пересчёт прогноза ЛГ ----------
+# ---------------- Пересчёт прогноза ----------------
+
 @router.post("/{lg_id}/recalc", response_model=ForecastRecalcResponse)
 async def recalc_lg(lg_id: UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id))
+    result = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0))
     lg = result.scalar_one_or_none()
     if not lg:
         raise HTTPException(404, "LocalGraph not found")
@@ -151,25 +356,21 @@ async def recalc_lg(lg_id: UUID, db: AsyncSession = Depends(get_db)):
 
 @router.post("/forecast-recalc", response_model=ForecastRecalcResponse)
 async def forecast_recalc(data: ForecastRecalcRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(LocalGraph).where(LocalGraph.task_id == data.task_id))
+    result = await db.execute(select(LocalGraph).where(LocalGraph.task_id == data.task_id, LocalGraph.is_deleted == 0))
     lg = result.scalar_one_or_none()
     if not lg:
         raise HTTPException(404, "LocalGraph not found")
-
     if data.predecessor_end:
         lg.predecessor_end = data.predecessor_end
-
     forecast = await _compute_forecast(lg, db)
     await db.commit()
-    logger.info(f"forecast_recalc: task={data.task_id}")
+    await _broadcast_snapshot(lg.lg_id, db)
     return forecast
 
 
 async def _compute_forecast(lg: LocalGraph, db: AsyncSession) -> ForecastRecalcResponse:
-    """Прогноз = min(start_date) / max(end_date) по задачам ЛГ. Fallback — target."""
-    result = await db.execute(select(LgTask).where(LgTask.lg_id == lg.lg_id))
+    result = await db.execute(select(LgTask).where(LgTask.lg_id == lg.lg_id, LgTask.is_deleted == 0))
     tasks = result.scalars().all()
-
     if tasks:
         starts = [t.start_date for t in tasks if t.start_date]
         ends = [t.end_date for t in tasks if t.end_date]
@@ -193,17 +394,13 @@ async def _compute_forecast(lg: LocalGraph, db: AsyncSession) -> ForecastRecalcR
             forecast_end = forecast_start + timedelta(days=duration)
 
     return ForecastRecalcResponse(
-        forecast_start=forecast_start,
-        forecast_end=forecast_end,
-        progress_current=progress_current,
-        progress_total=progress_total,
-        status=status,
+        forecast_start=forecast_start, forecast_end=forecast_end,
+        progress_current=progress_current, progress_total=progress_total, status=status,
     )
 
 
 async def _recalc_and_push(lg_id: UUID, db: AsyncSession):
-    """Пересчитать прогноз ЛГ и запушить в MG."""
-    result = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id))
+    result = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0))
     lg = result.scalar_one_or_none()
     if not lg:
         return
@@ -218,13 +415,62 @@ async def _recalc_and_push(lg_id: UUID, db: AsyncSession):
         "progress_current": forecast.progress_current,
         "progress_total": forecast.progress_total,
         "status": forecast.status,
+        "local_graph_state": lg.local_graph_state,
     }
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3.0)) as s:
             async with s.post(f"{MG_SERVICE_URL}/internal/forecast-update", json=payload) as resp:
                 if resp.status == 200:
-                    logger.info(f"pushed forecast to MG: task={lg.task_id}")
+                    logger.info(f"pushed forecast to MG: task={lg.task_id}, state={lg.local_graph_state}")
                 else:
                     logger.warning(f"push forecast to MG: HTTP {resp.status}")
     except Exception as e:
         logger.warning(f"push forecast to MG: {e}")
+
+
+# ---------------- Diff ----------------
+
+@router.put("/{lg_id}/diff")
+async def apply_diff(lg_id: UUID, payload: dict, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = _user_id(request)
+    lg_res = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0))
+    lg = lg_res.scalar_one_or_none()
+    if not lg:
+        raise HTTPException(404, "LocalGraph not found")
+    await _check_edit_access(lg, user_id)
+
+    changes = payload.get("changes", [])
+    applied = 0
+    errors = []
+
+    for ch in changes:
+        try:
+            entity = ch.get("entity")
+            op = ch.get("op")
+            eid = ch.get("id")
+            fields = ch.get("fields", {})
+            reason = ch.get("reason")
+            if entity == "task" and op == "update":
+                result = await db.execute(select(LgTask).where(LgTask.lg_task_id == eid, LgTask.lg_id == lg_id, LgTask.is_deleted == 0))
+                task = result.scalar_one_or_none()
+                if not task:
+                    errors.append({"id": eid, "error": "not_found"}); continue
+                for k, v in fields.items():
+                    if k in ("start_date", "end_date") and v:
+                        setattr(task, k, date.fromisoformat(v))
+                    elif k in ("title", "status", "sort_order", "responsible_id"):
+                        setattr(task, k, v)
+                task.version += 1
+                await _log_event(db, lg_id, LgEntityType.TASK, task.lg_task_id, LgEventType.UPDATE,
+                                 field=", ".join(fields.keys()), new_value=fields, reason=reason, actor_id=user_id)
+                applied += 1
+        except Exception as e:
+            errors.append({"id": ch.get("id"), "error": str(e)})
+
+    await _recalc_state(lg, db)
+    await db.commit()
+
+    await _broadcast_snapshot(lg_id, db)
+    if applied > 0:
+        await _recalc_and_push(lg_id, db)
+    return {"status": "ok", "applied": applied, "errors": errors}

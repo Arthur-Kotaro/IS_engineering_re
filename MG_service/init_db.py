@@ -3,15 +3,17 @@ import asyncio
 from datetime import date
 from sqlalchemy import select
 from app.database import engine, Base, AsyncSessionLocal
-from app.models import TaskGroup, Mastergraph, MgTask, MgDependency, Holiday
+from app.models import (
+    TaskGroup, Mastergraph, MgTask, MgDependency, Holiday,
+    MgMilestone, MgEvent, MgStatusHistory, MgGroup,
+)
 
 
 async def seed_holidays():
-    """Заполнить праздники (если пусто)."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(Holiday))
         if result.scalars().first():
-            print("ℹ️  Holidays already exist, skipping seed")
+            print("ℹ  Holidays already exist, skipping seed")
             return
         holidays = [
             Holiday(name="Новогодние каникулы", start_date=date(2000, 1, 1), end_date=date(2000, 1, 8), is_yearly=True),

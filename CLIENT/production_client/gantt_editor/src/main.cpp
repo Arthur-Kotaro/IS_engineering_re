@@ -10,8 +10,11 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QNetworkAccessManager>
+#include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QEventLoop>
+#include <QByteArray>
+#include <QMessageBox>
 
 #include "ProjectController.h"
 #include "TaskModel.h"
@@ -23,6 +26,21 @@
 #include "SettingsManager.h"
 #include "ExportManager.h"
 #include "HistoryEntry.h"
+
+static int decode_user_id(const QString& token)
+{
+    if (token.isEmpty()) return 0;
+    QStringList parts = token.split('.');
+    if (parts.size() != 3) return 0;
+    QByteArray b = parts[1].toUtf8();
+    b.replace('-', '+').replace('_', '/');
+    while (b.size() % 4) b.append('=');
+    QByteArray payload = QByteArray::fromBase64(b);
+    QJsonParseError err;
+    QJsonDocument doc = QJsonDocument::fromJson(payload, &err);
+    if (err.error != QJsonParseError::NoError || !doc.isObject()) return 0;
+    return doc.object().value("user_id").toInt(0);
+}
 
 int main(int argc, char *argv[])
 {
@@ -40,6 +58,7 @@ int main(int argc, char *argv[])
     QCommandLineOption taskIdOption("task-id", "ID задачи (UUID) — для ЛГ.", "task-id", "");
     QCommandLineOption busUrlOption("bus-url", "URL BUS (для ЛГ).", "bus-url", "");
     QCommandLineOption tokenFileOption("token-file", "Файл с JWT-токеном.", "token-file", "");
+    QCommandLineOption readOnlyOption("read-only", "Открыть в режиме просмотра.");
 
     parser.addOption(modeOption);
     parser.addOption(projectIdOption);
@@ -47,6 +66,7 @@ int main(int argc, char *argv[])
     parser.addOption(taskIdOption);
     parser.addOption(busUrlOption);
     parser.addOption(tokenFileOption);
+    parser.addOption(readOnlyOption);
     parser.process(app);
 
     const QString mode = parser.value(modeOption);
@@ -55,6 +75,7 @@ int main(int argc, char *argv[])
     const QString taskId = parser.value(taskIdOption);
     const QString busUrl = parser.value(busUrlOption);
     const QString tokenFile = parser.value(tokenFileOption);
+    const bool isReadOnly = parser.isSet(readOnlyOption);
 
     QString token;
     if (!tokenFile.isEmpty()) {
@@ -64,6 +85,19 @@ int main(int argc, char *argv[])
             f.close();
         }
     }
+
+    const int currentUserId = decode_user_id(token);
+
+    qInfo().noquote() << "========== GANTT EDITOR START =========="
+                      << "\n  mode:" << mode
+                      << "\n  projectId:" << projectId
+                      << "\n  mgId:" << mgId
+                      << "\n  taskId:" << taskId
+                      << "\n  busUrl:" << busUrl
+                      << "\n  tokenFile:" << tokenFile
+                      << "\n  token.length:" << token.length()
+                      << "\n  currentUserId:" << currentUserId
+                      << "\n  isReadOnly:" << isReadOnly;
 
     qmlRegisterType<TaskModel>("GanttEditor", 1, 0, "TaskModel");
     qmlRegisterType<GroupModel>("GanttEditor", 1, 0, "GroupModel");
@@ -84,57 +118,122 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("argTaskId", taskId);
     engine.rootContext()->setContextProperty("argBusUrl", busUrl);
     engine.rootContext()->setContextProperty("argToken", token);
+    engine.rootContext()->setContextProperty("argReadOnly", isReadOnly);
 
     QUrl url;
     if (mode == "local") {
         url = QUrl(QStringLiteral("qrc:/qml/LocalGraphEditorWindow.qml"));
 
-        // Синхронно грузим данные ЛГ перед загрузкой QML
         QNetworkAccessManager mgr;
-        QNetworkRequest req(QUrl(busUrl + "/internal/local-graphs/by-task/" + taskId));
+        const QString byTaskUrl = busUrl + "/internal/local-graphs/by-task/" + taskId;
+        qInfo().noquote() << "[LG] GET by-task:" << byTaskUrl << " X-User-ID:" << currentUserId;
+        QNetworkRequest req{QUrl(byTaskUrl)};
+        req.setRawHeader("X-User-ID", QByteArray::number(currentUserId));
         QNetworkReply* reply = mgr.get(req);
         QEventLoop loop;
         QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
         loop.exec();
 
-        if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-            if (doc.isObject()) {
-                QVariantMap lgData = doc.object().toVariantMap();
-                QString lgId = lgData.value("lg_id").toString();
-                
-                // Передаём контекст в LocalGraphController
-                controller.get_localGraphController()->setLocalGraphContext(lgId, busUrl);
+        int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        QByteArray body = reply->readAll();
+        qInfo().noquote() << "[LG] by-task response:"
+                          << "\n  httpStatus:" << httpStatus
+                          << "\n  error:" << reply->error()
+                          << "\n  errorString:" << reply->errorString()
+                          << "\n  body:" << QString::fromUtf8(body);
 
-                QNetworkRequest tReq(QUrl(busUrl + "/internal/local-graphs/" + lgId + "/tasks"));
-                QNetworkReply* tReply = mgr.get(tReq);
-                QEventLoop tLoop;
-                QObject::connect(tReply, &QNetworkReply::finished, &tLoop, &QEventLoop::quit);
-                tLoop.exec();
+        if (reply->error() == QNetworkReply::ContentNotFoundError) {
+            QMessageBox::warning(nullptr, "Локальный график",
+                                 "Для этой задачи локальный график не создан.");
+            return 0;
+        }
+        if (reply->error() != QNetworkReply::NoError) {
+            QMessageBox::warning(nullptr, "Локальный график",
+                                 "Ошибка загрузки ЛГ: " + reply->errorString());
+            return 0;
+        }
 
-                QVariantList tasks;
-                if (tReply->error() == QNetworkReply::NoError) {
-                    QJsonDocument tDoc = QJsonDocument::fromJson(tReply->readAll());
-                    if (tDoc.isObject()) {
-                        tasks = tDoc.object().value("tasks").toArray().toVariantList();
-                    }
-                }
-                tReply->deleteLater();
+        QJsonDocument doc = QJsonDocument::fromJson(body);
+        if (!doc.isObject()) {
+            QMessageBox::warning(nullptr, "Локальный график", "Некорректный ответ BUS");
+            return 0;
+        }
+        QVariantMap lgData = doc.object().toVariantMap();
+        QString lgId = lgData.value("lg_id").toString();
+        int lgProjectId = lgData.value("project_id").toInt();
+        int lgResponsible = lgData.value("responsible_id").toInt();
+        bool canEdit = lgData.value("can_edit").toBool();
 
-                controller.initLocalGraphData(lgData, tasks, busUrl);
+        qInfo().noquote() << "[LG] lgData:"
+                          << "\n  lg_id:" << lgId
+                          << "\n  project_id:" << lgProjectId
+                          << "\n  responsible_id:" << lgResponsible
+                          << "\n  can_edit:" << canEdit
+                          << "\n  target_start:" << lgData.value("target_start")
+                          << "\n  target_end:" << lgData.value("target_end")
+                          << "\n  predecessor_end:" << lgData.value("predecessor_end")
+                          << "\n  is_pure:" << lgData.value("is_pure")
+                          << "\n  local_graph_state:" << lgData.value("local_graph_state");
+
+        controller.get_localGraphController()->setLocalGraphContext(
+            lgId, busUrl, lgProjectId, lgResponsible, taskId);
+
+        const QString tasksUrl = busUrl + "/internal/local-graphs/" + lgId + "/tasks";
+        qInfo().noquote() << "[LG] GET tasks:" << tasksUrl;
+        QNetworkRequest tReq{QUrl(tasksUrl)};
+        tReq.setRawHeader("X-User-ID", QByteArray::number(currentUserId));
+        QNetworkReply* tReply = mgr.get(tReq);
+        QEventLoop tLoop;
+        QObject::connect(tReply, &QNetworkReply::finished, &tLoop, &QEventLoop::quit);
+        tLoop.exec();
+
+        int tHttpStatus = tReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        QByteArray tBody = tReply->readAll();
+        qInfo().noquote() << "[LG] tasks response:"
+                          << "\n  httpStatus:" << tHttpStatus
+                          << "\n  error:" << tReply->error()
+                          << "\n  errorString:" << tReply->errorString()
+                          << "\n  body:" << QString::fromUtf8(tBody);
+
+        QVariantList tasks;
+        if (tReply->error() == QNetworkReply::NoError) {
+            QJsonDocument tDoc = QJsonDocument::fromJson(tBody);
+            if (tDoc.isObject()) {
+                tasks = tDoc.object().value("tasks").toArray().toVariantList();
             }
         }
+        tReply->deleteLater();
         reply->deleteLater();
+
+        qInfo() << "[LG] tasks.size:" << tasks.size()
+                << " — calling initLocalGraphData";
+
+        controller.initLocalGraphData(lgData, tasks, busUrl);
+        qInfo() << "[LG] initLocalGraphData done. Loading QML:" << url.toString();
     } else {
         url = QUrl(QStringLiteral("qrc:/qml/GanttEditorWindow.qml"));
+
+        if (mgId.isEmpty() && projectId > 0) {
+            controller.openForProject(projectId, isReadOnly, token);
+        } else if (!mgId.isEmpty()) {
+            controller.loadFromServer(mgId, token);
+        }
     }
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app,
                      [url](QObject *obj, const QUrl &objUrl) {
-        if (!obj && url == objUrl)
+        if (!obj && url == objUrl) {
+            qWarning() << "[GanttEditor] objectCreated ERROR, url:" << objUrl;
             QCoreApplication::exit(-1);
+        }
     }, Qt::QueuedConnection);
     engine.load(url);
+
+    if (engine.rootObjects().isEmpty()) {
+        qWarning() << "[GanttEditor] engine.rootObjects().isEmpty() — QML load FAILED";
+    } else {
+        qInfo() << "[GanttEditor] engine.load OK, root objects:" << engine.rootObjects().size();
+    }
 
     if (!engine.rootObjects().isEmpty()) {
         QQuickWindow *window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());

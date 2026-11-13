@@ -1,6 +1,5 @@
-# app/models/mg_dependency.py
 import uuid
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, BigInteger, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.database import Base
@@ -16,6 +15,10 @@ class MgDependency(Base):
     dep_type = Column(String(20), nullable=False, default="finish_to_start")
     version = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(BigInteger, nullable=True)
 
     def __repr__(self):
         return f"<MgDependency({self.predecessor_id}->{self.successor_id})>"

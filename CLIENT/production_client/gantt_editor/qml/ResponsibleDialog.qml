@@ -6,19 +6,31 @@ Dialog
 {
     id: root
     title: "Назначить ответственного"
-    width: 400
+    width: 450
     height: 230
     modal: true
     standardButtons: Dialog.NoButton
     anchors.centerIn: Overlay.overlay
 
     property string taskId: ""
+    property int selectedUserId: 0
 
-    function openForTask(tId)
-    {
+    function openForTask(tId) {
         taskId = tId
+        selectedUserId = 0
         var task = projectController?.projectData?.taskModel?.getTask(tId)
-        responsibleField.text = task ? (task.responsible || "") : ""
+        if (task && task.responsible) {
+            var rid = parseInt(task.responsible)
+            if (!isNaN(rid)) selectedUserId = rid
+        }
+        // Найти индекс в members
+        var members = projectController ? projectController.projectMembers : []
+        var idx = -1
+        for (var i = 0; i < members.length; i++) {
+            if (members[i].user_id === selectedUserId) { idx = i; break }
+        }
+        if (idx >= 0) memberCombo.currentIndex = idx
+        else memberCombo.currentIndex = -1
         open()
     }
 
@@ -28,25 +40,19 @@ Dialog
         anchors.margins: 15
         spacing: 15
 
-        Label
-        {
-            text: "ФИО ответственного:"
-            Layout.fillWidth: true
-            font.pixelSize: 13
-        }
+        Label { text: "Ответственный:"; Layout.fillWidth: true; font.pixelSize: 13 }
 
-        TextField
+        ComboBox
         {
-            id: responsibleField
+            id: memberCombo
             Layout.fillWidth: true
             Layout.preferredHeight: 35
-            placeholderText: "Введите ФИО"
-            font.pixelSize: 13
-            focus: true
-            onAccepted:
-            {
-                if (responsibleField.text !== "")
-                    root.accept()
+            model: projectController ? projectController.projectMembers : []
+            textRole: "full_name"
+            valueRole: "user_id"
+            onActivated: {
+                var m = projectController.projectMembers[currentIndex]
+                root.selectedUserId = m.user_id
             }
         }
 
@@ -54,43 +60,18 @@ Dialog
 
         RowLayout
         {
-            Layout.fillWidth: true
-            spacing: 10
-
-            Button
-            {
-                text: "Отмена"
-                Layout.fillWidth: true
-                Layout.preferredHeight: 35
-                onClicked: root.close()
-            }
-
-            Button
-            {
-                text: "ОК"
-                Layout.fillWidth: true
-                Layout.preferredHeight: 35
-                enabled: responsibleField.text !== ""
-                onClicked: root.accept()
-            }
-        }
-    }
-
-    onAccepted:
-    {
-        if (taskId && projectController && projectController.projectData)
-        {
-            var task = projectController.projectData.taskModel.getTask(taskId)
-            if (task)
-            {
-                projectController.projectData.taskModel.updateTask(
-                    taskId,
-                    task.title,
-                    responsibleField.text,
-                    task.startDate,
-                    task.endDate,
-                    task.status
-                )
+            Layout.fillWidth: true; spacing: 10
+            Button { text: "Отмена"; Layout.fillWidth: true; Layout.preferredHeight: 35
+                onClicked: root.close() }
+            Button {
+                text: "ОК"; Layout.fillWidth: true; Layout.preferredHeight: 35
+                enabled: memberCombo.currentIndex >= 0
+                onClicked: {
+                    if (root.taskId && projectController && root.selectedUserId > 0) {
+                        projectController.updateTaskResponsible(root.taskId, root.selectedUserId)
+                        root.close()
+                    }
+                }
             }
         }
     }

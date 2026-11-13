@@ -22,6 +22,9 @@ class Project(Base):
     priority = Column(Integer, nullable=False, default=0)
     status = Column(String(20), nullable=False, default=ProjectStatus.DRAFT, index=True)
 
+    project_type = Column(String(50), nullable=False, default="vehicle")
+    typology = Column(String(50), nullable=False, default="brother")
+
     chief_engineer_id = Column(BigInteger, nullable=True, index=True)
     planning_engineer_id = Column(BigInteger, nullable=True, index=True)
 
@@ -37,4 +40,4 @@ class Project(Base):
     )
 
     def __repr__(self):
-        return f"<Project(id={self.project_id}, title='{self.title}', status='{self.status}')>"
+        return f"<Project(id={self.project_id}, title='{self.title}', type='{self.project_type}', typology='{self.typology}', status='{self.status}')>"

@@ -68,7 +68,7 @@ Dialog
 
     onAccepted:
     {
-        if (newNameField.text !== "" && projectController && projectController.projectData && root.groupId)
-            projectController.projectData.groupModel.renameGroup(root.groupId, newNameField.text)
+        if (newNameField.text !== "" && projectController && root.groupId)
+            projectController.renameGroup(root.groupId, newNameField.text)
     }
 }

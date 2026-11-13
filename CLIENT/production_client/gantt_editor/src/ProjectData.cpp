@@ -19,37 +19,18 @@ ProjectData::ProjectData(QObject *parent): QObject(parent), m_modified(false)
 QString ProjectData::get_projectName() const { return m_projectName; }
 void ProjectData::set_ProjectName(const QString& name)
 {
-    if (m_projectName != name)
-    {
-        m_projectName = name;
-        emit projectNameChanged();
-        set_Modified(true);
-    }
+    if (m_projectName != name) { m_projectName = name; emit projectNameChanged(); set_Modified(true); }
 }
-
 QString ProjectData::get_projectType() const { return m_projectType; }
 void ProjectData::set_ProjectType(const QString& type)
 {
-    if (m_projectType != type)
-    {
-        m_projectType = type;
-        emit projectTypeChanged();
-        set_Modified(true);
-    }
+    if (m_projectType != type) { m_projectType = type; emit projectTypeChanged(); set_Modified(true); }
 }
-
 QDate ProjectData::get_startDate() const { return m_startDate; }
 void ProjectData::set_StartDate(const QDate& date)
 {
-    if (m_startDate != date)
-    {
-        m_startDate = date;
-        emit startDateChanged();
-        recalculateEndDate();
-        set_Modified(true);
-    }
+    if (m_startDate != date) { m_startDate = date; emit startDateChanged(); recalculateEndDate(); set_Modified(true); }
 }
-
 QDate ProjectData::get_endDate() const { return m_endDate; }
 
 void ProjectData::recalculateEndDate()
@@ -63,91 +44,72 @@ void ProjectData::recalculateEndDate()
         if (taskEnd.isValid() && taskEnd > maxEnd) maxEnd = taskEnd;
         if (forecastEnd.isValid() && forecastEnd > maxEnd) maxEnd = forecastEnd;
     }
-    if (m_endDate != maxEnd)
-    {
-        m_endDate = maxEnd;
-        emit endDateChanged();
-    }
+    if (m_endDate != maxEnd) { m_endDate = maxEnd; emit endDateChanged(); }
 }
 
 QString ProjectData::get_filePath() const { return m_filePath; }
 void ProjectData::set_FilePath(const QString& path)
 {
-    if (m_filePath != path)
-    {
-        m_filePath = path;
-        emit filePathChanged();
-    }
+    if (m_filePath != path) { m_filePath = path; emit filePathChanged(); }
 }
-
 bool ProjectData::get_modified() const { return m_modified; }
 void ProjectData::set_Modified(bool mod)
 {
-    if (m_modified != mod)
-    {
-        m_modified = mod;
-        emit modifiedChanged();
-    }
+    if (m_modified != mod) { m_modified = mod; emit modifiedChanged(); }
 }
-
 QDateTime ProjectData::get_creationDateTime() const { return m_creationDateTime; }
 void ProjectData::set_CreationDateTime(const QDateTime& dt)
 {
-    if (m_creationDateTime != dt)
-    {
-        m_creationDateTime = dt;
-        emit creationDateTimeChanged();
-    }
+    if (m_creationDateTime != dt) { m_creationDateTime = dt; emit creationDateTimeChanged(); }
 }
-
 QDateTime ProjectData::get_lastModifiedDateTime() const { return m_lastModifiedDateTime; }
 void ProjectData::set_LastModifiedDateTime(const QDateTime& dt)
 {
-    if (m_lastModifiedDateTime != dt)
-    {
-        m_lastModifiedDateTime = dt;
-        emit lastModifiedDateTimeChanged();
-    }
+    if (m_lastModifiedDateTime != dt) { m_lastModifiedDateTime = dt; emit lastModifiedDateTimeChanged(); }
 }
-
 GanttDefines::GraphKind ProjectData::get_graphKind() const { return m_graphKind; }
 void ProjectData::set_GraphKind(GanttDefines::GraphKind kind)
 {
-    if (m_graphKind != kind)
-    {
-        m_graphKind = kind;
-        emit graphKindChanged();
-        set_Modified(true);
-    }
+    if (m_graphKind != kind) { m_graphKind = kind; emit graphKindChanged(); set_Modified(true); }
 }
-
-int ProjectData::get_graphKindInt() const
-{
-    return static_cast<int>(m_graphKind);
-}
-
+int ProjectData::get_graphKindInt() const { return static_cast<int>(m_graphKind); }
 void ProjectData::set_GraphKindInt(int kind)
 {
-    if (kind == 0 || kind == 1)
-        set_GraphKind(static_cast<GanttDefines::GraphKind>(kind));
+    if (kind == 0 || kind == 1) set_GraphKind(static_cast<GanttDefines::GraphKind>(kind));
 }
+void ProjectData::set_IsApproved(bool approved)
+{
+    if (m_isApproved != approved) { m_isApproved = approved; emit isApprovedChanged(); }
+}
+void ProjectData::set_TypologyName(const QString& t)
+{
+    if (m_typologyName != t) { m_typologyName = t; emit typologyNameChanged(); }
+}
+void ProjectData::set_MgId(const QString& id)
+{
+    if (m_mgId != id) { m_mgId = id; emit mgIdChanged(); }
+}
+
+void ProjectData::set_IsPure(bool pure)
+{
+    if (m_isPure != pure) { m_isPure = pure; emit isPureChanged(); }
+}
+
+void ProjectData::set_CanEdit(bool can)
+{
+    if (m_canEdit != can) { m_canEdit = can; emit canEditChanged(); }
+}
+
 
 QDate ProjectData::getLinkedTargetStart() const { return m_linkedTargetStart; }
 QDate ProjectData::getLinkedTargetEnd() const { return m_linkedTargetEnd; }
 void ProjectData::set_LinkedTargetStart(const QDate& date) { m_linkedTargetStart = date; }
 void ProjectData::set_LinkedTargetEnd(const QDate& date) { m_linkedTargetEnd = date; }
-
 QDate ProjectData::getLinkedPredecessorEndDate() const { return m_linkedPredecessorEndDate; }
-
 void ProjectData::set_LinkedPredecessorEndDate(const QDate& date)
 {
-    if (m_linkedPredecessorEndDate != date)
-    {
-        m_linkedPredecessorEndDate = date;
-        emit linkedPredecessorEndDateChanged();
-    }
+    if (m_linkedPredecessorEndDate != date) { m_linkedPredecessorEndDate = date; emit linkedPredecessorEndDateChanged(); }
 }
-
 QString ProjectData::getLinkedMasterTaskId() const { return m_linkedMasterTaskId; }
 void ProjectData::set_LinkedMasterTaskId(const QString& taskId) { m_linkedMasterTaskId = taskId; }
 
@@ -175,6 +137,8 @@ DependencyModel* ProjectData::get_dependencyModel() const { return m_dependencyM
 
 void ProjectData::clear()
 {
+    m_isPure = false;
+    m_canEdit = false;
     m_taskModel->clear();
     m_groupModel->clear();
     m_milestoneModel->clear();
@@ -184,24 +148,21 @@ void ProjectData::clear()
     m_startDate = QDate();
     m_endDate = QDate();
     m_filePath.clear();
-
     m_creationDateTime = QDateTime();
     m_lastModifiedDateTime = QDateTime();
-
     m_graphKind = GanttDefines::GraphKind::Master;
     m_linkedTargetStart = QDate();
     m_linkedTargetEnd = QDate();
     m_linkedMasterTaskId.clear();
     m_linkedPredecessorEndDate = QDate();
-
+    m_isApproved = false;
+    m_typologyName.clear();
+    m_mgId.clear();
     set_Modified(false);
     emit dataCleared();
 }
 
-QVariantMap ProjectData::toJson() const
-{
-    return m_serializer->toJson(this);
-}
+QVariantMap ProjectData::toJson() const { return m_serializer->toJson(this); }
 
 bool ProjectData::fromJson(const QVariantMap& json)
 {
@@ -209,10 +170,36 @@ bool ProjectData::fromJson(const QVariantMap& json)
 
     set_ProjectName(json.value("name").toString());
     set_ProjectType("");
+    set_MgId(json.value("mg_id").toString());
+    set_IsApproved(json.value("is_approved").toBool());
+    set_TypologyName(json.value("typology_name").toString());
+    set_IsPure(json.value("is_pure").toBool());
+
+    QVariantList milestones = json.value("milestones").toList();
+    if (!milestones.isEmpty()) {
+        m_milestoneModel->clear();
+        for (const QVariant& mv : milestones) {
+            QVariantMap m = mv.toMap();
+            QString abbrev = m.value("abbreviation").toString();
+            QString fullName = m.value("full_name").toString();
+            QString tooltip = m.value("tooltip").toString();
+            int weekOffset = m.value("week_offset").toInt();
+            QDate planned = QDate::fromString(m.value("planned_date").toString(), Qt::ISODate);
+            QDate actual = QDate::fromString(m.value("actual_date").toString(), Qt::ISODate);
+            int status = m.value("status").toInt();
+            int sortOrder = m.value("sort_order").toInt();
+
+            m_milestoneModel->addMilestoneFull(
+                m.value("milestone_id").toString(),
+                abbrev, fullName, tooltip, weekOffset,
+                planned, actual, status, sortOrder);
+        }
+    }
 
     QVariantList tasks = json.value("tasks").toList();
     QDate minStart;
-    for (const QVariant& tv : tasks) {
+    for (const QVariant& tv : tasks)
+    {
         QVariantMap t = tv.toMap();
         QString taskId = t.value("task_id").toString();
         QString groupId = t.value("group_id").toString();
@@ -221,7 +208,7 @@ bool ProjectData::fromJson(const QVariantMap& json)
 
         QString responsible = t.value("responsible_name").toString();
         if (responsible.isEmpty())
-            responsible = QString::number(responsibleId);
+            responsible = (responsibleId > 0) ? QString::number(responsibleId) : QString();
 
         QDate startDate = QDate::fromString(t.value("start_date").toString(), Qt::ISODate);
         QDate endDate = QDate::fromString(t.value("end_date").toString(), Qt::ISODate);
@@ -230,17 +217,21 @@ bool ProjectData::fromJson(const QVariantMap& json)
         int status = t.value("status").toInt();
         int progressCurrent = t.value("progress_current").toInt();
         int progressTotal = t.value("progress_total").toInt();
-        int localGraphState = t.value("local_graph_state").toInt(0);
+        int localGraphState = t.value("local_graph_state").toInt();
+        QString comment = t.value("comment").toString();
+        QVariantList dateHistory = t.value("date_history").toList();
 
         m_taskModel->addTaskWithId(taskId, groupId, title, responsible,
                                    startDate, endDate, forecastStart, forecastEnd,
-                                   status, progressCurrent, progressTotal, localGraphState);
+                                   status, progressCurrent, progressTotal, localGraphState,
+                                   comment, dateHistory);
 
         if (startDate.isValid() && (!minStart.isValid() || startDate < minStart))
             minStart = startDate;
     }
 
-    if (minStart.isValid()) {
+    if (minStart.isValid())
+    {
         QDate leftBoundary(minStart.year(), minStart.month(), 1);
         leftBoundary = leftBoundary.addMonths(-1);
         set_StartDate(leftBoundary);
@@ -266,131 +257,100 @@ bool ProjectData::fromJson(const QVariantMap& json)
     recalculateEndDate();
     set_Modified(false);
     qDebug() << "=== fromJson OK, tasks:" << m_taskModel->rowCount()
-             << "groups:" << m_groupModel->rowCount();
+             << "groups:" << m_groupModel->rowCount()
+             << "milestones:" << m_milestoneModel->rowCount();
     return true;
 }
 
 QDate ProjectData::getEarliestDate() const
 {
     QDate earliest = QDate::currentDate();
-
     for (int i = 0; i < m_milestoneModel->rowCount(); ++i)
     {
         QModelIndex idx = m_milestoneModel->index(i);
         QDate plannedDate = idx.data(Qt::UserRole + 3).toDate();
-        if (plannedDate.isValid() && plannedDate < earliest)
-            earliest = plannedDate;
-
+        if (plannedDate.isValid() && plannedDate < earliest) earliest = plannedDate;
         QVariantList history = idx.data(Qt::UserRole + 7).toList();
-        for (const auto& h : history)
-        {
+        for (const auto& h : history) {
             QDate d = QDate::fromString(h.toString(), "dd.MM.yyyy");
-            if (d.isValid() && d < earliest)
-                earliest = d;
+            if (d.isValid() && d < earliest) earliest = d;
         }
     }
-
     for (int i = 0; i < m_taskModel->rowCount(); ++i)
     {
         QModelIndex idx = m_taskModel->index(i);
-
         QDate startDate = idx.data(GanttDefines::StartDateRole).toDate();
-        if (startDate.isValid() && startDate < earliest)
-            earliest = startDate;
-
+        if (startDate.isValid() && startDate < earliest) earliest = startDate;
         QDate forecastStart = idx.data(GanttDefines::ForecastStartRole).toDate();
-        if (forecastStart.isValid() && forecastStart < earliest)
-            earliest = forecastStart;
-
+        if (forecastStart.isValid() && forecastStart < earliest) earliest = forecastStart;
         QString taskId = idx.data(GanttDefines::IdRole).toString();
         QVariantMap task = m_taskModel->getTask(taskId);
         QVariantList dateHistory = task["dateHistory"].toList();
-        for (const auto& dh : dateHistory)
-        {
+        for (const auto& dh : dateHistory) {
             QVariantMap dates = dh.toMap();
             QDate oldStart = QDate::fromString(dates["start"].toString(), "dd.MM.yyyy");
-            if (oldStart.isValid() && oldStart < earliest)
-                earliest = oldStart;
+            if (oldStart.isValid() && oldStart < earliest) earliest = oldStart;
         }
     }
-
     return earliest;
 }
 
 QDate ProjectData::getLatestDate() const
 {
     QDate latest = QDate(1900, 1, 1);
+    bool hasAny = false;
 
     for (int i = 0; i < m_milestoneModel->rowCount(); ++i)
     {
         QModelIndex idx = m_milestoneModel->index(i);
         QDate plannedDate = idx.data(Qt::UserRole + 3).toDate();
-        if (plannedDate.isValid() && plannedDate > latest)
-            latest = plannedDate;
-
+        if (plannedDate.isValid() && plannedDate > latest) { latest = plannedDate; hasAny = true; }
         QVariantList history = idx.data(Qt::UserRole + 7).toList();
-        for (const auto& h : history)
-        {
+        for (const auto& h : history) {
             QDate d = QDate::fromString(h.toString(), "dd.MM.yyyy");
-            if (d.isValid() && d > latest)
-                latest = d;
+            if (d.isValid() && d > latest) { latest = d; hasAny = true; }
         }
     }
-
     for (int i = 0; i < m_taskModel->rowCount(); ++i)
     {
         QModelIndex idx = m_taskModel->index(i);
-
         QDate endDate = idx.data(GanttDefines::EndDateRole).toDate();
-        if (endDate.isValid() && endDate > latest)
-            latest = endDate;
-
+        if (endDate.isValid() && endDate > latest) { latest = endDate; hasAny = true; }
         QDate forecastEnd = idx.data(GanttDefines::ForecastEndRole).toDate();
-        if (forecastEnd.isValid() && forecastEnd > latest)
-            latest = forecastEnd;
-
+        if (forecastEnd.isValid() && forecastEnd > latest) { latest = forecastEnd; hasAny = true; }
         QString taskId = idx.data(GanttDefines::IdRole).toString();
         QVariantMap task = m_taskModel->getTask(taskId);
         QVariantList dateHistory = task["dateHistory"].toList();
-        for (const auto& dh : dateHistory)
-        {
+        for (const auto& dh : dateHistory) {
             QVariantMap dates = dh.toMap();
             QDate oldEnd = QDate::fromString(dates["end"].toString(), "dd.MM.yyyy");
-            if (oldEnd.isValid() && oldEnd > latest)
-                latest = oldEnd;
+            if (oldEnd.isValid() && oldEnd > latest) { latest = oldEnd; hasAny = true; }
         }
     }
 
+    // Если задач/вех с датами нет — возвращаем текущую дату (не 1900!)
+    if (!hasAny) return QDate::currentDate();
     return latest;
 }
 
 QVariantMap ProjectData::getTaskStatistics() const
 {
-    int withDates = 0;
-    int withoutDates = 0;
-    int unapprovedForecasts = 0;
-    int total = 0;
-
-    for (int i = 0; i < m_taskModel->rowCount(); ++i)
-    {
+    int withDates = 0, withoutDates = 0, unapprovedForecasts = 0, total = 0;
+    for (int i = 0; i < m_taskModel->rowCount(); ++i) {
         QModelIndex idx = m_taskModel->index(i);
         QDate startDate = idx.data(GanttDefines::StartDateRole).toDate();
         QDate endDate = idx.data(GanttDefines::EndDateRole).toDate();
         QDate forecastStart = idx.data(GanttDefines::ForecastStartRole).toDate();
         QDate forecastEnd = idx.data(GanttDefines::ForecastEndRole).toDate();
-
         bool hasStart = startDate.isValid();
         bool hasEnd = endDate.isValid();
         bool hasDates = hasStart && hasEnd;
         bool hasForecast = forecastStart.isValid() && forecastEnd.isValid();
-
         total++;
-
         if (hasDates) withDates++;
         if (!hasDates) withoutDates++;
         if (!hasDates && hasForecast) unapprovedForecasts++;
     }
-
     QVariantMap result;
     result["withDates"] = withDates;
     result["withoutDates"] = withoutDates;
@@ -402,28 +362,19 @@ QVariantMap ProjectData::getTaskStatistics() const
 QVariantList ProjectData::getConflictingTaskIds() const
 {
     QVariantList result;
-
     if (m_graphKind != GanttDefines::GraphKind::Local) return result;
     if (!m_linkedPredecessorEndDate.isValid()) return result;
-
     QDate minStart = m_linkedPredecessorEndDate.addDays(1);
-
-    for (int i = 0; i < m_taskModel->rowCount(); ++i)
-    {
+    for (int i = 0; i < m_taskModel->rowCount(); ++i) {
         QModelIndex idx = m_taskModel->index(i);
         QDate startDate = idx.data(GanttDefines::StartDateRole).toDate();
         if (!startDate.isValid()) continue;
-        if (startDate < minStart)
-            result.append(idx.data(GanttDefines::IdRole).toString());
+        if (startDate < minStart) result.append(idx.data(GanttDefines::IdRole).toString());
     }
-
     return result;
 }
 
-int ProjectData::getConflictCount() const
-{
-    return getConflictingTaskIds().size();
-}
+int ProjectData::getConflictCount() const { return getConflictingTaskIds().size(); }
 
 bool ProjectData::fromSerializerJson(const QVariantMap& json)
 {

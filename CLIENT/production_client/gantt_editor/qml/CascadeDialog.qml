@@ -7,9 +7,9 @@ Dialog
     id: root
     title: "Создание каскада задач"
     width: 1380
-    height: 600
+    height: 700
     modal: true
-    standardButtons: Dialog.Ok | Dialog.Cancel
+    standardButtons: Dialog.NoButton
     anchors.centerIn: Overlay.overlay
 
     property int taskCount: 0
@@ -17,36 +17,32 @@ Dialog
     property var cascadeModel: []
     property bool createWithoutDates: false
     property bool isLocalMode: projectController && projectController.projectData && projectController.projectData.graphKind === 1
+    property var conflictMessages: []
 
-    function groupNames()
-    {
+    function groupNames() {
         if (!projectController || !projectController.projectData) return []
-        return projectController.projectData.groupModel.getGroupIds().map(function(id)
-        {
+        return projectController.projectData.groupModel.getGroupIds().map(function(id) {
             return projectController.projectData.groupModel.getGroup(id).name
         })
     }
+    function groupIds() {
+        if (!projectController || !projectController.projectData) return []
+        return projectController.projectData.groupModel.getGroupIds()
+    }
 
-    function buildCascade()
-    {
+    function buildCascade() {
         cascadeModel = []
-        for (var i = 0; i < taskCount; i++)
-        {
-            cascadeModel.push({
-                groupIndex: 0,
-                title: "Задача " + (i + 1),
-                responsible: "",
-                duration: 7,
-                comment: ""
-            })
+        for (var i = 0; i < taskCount; i++) {
+            cascadeModel.push({ groupIndex: 0, title: "Задача " + (i + 1),
+                                 responsible: "", duration: 7, comment: "" })
         }
         cascadeRepeater.model = cascadeModel
     }
 
-    function resetDialog()
-    {
+    function resetDialog() {
         taskCount = 0
         cascadeModel = []
+        conflictMessages = []
         countField.text = "3"
         startDate = new Date()
         startDateField.text = Qt.formatDateTime(root.startDate, "dd.MM.yyyy")
@@ -55,11 +51,32 @@ Dialog
         cascadeRepeater.model = []
     }
 
-    onOpened:
-    {
-        resetDialog()
-        countField.forceActiveFocus()
+    function localCheckConflicts() {
+        var result = []
+        if (!projectController || !projectController.projectData) return result
+        var gm = projectController.projectData.groupModel
+        var taskModel = projectController.projectData.taskModel
+        var gIds = groupIds()
+        var names = {}
+        for (var i = 0; i < cascadeModel.length; i++) {
+            var item = cascadeModel[i]
+            var gid = gIds[item.groupIndex] || gIds[0]
+            var key = gid + "||" + item.title
+            if (names[key]) result.push("Дублирование имени \"" + item.title + "\" в каскаде")
+            names[key] = true
+            var existing = taskModel.getTasksForGroup(gid)
+            for (var j = 0; j < existing.length; j++) {
+                var t = taskModel.getTask(existing[j])
+                if (t && t.title === item.title) {
+                    var gname = gm.getGroup(gid).name || gid
+                    result.push("Задача с именем \"" + item.title + "\" уже есть в группе \"" + gname + "\"")
+                }
+            }
+        }
+        return result
     }
+
+    onOpened: { resetDialog(); countField.forceActiveFocus() }
 
     ColumnLayout
     {
@@ -73,56 +90,35 @@ Dialog
             spacing: 10
 
             Label { text: "Количество задач:" }
-            TextField
-            {
+            TextField {
                 id: countField
                 Layout.preferredWidth: 60
                 text: "3"
                 validator: IntValidator { bottom: 1; top: 100 }
-                onEditingFinished:
-                {
-                    root.taskCount = parseInt(text) || 3
-                    root.buildCascade()
-                }
+                onEditingFinished: { root.taskCount = parseInt(text) || 3; root.buildCascade() }
             }
 
-            Label
-            {
-                text: "Дата начала:"
-                visible: !root.createWithoutDates
-            }
-            TextField
-            {
+            Label { text: "Дата начала:"; visible: !root.createWithoutDates }
+            TextField {
                 id: startDateField
                 Layout.preferredWidth: 100
                 visible: !root.createWithoutDates
-                onEditingFinished:
-                {
+                onEditingFinished: {
                     var parts = text.split(".")
-                    if (parts.length === 3)
-                    {
+                    if (parts.length === 3) {
                         var d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
                         if (!isNaN(d.getTime())) root.startDate = d
                     }
                 }
             }
 
-            CheckBox
-            {
+            CheckBox {
                 id: withoutDatesCheck
                 text: "Создать без сроков"
                 onCheckedChanged: root.createWithoutDates = checked
             }
 
-            Button
-            {
-                text: "Построить"
-                onClicked:
-                {
-                    root.taskCount = parseInt(countField.text) || 3
-                    root.buildCascade()
-                }
-            }
+            Button { text: "Построить"; onClicked: { root.taskCount = parseInt(countField.text) || 3; root.buildCascade() } }
 
             Item { Layout.fillWidth: true }
         }
@@ -145,125 +141,157 @@ Dialog
                 {
                     id: cascadeRepeater
                     model: cascadeModel
-
                     delegate: RowLayout
                     {
+                        id: cascadeRow
                         Layout.fillWidth: true
                         width: parent.width
                         spacing: 5
+                        property int rowIndex: index
 
-                        Label { text: (index + 1) + "."; Layout.preferredWidth: 25 }
+                        Label { text: (cascadeRow.rowIndex + 1) + "."; Layout.preferredWidth: 25 }
 
-                        ComboBox
-                        {
+                        ComboBox {
                             Layout.preferredWidth: 300
                             visible: !root.isLocalMode
                             model: root.groupNames()
-                            onCurrentIndexChanged:
-                            {
-                                if (cascadeModel[index]) cascadeModel[index].groupIndex = currentIndex
+                            onCurrentIndexChanged: {
+                                if (cascadeModel[cascadeRow.rowIndex])
+                                    cascadeModel[cascadeRow.rowIndex].groupIndex = currentIndex
                             }
                         }
 
-                        TextField
-                        {
+                        TextField {
                             Layout.preferredWidth: 200
                             text: modelData ? modelData.title : ""
                             placeholderText: "Название"
-                            onTextChanged:
-                            {
-                                if (cascadeModel[index]) cascadeModel[index].title = text
+                            onTextChanged: {
+                                if (cascadeModel[cascadeRow.rowIndex])
+                                    cascadeModel[cascadeRow.rowIndex].title = text
                             }
                         }
 
-                        TextField
-                        {
+                        ComboBox {
                             Layout.fillWidth: true
                             Layout.minimumWidth: 150
-                            placeholderText: "Ответственный"
-                            text: modelData ? modelData.responsible : ""
-                            onTextChanged:
-                            {
-                                if (cascadeModel[index]) cascadeModel[index].responsible = text
+                            model: projectController ? projectController.projectMembers : []
+                            textRole: "full_name"
+                            valueRole: "user_id"
+                            onActivated: {
+                                if (cascadeModel[cascadeRow.rowIndex]) {
+                                    var m = projectController.projectMembers[currentIndex]
+                                    cascadeModel[cascadeRow.rowIndex].responsible = String(m.user_id)
+                                }
                             }
                         }
 
-                        TextField
-                        {
+                        TextField {
                             Layout.preferredWidth: 50
                             visible: !root.createWithoutDates
                             text: modelData ? modelData.duration : "7"
                             validator: IntValidator { bottom: 1; top: 365 }
-                            onTextChanged:
-                            {
-                                if (cascadeModel[index]) cascadeModel[index].duration = parseInt(text) || 7
+                            onTextChanged: {
+                                if (cascadeModel[cascadeRow.rowIndex])
+                                    cascadeModel[cascadeRow.rowIndex].duration = parseInt(text) || 7
                             }
                         }
 
-                        Label
-                        {
-                            text: "дн."
-                            visible: !root.createWithoutDates
-                            Layout.preferredWidth: 30
-                        }
+                        Label { text: "дн."; visible: !root.createWithoutDates; Layout.preferredWidth: 30 }
 
-                        TextField
-                        {
+                        TextField {
                             Layout.fillWidth: true
                             Layout.minimumWidth: 200
                             placeholderText: "Комментарий"
                             text: modelData ? modelData.comment : ""
-                            onTextChanged:
-                            {
-                                if (cascadeModel[index]) cascadeModel[index].comment = text
+                            onTextChanged: {
+                                if (cascadeModel[cascadeRow.rowIndex])
+                                    cascadeModel[cascadeRow.rowIndex].comment = text
                             }
                         }
                     }
                 }
             }
         }
-    }
 
-    onAccepted:
-    {
-        if (cascadeModel.length === 0) return
-
-        var currentDate = new Date(root.startDate)
-        var prevTaskId = ""
-        var groupIds = projectController.projectData.groupModel.getGroupIds()
-
-        for (var i = 0; i < cascadeModel.length; i++)
+        ColumnLayout
         {
-            var item = cascadeModel[i]
-            var groupId = groupIds[item.groupIndex] || groupIds[0]
-            var newTaskId = ""
-
-            if (root.createWithoutDates)
+            Layout.fillWidth: true
+            spacing: 2
+            Repeater
             {
-                projectController.taskController.addTaskWithoutDates(groupId, item.title, item.responsible)
-                var tasks = projectController.projectData.taskModel.getTasksForGroup(groupId)
-                newTaskId = tasks[tasks.length - 1]
+                model: root.conflictMessages
+                delegate: Label {
+                    text: modelData
+                    color: "#c62828"
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
             }
-            else
-            {
-                var endDate = new Date(currentDate)
-                endDate.setDate(endDate.getDate() + item.duration - 1)
-                projectController.taskController.addTask(groupId, item.title, item.responsible, currentDate, endDate)
-                var tasks2 = projectController.projectData.taskModel.getTasksForGroup(groupId)
-                newTaskId = tasks2[tasks2.length - 1]
-                currentDate = new Date(endDate)
-                currentDate.setDate(currentDate.getDate() + 1)
-            }
-
-            if (item.comment)
-                projectController.projectData.taskModel.setTaskComment(newTaskId, item.comment)
-
-            if (prevTaskId)
-                projectController.dependencyController.addDependency(prevTaskId, newTaskId)
-
-            prevTaskId = newTaskId
         }
 
-        if (mainWindow && mainWindow.gridArea) mainWindow.gridArea.updateData()
+        RowLayout
+        {
+            Layout.alignment: Qt.AlignRight
+            spacing: 10
+            Button { text: "Отмена"; onClicked: root.close() }
+            Button
+            {
+                text: "Создать"
+                onClicked:
+                {
+                    root.conflictMessages = root.localCheckConflicts()
+                    if (root.conflictMessages.length > 0) return
+
+                    var tasks = []
+                    var dependencies = []
+                    var gIds = root.groupIds()
+                    var currentDate = new Date(root.startDate)
+                    var prevBatchId = ""
+
+                    for (var i = 0; i < root.cascadeModel.length; i++)
+                    {
+                        var item = root.cascadeModel[i]
+                        var gid = gIds[item.groupIndex] || gIds[0]
+                        var batchId = "b" + i
+                        var t = { batch_id: batchId, group_id: gid, title: item.title }
+                        if (!root.createWithoutDates)
+                        {
+                            var endDate = new Date(currentDate)
+                            endDate.setDate(endDate.getDate() + item.duration - 1)
+                            t.start_date = Qt.formatDateTime(currentDate, "yyyy-MM-dd")
+                            t.end_date = Qt.formatDateTime(endDate, "yyyy-MM-dd")
+                            currentDate = new Date(endDate)
+                            currentDate.setDate(currentDate.getDate() + 1)
+                        }
+                        if (item.responsible) {
+                            var rid = parseInt(item.responsible)
+                            if (!isNaN(rid) && rid > 0) t.responsible_id = rid
+                        }
+                        tasks.push(t)
+                        if (prevBatchId !== "")
+                            dependencies.push({ predecessor_batch_id: prevBatchId, successor_batch_id: batchId })
+                        prevBatchId = batchId
+                    }
+
+                    projectController.createTasksBatch(tasks, dependencies)
+                    root.close()
+                }
+            }
+        }
+    }
+
+    Connections
+    {
+        target: projectController
+        function onTitleConflictDetected(conflicts) {
+            var msgs = []
+            for (var i = 0; i < conflicts.length; i++) {
+                var c = conflicts[i]
+                msgs.push("Задача с именем \"" + c.title + "\" уже есть в группе \"" +
+                          (c.group_name || c.group_id) + "\"")
+            }
+            root.conflictMessages = msgs
+        }
     }
 }

@@ -9,17 +9,16 @@ Dialog
     width: 400
     height: 250
     modal: true
-    standardButtons: Dialog.Ok | Dialog.Cancel
+    standardButtons: Dialog.NoButton
     anchors.centerIn: Overlay.overlay
 
     property string taskId: ""
     property string comment: ""
 
-    function openForTask(tId)
-    {
+    function openForTask(tId) {
         if (!projectController) return
         if (projectController.settingsManager.editingLocked) {
-            showToast("Редактирование заблокировано")
+            if (mainWindow && mainWindow.toast) mainWindow.toast.show("Редактирование заблокировано")
             return
         }
         taskId = tId
@@ -29,14 +28,6 @@ Dialog
         open()
     }
 
-    function showToast(message)
-    {
-        var w = root.Window.window
-        if (w && w.toast) w.toast.show(message)
-        else if (typeof mainWindow !== "undefined" && mainWindow && mainWindow.toast) mainWindow.toast.show(message)
-        else console.log("TOAST:", message)
-    }
-
     ColumnLayout
     {
         anchors.fill: parent
@@ -44,22 +35,22 @@ Dialog
         spacing: 10
 
         Label { text: "Комментарий:"; font.bold: true }
-        TextArea
-        {
-            id: commentField
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            text: root.comment
-            wrapMode: Text.WordWrap
-        }
-    }
+        TextArea { id: commentField; Layout.fillWidth: true; Layout.fillHeight: true
+            text: root.comment; wrapMode: Text.WordWrap }
 
-    onAccepted:
-    {
-        if (taskId && projectController)
+        RowLayout
         {
-            projectController.projectData.taskModel.setTaskComment(taskId, commentField.text)
-            if (mainWindow && mainWindow.gridArea) mainWindow.gridArea.updateData()
+            Layout.fillWidth: true; spacing: 10
+            Item { Layout.fillWidth: true }
+            Button { text: "OK"; Layout.preferredWidth: 100; Layout.preferredHeight: 34
+                onClicked: {
+                    if (taskId && projectController) {
+                        projectController.updateTaskComment(taskId, commentField.text)
+                        root.close()
+                    }
+                } }
+            Button { text: "Отмена"; Layout.preferredWidth: 100; Layout.preferredHeight: 34
+                onClicked: root.close() }
         }
     }
 }

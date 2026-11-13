@@ -166,7 +166,8 @@ Item
                 function responsibleText() {
                     if (!taskData) return ""
                     var r = taskData.responsible
-                    return (r && r.length > 0) ? r : "—"
+                    if (!r || r === "" || r === "0") return "—"
+                    return r
                 }
 
                 function startDateText() {
@@ -228,7 +229,7 @@ Item
 
                     Rectangle {
                         width: 65; height: parent.height; color: "transparent"
-                        Text { text: viewLabelText(); anchors.left: parent.left; anchors.leftMargin: 4; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; color: "#444444" }
+                        Text { text: viewLabelText(); anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; color: "#444444" }
                     }
                     Rectangle {
                         width: 100; height: parent.height; color: "transparent"
@@ -247,25 +248,25 @@ Item
                     hoverEnabled: true
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                     cursorShape: Qt.ArrowCursor
-                    
+
                     onPositionChanged: {
                         if (mainWindow && mainWindow.hasGridArea()) {
                             if (mainWindow.gridArea.hoveredTaskId !== taskId)
                                 mainWindow.gridArea.hoveredTaskId = taskId
                         }
                     }
-                    
+
                     onExited: {
                         if (mainWindow && mainWindow.hasGridArea() && mainWindow.gridArea.hoveredTaskId === taskId) {
                             mainWindow.gridArea.hoveredTaskId = ""
                         }
                     }
-                    
+
                     onDoubleClicked: {
-                        if (mainWindow && mainWindow.hasGridArea()) 
+                        if (mainWindow && mainWindow.hasGridArea())
                             mainWindow.gridArea.centerOnTask(taskId)
                     }
-                    
+
                     onClicked: function(mouse)
                     {
                         if (mouse.button === Qt.RightButton && taskId)
@@ -279,8 +280,6 @@ Item
                 TaskContextMenu
                 {
                     id: taskContextMenu
-                    onAddTaskAboveCallback: function(tId) { addTaskAbove(tId) }
-                    onAddTaskBelowCallback: function(tId) { addTaskBelow(tId) }
                 }
             }
         }
@@ -289,7 +288,7 @@ Item
     RenameGroupDialog { id: renameGroupDialog }
 
     function addTaskAbove(existingTaskId) { mainWindow.newTaskDialog.openForGroup(groupId, existingTaskId) }
-    
+
     function addTaskBelow(existingTaskId)
     {
         var tasks = projectController.projectData.taskModel.getTasksForGroup(groupId)
@@ -300,22 +299,14 @@ Item
 
     function addGroupAbove()
     {
-        if (projectController && projectController.projectData) {
-            var groupIds = projectController.projectData.groupModel.getGroupIds()
-            var index = groupIds.indexOf(groupId)
-            if (index < 0) index = 0
-            projectController.projectData.groupModel.addGroupAt(index, "Новая группа")
-        }
+        if (mainWindow && mainWindow.groupWizardDialog)
+            mainWindow.groupWizardDialog.openWith("top", groupId, groupName)
     }
 
     function addGroupBelow()
     {
-        if (projectController && projectController.projectData) {
-            var groupIds = projectController.projectData.groupModel.getGroupIds()
-            var index = groupIds.indexOf(groupId)
-            if (index < 0) index = groupIds.length
-            projectController.projectData.groupModel.addGroupAt(index + 1, "Новая группа")
-        }
+        if (mainWindow && mainWindow.groupWizardDialog)
+            mainWindow.groupWizardDialog.openWith("bottom", groupId, groupName)
     }
 
     function deleteGroup()
@@ -323,11 +314,11 @@ Item
         if (projectController && projectController.projectData) {
             var tasks = projectController.projectData.taskModel.getTasksForGroup(groupId)
             if (tasks.length > 0) {
-                // Показать toast
-                if (mainWindow && mainWindow.toast) mainWindow.toast.show("Удаление групп содержащих задачи запрещено")
-                    return
+                if (mainWindow && mainWindow.toast)
+                    mainWindow.toast.show("Удаление групп содержащих задачи запрещено")
+                return
             }
-            projectController.projectData.groupModel.removeGroup(groupId)
+            projectController.deleteGroup(groupId)
         }
     }
 }

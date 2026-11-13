@@ -59,7 +59,9 @@ class WidgetBridge : public QObject
 
     Q_INVOKABLE void openGanttEditor(int projectId, bool isReadOnly);
 
-    // --- Загрузка списка проектов (для ProjectList) ---
+    // Запуск gantt_editor как отдельного процесса
+    Q_INVOKABLE void launchGanttEditor(int projectId, bool isReadOnly);
+
     Q_INVOKABLE void loadProjectList(const QString &callbackId);
 
   signals:
@@ -69,8 +71,6 @@ class WidgetBridge : public QObject
     void httpResponse(const QString &callbackId, int status, const QString &data);
     void workflowEventCompleted(const QJsonObject &response);
     void ganttEditorRequested(int projectId, bool isReadOnly);
-
-    // --- Сигнал с результатом загрузки проектов ---
     void projectListLoaded(const QString &callbackId, const QJsonArray &editable, const QJsonArray &viewable);
 
   private slots:

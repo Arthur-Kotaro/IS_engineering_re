@@ -22,6 +22,9 @@ QHash<int, QByteArray> MilestoneModel::roleNames() const
     roles[Qt::UserRole + 5] = "status";
     roles[Qt::UserRole + 6] = "color";
     roles[Qt::UserRole + 7] = "rescheduleHistory";
+    roles[Qt::UserRole + 8] = "tooltip";
+    roles[Qt::UserRole + 9] = "weekOffset";
+    roles[Qt::UserRole + 10] = "sortOrder";
     return roles;
 }
 
@@ -41,6 +44,9 @@ QVariant MilestoneModel::data(const QModelIndex &index, int role) const
         case Qt::UserRole + 5: return static_cast<int>(ms.status);
         case Qt::UserRole + 7: { QVariantList history; for (const QDate& d : ms.rescheduleHistory) history.append(d.toString("dd.MM.yyyy")); return history; }
         case Qt::UserRole + 6: return GanttDefines::getMilestoneStatusColor(ms.status);
+        case Qt::UserRole + 8: return ms.tooltip;
+        case Qt::UserRole + 9: return ms.weekOffset;
+        case Qt::UserRole + 10: return ms.sortOrder;
         default: return QVariant();
     }
 }
@@ -75,6 +81,32 @@ void MilestoneModel::addMilestone(const QString& abbreviation, const QString& fu
     qDebug() << "MilestoneModel::addMilestone:" << ms.id << ms.abbreviation << ms.plannedDate.toString("dd.MM.yyyy");
 }
 
+void MilestoneModel::addMilestoneFull(const QString& id,
+                                      const QString& abbreviation,
+                                      const QString& fullName,
+                                      const QString& tooltip,
+                                      int weekOffset,
+                                      const QDate& plannedDate,
+                                      const QDate& actualDate,
+                                      int status,
+                                      int sortOrder)
+{
+    beginInsertRows(QModelIndex(), m_milestones.size(), m_milestones.size());
+    Milestone ms;
+    ms.id = id.isEmpty() ? generateId() : id;
+    ms.abbreviation = abbreviation;
+    ms.fullName = fullName;
+    ms.tooltip = tooltip;
+    ms.weekOffset = weekOffset;
+    ms.plannedDate = plannedDate;
+    ms.actualDate = actualDate;
+    ms.status = static_cast<GanttDefines::MilestoneStatus>(status);
+    ms.sortOrder = sortOrder;
+    m_milestones.append(ms);
+    endInsertRows();
+    emit milestonesChanged();
+}
+
 void MilestoneModel::removeMilestone(const QString& milestoneId)
 {
     int index = findMilestoneIndex(milestoneId);
@@ -84,7 +116,6 @@ void MilestoneModel::removeMilestone(const QString& milestoneId)
         m_milestones.removeAt(index);
         endRemoveRows();
         emit milestonesChanged();
-        qDebug() << "MilestoneModel::removeMilestone:" << milestoneId;
     }
 }
 
@@ -98,7 +129,7 @@ void MilestoneModel::setMilestoneCompleted(const QString& milestoneId)
             if (m_milestones[i].status != GanttDefines::MilestoneStatus::Completed)
             {
                 qDebug() << "MilestoneModel::setMilestoneCompleted: cannot complete"
-                << milestoneId << "- previous milestone" << m_milestones[i].id << "not completed";
+                         << milestoneId << "- previous milestone" << m_milestones[i].id << "not completed";
                 return;
             }
         }
@@ -108,8 +139,6 @@ void MilestoneModel::setMilestoneCompleted(const QString& milestoneId)
         emit dataChanged(modelIndex, modelIndex);
         emit milestoneStatusChanged(milestoneId);
         emit milestonesChanged();
-        qDebug() << "MilestoneModel::setMilestoneCompleted:" << milestoneId
-        << "actualDate:" << m_milestones[index].actualDate.toString("dd.MM.yyyy");
     }
 }
 
@@ -125,8 +154,6 @@ void MilestoneModel::rescheduleMilestone(const QString& milestoneId, const QDate
         emit dataChanged(modelIndex, modelIndex);
         emit milestoneDateChanged(milestoneId);
         emit milestonesChanged();
-        qDebug() << "MilestoneModel::rescheduleMilestone:" << milestoneId
-        << "new planned date:" << newDate.toString("dd.MM.yyyy");
     }
 }
 
@@ -139,8 +166,6 @@ void MilestoneModel::addRescheduleHistory(const QString& milestoneId, const QDat
         QModelIndex modelIndex = createIndex(index, 0);
         emit dataChanged(modelIndex, modelIndex);
         emit milestonesChanged();
-        qDebug() << "MilestoneModel::addRescheduleHistory:" << milestoneId
-        << "date:" << date.toString("dd.MM.yyyy");
     }
 }
 
@@ -158,8 +183,6 @@ void MilestoneModel::setRescheduleHistory(const QString& milestoneId, const QVar
         QModelIndex modelIndex = createIndex(index, 0);
         emit dataChanged(modelIndex, modelIndex);
         emit milestonesChanged();
-        qDebug() << "MilestoneModel::setRescheduleHistory:" << milestoneId
-        << "count:" << m_milestones[index].rescheduleHistory.size();
     }
 }
 
@@ -201,18 +224,6 @@ void MilestoneModel::loadFromTemplate(const QVariantList& templates, const QDate
 
     endResetModel();
     emit milestonesChanged();
-
-    if (!m_milestones.isEmpty())
-    {
-        qDebug() << "MilestoneModel::loadFromTemplate: count =" << m_milestones.size()
-        << "last id =" << m_milestones.last().id
-        << "name =" << m_milestones.last().fullName
-        << "planned date =" << m_milestones.last().plannedDate.toString("dd.MM.yyyy");
-    }
-    else
-    {
-        qDebug() << "MilestoneModel::loadFromTemplate: no milestones loaded";
-    }
 }
 
 QVariantMap MilestoneModel::getMilestone(const QString& milestoneId) const
@@ -232,6 +243,9 @@ QVariantMap MilestoneModel::getMilestone(const QString& milestoneId) const
             history.append(d.toString("dd.MM.yyyy"));
         map["rescheduleHistory"] = history;
         map["status"] = static_cast<int>(ms.status);
+        map["tooltip"] = ms.tooltip;
+        map["weekOffset"] = ms.weekOffset;
+        map["sortOrder"] = ms.sortOrder;
         return map;
     }
     return QVariantMap();
@@ -254,6 +268,7 @@ QVariantList MilestoneModel::getAllMilestones() const
         map["rescheduleHistory"] = history;
         map["status"] = static_cast<int>(ms.status);
         map["actualDate"] = ms.actualDate;
+        map["sortOrder"] = ms.sortOrder;
         result.append(map);
     }
     return result;

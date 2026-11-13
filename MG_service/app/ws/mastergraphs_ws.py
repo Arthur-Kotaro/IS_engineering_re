@@ -7,6 +7,7 @@ from app.database import AsyncSessionLocal
 from app.models.mastergraph import Mastergraph
 from app.models.mg_task import MgTask
 from app.models.mg_dependency import MgDependency
+from app.models.mg_milestone import MgMilestone
 from app.models.task_group import TaskGroup
 from app.ws.manager import manager
 
@@ -16,7 +17,7 @@ router = APIRouter(tags=["WebSocket"])
 
 @router.websocket("/ws/mastergraphs/{mg_id}")
 async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)):
-    print(f"[WS ENDPOINT] connection request for mg={mg_id}", flush=True)
+    print(f"[WS ENDPOINT] connection for mg={mg_id}", flush=True)
     await manager.connect(mg_id, ws)
     try:
         async with AsyncSessionLocal() as session:
@@ -26,11 +27,13 @@ async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)
                 await ws.send_json({"type": "error", "message": "Mastergraph not found"})
                 return
 
-            tasks_result = await session.execute(select(MgTask).where(MgTask.mg_id == mg_id))
+            tasks_result = await session.execute(select(MgTask).where(MgTask.mg_id == mg_id, MgTask.is_deleted == False))
             tasks = tasks_result.scalars().all()
-            deps_result = await session.execute(select(MgDependency).where(MgDependency.mg_id == mg_id))
+            deps_result = await session.execute(select(MgDependency).where(MgDependency.mg_id == mg_id, MgDependency.is_deleted == False))
             deps = deps_result.scalars().all()
-            groups_result = await session.execute(select(TaskGroup))
+            ms_result = await session.execute(select(MgMilestone).where(MgMilestone.mg_id == mg_id, MgMilestone.is_deleted == False).order_by(MgMilestone.sort_order))
+            milestones = ms_result.scalars().all()
+            groups_result = await session.execute(select(TaskGroup).where(TaskGroup.is_deleted == False))
             groups = groups_result.scalars().all()
 
             snapshot = {
@@ -39,39 +42,36 @@ async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)
                 "project_id": mg.project_id,
                 "name": mg.name,
                 "version": mg.version,
+                "is_approved": mg.is_approved,
+                "typology_name": mg.typology_name,
                 "tasks": [
                     {
-                        "task_id": str(t.task_id),
-                        "group_id": t.group_id,
-                        "title": t.title,
-                        "responsible_id": t.responsible_id,
-                        "status": t.status,
+                        "task_id": str(t.task_id), "group_id": t.group_id, "title": t.title,
+                        "responsible_id": t.responsible_id, "status": t.status,
                         "start_date": t.start_date.isoformat() if t.start_date else None,
                         "end_date": t.end_date.isoformat() if t.end_date else None,
                         "forecast_start": t.forecast_start.isoformat() if t.forecast_start else None,
                         "forecast_end": t.forecast_end.isoformat() if t.forecast_end else None,
-                        "progress_current": t.progress_current,
-                        "progress_total": t.progress_total,
-                        "sort_order": t.sort_order,
-                        "version": t.version,
+                        "progress_current": t.progress_current, "progress_total": t.progress_total,
+                        "sort_order": t.sort_order, "version": t.version,
                     } for t in tasks
                 ],
                 "dependencies": [
-                    {
-                        "dep_id": str(d.dep_id),
-                        "predecessor_id": str(d.predecessor_id),
-                        "successor_id": str(d.successor_id),
-                        "dep_type": d.dep_type,
-                        "version": d.version,
-                    } for d in deps
+                    {"dep_id": str(d.dep_id), "predecessor_id": str(d.predecessor_id),
+                     "successor_id": str(d.successor_id), "dep_type": d.dep_type, "version": d.version}
+                    for d in deps
+                ],
+                "milestones": [
+                    {"milestone_id": str(m.milestone_id), "abbreviation": m.abbreviation,
+                     "full_name": m.full_name, "tooltip": m.tooltip, "week_offset": m.week_offset,
+                     "planned_date": m.planned_date.isoformat() if m.planned_date else None,
+                     "actual_date": m.actual_date.isoformat() if m.actual_date else None,
+                     "status": m.status, "sort_order": m.sort_order, "version": m.version}
+                    for m in milestones
                 ],
                 "groups": [
-                    {
-                        "group_id": g.group_id,
-                        "name": g.name,
-                        "description": g.description,
-                        "bus_instance_id": g.bus_instance_id,
-                    } for g in groups
+                    {"group_id": g.group_id, "name": g.name, "description": g.description, "bus_instance_id": g.bus_instance_id}
+                    for g in groups
                 ],
             }
             await ws.send_json(snapshot)
@@ -79,7 +79,6 @@ async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)
 
         while True:
             data = await ws.receive_json()
-            print(f"[WS ENDPOINT] received: {data}", flush=True)
             await ws.send_json({"type": "ack", "received": data.get("type")})
 
     except WebSocketDisconnect:

@@ -107,7 +107,8 @@ void TaskModel::addTaskWithoutDates(const QString& groupId, const QString& title
 void TaskModel::addTaskWithId(const QString& taskId, const QString& groupId, const QString& title,
                               const QString& responsible, const QDate& startDate, const QDate& endDate,
                               const QDate& forecastStart, const QDate& forecastEnd, int status,
-                              int progressCurrent, int progressTotal, int localGraphState)
+                              int progressCurrent, int progressTotal, int localGraphState,
+                              const QString& comment, const QVariantList& dateHistory)
 {
     beginInsertRows(QModelIndex(), m_tasks.size(), m_tasks.size());
     Task task;
@@ -130,6 +131,7 @@ void TaskModel::addTaskWithId(const QString& taskId, const QString& groupId, con
     }
 
     task.groupId = groupId;
+    task.comment = comment;
 
     if (progressCurrent >= 0 && progressTotal > 0)
     {
@@ -139,6 +141,21 @@ void TaskModel::addTaskWithId(const QString& taskId, const QString& groupId, con
 
     if (localGraphState >= 0 && localGraphState <= 3)
         task.localGraphState = static_cast<GanttDefines::LocalGraphState>(localGraphState);
+
+    // dateHistory: [{old_start, old_end, new_start, new_end, reason, ...}]
+    for (const QVariant& item : dateHistory)
+    {
+        QVariantMap m = item.toMap();
+        QVariantMap entry;
+        entry["old_start"] = m.value("old_start").toString();
+        entry["old_end"] = m.value("old_end").toString();
+        entry["new_start"] = m.value("new_start").toString();
+        entry["new_end"] = m.value("new_end").toString();
+        entry["reason"] = m.value("reason").toString();
+        entry["created_at"] = m.value("created_at").toString();
+        entry["actor_id"] = m.value("actor_id").toInt();
+        task.dateHistory.append(entry);
+    }
 
     m_tasks.append(task);
     endInsertRows();
@@ -182,27 +199,31 @@ void TaskModel::updateTask(const QString& taskId, const QString& title, const QS
     }
 }
 
-void TaskModel::updateTaskDates(const QString& taskId, const QDate& newStart, const QDate& newEnd, bool addToHistory)
+void TaskModel::updateTaskDates(const QString& taskId, const QDate& newStart, const QDate& newEnd,
+                                 bool addToHistory, const QString& reason)
 {
     int index = findTaskIndex(taskId);
     if (index >= 0 && newStart <= newEnd)
     {
         Task& task = m_tasks[index];
-
-        // П.7: Запоминаем, были ли у задачи сроки ДО изменения (чтобы не сохранять "пустой" след в историю)
         bool hadDates = task.startDate.isValid() && task.endDate.isValid();
 
         if (addToHistory && hadDates)
         {
-            QPair<QDate, QDate> oldDates(task.startDate, task.endDate);
-            task.dateHistory.append(oldDates);
+            QVariantMap entry;
+            entry["old_start"] = task.startDate.toString(Qt::ISODate);
+            entry["old_end"] = task.endDate.toString(Qt::ISODate);
+            entry["new_start"] = newStart.toString(Qt::ISODate);
+            entry["new_end"] = newEnd.toString(Qt::ISODate);
+            entry["reason"] = reason;
+            entry["created_at"] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+            entry["actor_id"] = 0;
+            task.dateHistory.append(entry);
         }
 
         task.startDate = newStart;
         task.endDate = newEnd;
 
-        // П.6: Если у задачи не было сроков (это первая установка), или она завершена —
-        // прогноз должен стать равным целевому.
         if (!hadDates || task.status == GanttDefines::TaskStatus::Completed)
         {
             task.forecastStart = newStart;
@@ -213,7 +234,6 @@ void TaskModel::updateTaskDates(const QString& taskId, const QDate& newStart, co
         emit dataChanged(modelIndex, modelIndex);
         emit taskDatesChanged(taskId);
 
-        // Эмитим сигнал прогноза, если он изменился (для завершённых или при первой установке)
         if (!hadDates || task.status == GanttDefines::TaskStatus::Completed)
         {
             emit taskForecastDatesChanged(taskId);
@@ -274,26 +294,16 @@ void TaskModel::setTaskProgress(const QString& taskId, int current, int total)
     if (index < 0) return;
 
     Task& task = m_tasks[index];
-
     bool progressValid = (current >= 0 && total > 0 && current <= total);
 
-    if (!progressValid)
-    {
-        task.progressCurrent = -1;
-        task.progressTotal = -1;
-    }
-    else
-    {
-        task.progressCurrent = current;
-        task.progressTotal = total;
-    }
+    if (!progressValid) { task.progressCurrent = -1; task.progressTotal = -1; }
+    else { task.progressCurrent = current; task.progressTotal = total; }
 
     QModelIndex modelIndex = createIndex(index, 0);
     emit dataChanged(modelIndex, modelIndex, {GanttDefines::ProgressCurrentRole, GanttDefines::ProgressTotalRole});
     emit taskProgressChanged(taskId);
 
-    if (progressValid
-        && task.progressCurrent == task.progressTotal
+    if (progressValid && task.progressCurrent == task.progressTotal
         && task.status != GanttDefines::TaskStatus::Completed)
     {
         setTaskStatus(taskId, GanttDefines::TaskStatus::Completed);
@@ -317,8 +327,10 @@ void TaskModel::addDateHistory(const QString& taskId, const QDate& oldStart, con
     int index = findTaskIndex(taskId);
     if (index >= 0)
     {
-        QPair<QDate, QDate> oldDates(oldStart, oldEnd);
-        m_tasks[index].dateHistory.append(oldDates);
+        QVariantMap entry;
+        entry["old_start"] = oldStart.toString(Qt::ISODate);
+        entry["old_end"] = oldEnd.toString(Qt::ISODate);
+        m_tasks[index].dateHistory.append(entry);
         QModelIndex modelIndex = createIndex(index, 0);
         emit dataChanged(modelIndex, modelIndex);
     }
@@ -354,13 +366,18 @@ QVariantMap TaskModel::getTask(const QString& taskId) const
         map["progressCurrent"] = task.progressCurrent;
         map["progressTotal"] = task.progressTotal;
         map["localGraphState"] = static_cast<int>(task.localGraphState);
+
         QVariantList history;
-        for (const auto& pair : task.dateHistory)
+        for (const QVariantMap& entry : task.dateHistory)
         {
-            QVariantMap dates;
-            dates["start"] = pair.first.toString("dd.MM.yyyy");
-            dates["end"] = pair.second.toString("dd.MM.yyyy");
-            history.append(dates);
+            QVariantMap h;
+            h["old_start"] = entry.value("old_start");
+            h["old_end"] = entry.value("old_end");
+            h["new_start"] = entry.value("new_start");
+            h["new_end"] = entry.value("new_end");
+            h["reason"] = entry.value("reason");
+            h["created_at"] = entry.value("created_at");
+            history.append(h);
         }
         map["dateHistory"] = history;
         return map;
@@ -416,13 +433,11 @@ QVariantList TaskModel::getAllTasks() const
         map["progressCurrent"] = task.progressCurrent;
         map["progressTotal"] = task.progressTotal;
         map["localGraphState"] = static_cast<int>(task.localGraphState);
+
         QVariantList history;
-        for (const auto& pair : task.dateHistory)
+        for (const QVariantMap& entry : task.dateHistory)
         {
-            QVariantMap dates;
-            dates["start"] = pair.first.toString("dd.MM.yyyy");
-            dates["end"] = pair.second.toString("dd.MM.yyyy");
-            history.append(dates);
+            history.append(entry);
         }
         map["dateHistory"] = history;
         result.append(map);

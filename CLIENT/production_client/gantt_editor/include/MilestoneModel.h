@@ -16,11 +16,12 @@ public:
         QString abbreviation;
         QString fullName;
         QString tooltip;
-        int weekOffset;
+        int weekOffset = 0;
         QDate plannedDate;
         QDate actualDate;
-        GanttDefines::MilestoneStatus status;
+        GanttDefines::MilestoneStatus status = GanttDefines::MilestoneStatus::Planned;
         QList<QDate> rescheduleHistory;
+        int sortOrder = 0;
     };
 
     explicit MilestoneModel(QObject *parent = nullptr);
@@ -30,7 +31,16 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     Q_INVOKABLE void addMilestone(const QString& abbreviation, const QString& fullName, const QDate& plannedDate);
-    Q_INVOKABLE void removeMilestone(const QString& milestoneId); 
+    Q_INVOKABLE void addMilestoneFull(const QString& id,
+                                      const QString& abbreviation,
+                                      const QString& fullName,
+                                      const QString& tooltip,
+                                      int weekOffset,
+                                      const QDate& plannedDate,
+                                      const QDate& actualDate,
+                                      int status,
+                                      int sortOrder);
+    Q_INVOKABLE void removeMilestone(const QString& milestoneId);
     Q_INVOKABLE void setMilestoneCompleted(const QString& milestoneId);
     Q_INVOKABLE void rescheduleMilestone(const QString& milestoneId, const QDate& newDate);
     Q_INVOKABLE void setRescheduleHistory(const QString& milestoneId, const QVariantList& history);
@@ -47,15 +57,13 @@ public:
 signals:
     void milestoneStatusChanged(const QString& milestoneId);
     void milestoneDateChanged(const QString& milestoneId);
-    void milestonesChanged(); // Сигнал для обновления диапазона календаря
+    void milestonesChanged();
 
 private:
     QList<Milestone> m_milestones;
     QDate m_originalFirstDate;
     QString generateId() const;
     int findMilestoneIndex(const QString& milestoneId) const;
-    
-    // Вспомогательный метод для корректировки даты на ближайший понедельник
     QDate adjustToNextMonday(QDate date);
 };
 

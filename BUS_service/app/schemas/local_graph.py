@@ -25,6 +25,9 @@ class LocalGraphResponse(BaseModel):
     target_end: Optional[date]
     predecessor_end: Optional[date]
     version: int
+    local_graph_state: int = 0
+    is_pure: bool = False
+    can_edit: bool = False
 
     class Config:
         from_attributes = True

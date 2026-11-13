@@ -17,15 +17,23 @@ LocalGraphController::LocalGraphController(ProjectData* projectData,
     , m_resourceManager(resourceManager)
     , m_settingsManager(settingsManager)
     , m_apiClient(apiClient)
+    , m_networkManager(new QNetworkAccessManager(this))
 {
     connect(m_apiClient, &GanttApiClient::localGraphCreated, this, &LocalGraphController::onLocalGraphCreated);
     connect(m_apiClient, &GanttApiClient::forecastRecalculated, this, &LocalGraphController::onForecastRecalculated);
 }
 
-void LocalGraphController::setLocalGraphContext(const QString& lgId, const QString& busUrl)
+void LocalGraphController::setLocalGraphContext(const QString& lgId, const QString& busUrl,
+                                                 int projectId, int responsibleId, const QString& masterTaskId)
 {
     m_lgId = lgId;
     m_busUrl = busUrl;
+    m_projectId = projectId;
+    m_responsibleId = responsibleId;
+    m_masterTaskId = masterTaskId;
+    qDebug() << "LocalGraphController::setLocalGraphContext: lgId=" << lgId
+             << "busUrl=" << busUrl << "projectId=" << projectId
+             << "responsibleId=" << responsibleId << "masterTaskId=" << masterTaskId;
 }
 
 QString LocalGraphController::getBusUrlForTask(const QString& taskId) const
@@ -86,9 +94,9 @@ bool LocalGraphController::createLocalGraph(const QString& taskId)
     m_pendingTaskId = taskId;
 
     QVariantMap payload;
-    payload["project_id"] = 0;
+    payload["project_id"] = m_projectId;
     payload["task_id"] = taskId;
-    payload["responsible_id"] = task["responsible"].toString().toInt();
+    payload["responsible_id"] = m_responsibleId;
     payload["title"] = task["title"].toString();
     payload["target_start"] = task["startDate"].toDate().toString(Qt::ISODate);
     payload["target_end"] = task["endDate"].toDate().toString(Qt::ISODate);
@@ -136,7 +144,7 @@ void LocalGraphController::refreshLocalGraphForecast(const QString& taskId)
     m_pendingTaskId = taskId;
 
     QVariantMap payload;
-    payload["project_id"] = 0;
+    payload["project_id"] = m_projectId;
     payload["task_id"] = taskId;
     if (predecessorEnd.isValid())
         payload["predecessor_end"] = predecessorEnd.toString(Qt::ISODate);
@@ -146,9 +154,13 @@ void LocalGraphController::refreshLocalGraphForecast(const QString& taskId)
 
 // ---- CRUD для задач ЛГ ----
 
-void LocalGraphController::addLocalTask(const QString& title, const QString& responsible, const QDate& startDate, const QDate& endDate)
+void LocalGraphController::addLocalTask(const QString& title, const QString& responsible,
+                                         const QDate& startDate, const QDate& endDate)
 {
-    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) return;
+    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) {
+        emit errorOccurred("Локальный график не инициализирован");
+        return;
+    }
 
     QVariantMap payload;
     payload["title"] = title;
@@ -156,12 +168,13 @@ void LocalGraphController::addLocalTask(const QString& title, const QString& res
     if (startDate.isValid()) payload["start_date"] = startDate.toString(Qt::ISODate);
     if (endDate.isValid()) payload["end_date"] = endDate.toString(Qt::ISODate);
 
-    QNetworkAccessManager mgr;
     QNetworkRequest req(QUrl(m_busUrl + "/internal/local-graphs/" + m_lgId + "/tasks"));
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setRawHeader("X-User-ID", QByteArray::number(m_responsibleId));
+
     QJsonDocument doc = QJsonDocument::fromVariant(payload);
-    QNetworkReply* reply = mgr.post(req, doc.toJson(QJsonDocument::Compact));
-    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    QNetworkReply* reply = m_networkManager->post(req, doc.toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (reply->error() == QNetworkReply::NoError) {
             emit localTasksReloaded();
@@ -179,15 +192,45 @@ void LocalGraphController::updateLocalTaskDates(const QString& taskId, const QDa
     if (newStart.isValid()) payload["start_date"] = newStart.toString(Qt::ISODate);
     if (newEnd.isValid()) payload["end_date"] = newEnd.toString(Qt::ISODate);
 
-    QNetworkAccessManager mgr;
     QNetworkRequest req(QUrl(m_busUrl + "/internal/local-graphs/" + m_lgId + "/tasks/" + taskId));
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setRawHeader("X-User-ID", QByteArray::number(m_responsibleId));
+
     QJsonDocument doc = QJsonDocument::fromVariant(payload);
-    QNetworkReply* reply = mgr.put(req, doc.toJson(QJsonDocument::Compact));
-    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    QNetworkReply* reply = m_networkManager->put(req, doc.toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, taskId, newStart, newEnd]() {
         reply->deleteLater();
         if (reply->error() == QNetworkReply::NoError) {
+            // Локально — обновить TaskModel (для мгновенного UI)
+            bool addToHistory = m_projectData->get_isApproved();
+            m_projectData->get_taskModel()->updateTaskDates(taskId, newStart, newEnd, addToHistory, "");
+            m_projectData->recalculateEndDate();
             emit localTasksReloaded();
+
+            // Каскад: последователи, чьи start_date < newEnd
+            QVariantList successors;
+            auto* depModel = m_projectData->get_dependencyModel();
+            auto* taskModel = m_projectData->get_taskModel();
+            QStringList succIds = depModel->getSuccessors(taskId);
+            for (const QString& sid : succIds) {
+                QVariantMap st = taskModel->getTask(sid);
+                if (st.isEmpty()) continue;
+                QDate sStart = st.value("startDate").toDate();
+                QDate sEnd = st.value("endDate").toDate();
+                if (!sStart.isValid() || !sEnd.isValid()) continue;
+                if (sStart < newEnd) {
+                    int duration = sStart.daysTo(sEnd);
+                    QDate newStart2 = newEnd;
+                    QDate newEnd2 = newStart2.addDays(duration);
+                    successors.append(QVariantMap{
+                        {"taskId", sid},
+                        {"title", st.value("title")},
+                        {"newStart", newStart2.toString(Qt::ISODate)},
+                        {"newEnd", newEnd2.toString(Qt::ISODate)},
+                    });
+                }
+            }
+            if (!successors.isEmpty()) emit cascadeUpdateRequested(successors, "");
         } else {
             emit errorOccurred("updateLocalTaskDates: " + reply->errorString());
         }
@@ -201,12 +244,13 @@ void LocalGraphController::setLocalTaskStatus(const QString& taskId, int status)
     QVariantMap payload;
     payload["status"] = status;
 
-    QNetworkAccessManager mgr;
     QNetworkRequest req(QUrl(m_busUrl + "/internal/local-graphs/" + m_lgId + "/tasks/" + taskId));
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setRawHeader("X-User-ID", QByteArray::number(m_responsibleId));
+
     QJsonDocument doc = QJsonDocument::fromVariant(payload);
-    QNetworkReply* reply = mgr.put(req, doc.toJson(QJsonDocument::Compact));
-    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    QNetworkReply* reply = m_networkManager->put(req, doc.toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (reply->error() == QNetworkReply::NoError) {
             emit localTasksReloaded();
@@ -220,10 +264,11 @@ void LocalGraphController::removeLocalTask(const QString& taskId)
 {
     if (m_lgId.isEmpty() || m_busUrl.isEmpty()) return;
 
-    QNetworkAccessManager mgr;
     QNetworkRequest req(QUrl(m_busUrl + "/internal/local-graphs/" + m_lgId + "/tasks/" + taskId));
-    QNetworkReply* reply = mgr.deleteResource(req);
-    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    req.setRawHeader("X-User-ID", QByteArray::number(m_responsibleId));
+
+    QNetworkReply* reply = m_networkManager->deleteResource(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (reply->error() == QNetworkReply::NoError) {
             emit localTasksReloaded();

@@ -3,9 +3,11 @@
 #include "core/DataManager.h"
 #include "renderer/JsonUiRenderer.h"
 
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDebug>
 #include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -13,9 +15,11 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QProcess>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QUrl>
+#include <QSet>
 
 WidgetBridge::WidgetBridge(QObject *parent)
     : QObject(parent), m_networkManager(new QNetworkAccessManager(this))
@@ -304,8 +308,6 @@ void WidgetBridge::renderPage(const QJsonObject &uiData, QQuickItem *container)
     }
 }
 
-// Нормализация: строки вида "[...]" -> массивы, элементы-числа -> int.
-// Нужно для MultiSelectField (role_ids), который приходит как строка "[\"51\"]".
 QJsonObject WidgetBridge::normalizeArrayValues(const QJsonObject &body)
 {
     QJsonObject normalizedBody;
@@ -345,8 +347,6 @@ QJsonObject WidgetBridge::normalizeArrayValues(const QJsonObject &body)
                         }
                     }
                     normalizedBody[key] = normalized;
-                    qDebug() << "normalizeArrayValues: normalized array for" << key
-                             << "size=" << normalized.size();
                     continue;
                 }
             }
@@ -359,8 +359,7 @@ QJsonObject WidgetBridge::normalizeArrayValues(const QJsonObject &body)
 void WidgetBridge::sendWorkflowEvent(const QString &widgetId, const QString &eventType,
                                      const QJsonObject &data)
 {
-    qDebug() << "WidgetBridge: sendWorkflowEvent widget=" << widgetId << "type=" << eventType
-             << "sessionId.length=" << m_currentSessionId.length();
+    qDebug() << "WidgetBridge: sendWorkflowEvent widget=" << widgetId << "type=" << eventType;
 
     if (m_currentSessionId.isEmpty())
     {
@@ -425,22 +424,14 @@ void WidgetBridge::submitForm(const QString &endpoint, const QString &method,
 
     QJsonObject normalizedBody = normalizeArrayValues(body);
     QByteArray payload = QJsonDocument(normalizedBody).toJson();
-    qDebug() << "submitForm: payload =" << QString::fromUtf8(payload);
 
     QNetworkReply *reply = nullptr;
-
     if (method == "POST")
-    {
         reply = m_networkManager->post(request, payload);
-    }
     else if (method == "PUT")
-    {
         reply = m_networkManager->put(request, payload);
-    }
     else
-    {
         reply = m_networkManager->post(request, payload);
-    }
 
     m_pendingRequests[reply] = callbackId;
 }
@@ -457,7 +448,6 @@ void WidgetBridge::setAccessToken(const QString &token)
 void WidgetBridge::setCurrentSessionId(const QString &sessionId)
 {
     m_currentSessionId = sessionId;
-    qDebug() << "WidgetBridge: current session id set, length =" << sessionId.length();
 }
 
 void WidgetBridge::clearParameters()
@@ -465,7 +455,6 @@ void WidgetBridge::clearParameters()
     if (m_dataManager)
     {
         m_dataManager->clearParameters();
-        qDebug() << "WidgetBridge: parameters cleared";
     }
 }
 
@@ -475,7 +464,58 @@ void WidgetBridge::openGanttEditor(int projectId, bool isReadOnly)
     emit ganttEditorRequested(projectId, isReadOnly);
 }
 
-// Извлекает user_id из JWT (payload.user_id). Без проверки подписи — только для X-User-ID.
+// ============================================================
+// Запуск gantt_editor как отдельного процесса
+// ============================================================
+void WidgetBridge::launchGanttEditor(int projectId, bool isReadOnly)
+{
+    qDebug() << "WidgetBridge::launchGanttEditor: projectId=" << projectId
+             << "readOnly=" << isReadOnly;
+
+    QString appDir = QCoreApplication::applicationDirPath();
+    QStringList candidates;
+#ifdef Q_OS_WIN
+    candidates << appDir + "/gantt_editor.exe"
+               << appDir + "/gantt_editor/gantt_editor.exe"
+               << appDir + "/../gantt_editor/gantt_editor.exe";
+#else
+    candidates << appDir + "/gantt_editor"
+               << appDir + "/gantt_editor/gantt_editor"
+               << appDir + "/../gantt_editor/gantt_editor";
+#endif
+
+    QString program;
+    for (const QString& c : candidates)
+    {
+        QFileInfo fi(c);
+        if (fi.exists() && fi.isFile() && fi.isExecutable()) { program = c; break; }
+    }
+    if (program.isEmpty())
+    {
+        qWarning() << "gantt_editor not found. Tried:" << candidates;
+        emit interfaceError("Не найден исполняемый файл gantt_editor");
+        return;
+    }
+
+    QStringList arguments;
+    arguments << "--mode=master"
+              << "--project-id=" + QString::number(projectId);
+    if (isReadOnly) arguments << "--read-only";
+
+    if (!m_currentToken.isEmpty()) {
+        QString tokenFile = QString("/tmp/gantt_token_master_%1.txt").arg(projectId);
+        QFile f(tokenFile);
+        if (f.open(QIODevice::WriteOnly)) {
+            f.write(m_currentToken.toUtf8());
+            f.close();
+            arguments << "--token-file=" + tokenFile;
+        }
+    }
+
+    bool ok = QProcess::startDetached(program, arguments);
+    qDebug() << "gantt_editor launched:" << ok << "program:" << program << "args:" << arguments;
+}
+
 int WidgetBridge::extractUserIdFromToken() const
 {
     if (m_currentToken.isEmpty()) return 0;
@@ -483,7 +523,6 @@ int WidgetBridge::extractUserIdFromToken() const
     if (parts.size() != 3) return 0;
 
     QByteArray payloadB64 = parts[1].toUtf8();
-    // Base64url -> Base64
     payloadB64.replace('-', '+').replace('_', '/');
     while (payloadB64.size() % 4) payloadB64.append('=');
 
@@ -497,23 +536,16 @@ int WidgetBridge::extractUserIdFromToken() const
 
 void WidgetBridge::loadProjectList(const QString &callbackId)
 {
-    qDebug() << "WidgetBridge: loadProjectList callbackId=" << callbackId;
-
     int userId = extractUserIdFromToken();
-    qDebug() << "loadProjectList: userId=" << userId << "tokenLen=" << m_currentToken.length();
-    
     if (userId == 0) {
-        qWarning() << "WidgetBridge: cannot extract user_id from token";
         emit projectListLoaded(callbackId, QJsonArray(), QJsonArray());
         return;
     }
 
     const QString baseUrl = "http://localhost:8001/api/v1/projects/list-with-access";
 
-    // Создаём отдельный QNAM только для этого запроса, чтобы 
-    // глобальный onNetworkReplyFinished не съел данные.
     QNetworkAccessManager *localNam = new QNetworkAccessManager(this);
-    
+
     auto makeRequest = [this, localNam, userId](const QString &url) -> QNetworkReply* {
         QNetworkRequest req{QUrl(url)};
         if (!m_currentToken.isEmpty())
@@ -526,22 +558,15 @@ void WidgetBridge::loadProjectList(const QString &callbackId)
 
     connect(replyEdit, &QNetworkReply::finished, this,
             [this, localNam, replyEdit, baseUrl, callbackId]() {
-        
+
         QByteArray replyEditData = replyEdit->readAll();
-        qDebug() << "replyEdit: status=" << replyEdit->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
-                 << "size=" << replyEditData.size()
-                 << "preview=" << replyEditData.left(150);
-                 
         int userId = extractUserIdFromToken();
-                 
+
         QJsonArray editable;
         if (replyEdit->error() == QNetworkReply::NoError) {
             QJsonDocument doc = QJsonDocument::fromJson(replyEditData);
             if (doc.isArray()) editable = doc.array();
-        } else {
-            qWarning() << "loadProjectList edit error: " << replyEdit->errorString();
         }
-        
         replyEdit->deleteLater();
 
         QNetworkRequest req2{QUrl(baseUrl + "?permission=view_project")};
@@ -552,18 +577,13 @@ void WidgetBridge::loadProjectList(const QString &callbackId)
         QNetworkReply* replyView = localNam->get(req2);
         connect(replyView, &QNetworkReply::finished, this,
                 [this, localNam, replyView, editable, callbackId]() {
-            
+
             QByteArray replyViewData = replyView->readAll();
-            qDebug() << "replyView: status=" << replyView->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
-                     << "size=" << replyViewData.size()
-                     << "preview=" << replyViewData.left(150);
 
             QJsonArray all;
             if (replyView->error() == QNetworkReply::NoError) {
                 QJsonDocument doc = QJsonDocument::fromJson(replyViewData);
                 if (doc.isArray()) all = doc.array();
-            } else {
-                qWarning() << "loadProjectList view error: " << replyView->errorString();
             }
 
             QSet<int> editIds;
@@ -576,12 +596,10 @@ void WidgetBridge::loadProjectList(const QString &callbackId)
                     viewable.append(v);
             }
 
-            qDebug() << "WidgetBridge: projectListLoaded editable=" << editable.size()
-                     << "viewable=" << viewable.size();
             emit projectListLoaded(callbackId, editable, viewable);
-            
+
             replyView->deleteLater();
-            localNam->deleteLater(); // Удаляем временный менеджер
+            localNam->deleteLater();
         });
     });
 }

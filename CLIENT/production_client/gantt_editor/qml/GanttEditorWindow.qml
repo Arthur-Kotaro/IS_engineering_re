@@ -6,9 +6,9 @@ import GanttEditor 1.0
 ApplicationWindow
 {
     id: mainWindow
-    width: 1800
+    width: 1900
     height: 750
-    minimumWidth: 1800
+    minimumWidth: 1900
     minimumHeight: 750
     visible: true
     title: "Мастерграфик: " + (projectController.projectData ? projectController.projectData.projectName : "")
@@ -56,11 +56,10 @@ ApplicationWindow
     property alias helpDialog: helpDialog
     property alias exportDialog: exportDialog
     property alias taskContextMenu: taskContextMenu
-
-    Component.onCompleted: {
-        if (mgId !== "")
-            projectController.loadFromServer(mgId, accessToken)
-    }
+    property alias taskDetailsDialog: taskDetailsDialog
+    property alias defaultGroupsDialog: defaultGroupsDialog
+    property alias createGroupDialog: createGroupDialog
+    property alias cascadeUpdateDialog: cascadeUpdateDialog
 
     Connections
     {
@@ -78,6 +77,21 @@ ApplicationWindow
         function onErrorOccurred(message)
         {
             if (typeof toast !== "undefined" && toast) toast.show(message)
+        }
+    }
+
+    Connections
+    {
+        target: projectController
+        function onCascadeUpdateRequested(successors, baseReason) {
+            if (mainWindow.cascadeUpdateDialog)
+                mainWindow.cascadeUpdateDialog.openWith(successors, baseReason, function(list, finalReason) {
+                    for (var i = 0; i < list.length; i++) {
+                        var s = list[i]
+                        projectController.updateTaskDates(s.taskId,
+                                                          new Date(s.newStart), new Date(s.newEnd), finalReason)
+                    }
+                })
         }
     }
 
@@ -223,6 +237,10 @@ ApplicationWindow
     AboutDialog { id: aboutDialog }
     HelpDialog { id: helpDialog }
     ExportDialog { id: exportDialog }
+    TaskDetailsDialog { id: taskDetailsDialog }
+    DefaultGroupsDialog { id: defaultGroupsDialog }
+    CreateGroupDialog { id: createGroupDialog }
+    CascadeUpdateDialog { id: cascadeUpdateDialog }
 
     Rectangle
     {

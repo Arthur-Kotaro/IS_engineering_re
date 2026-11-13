@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Boolean, Date, DateTime
+from sqlalchemy import Column, String, Boolean, Date, DateTime, BigInteger
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.database import Base
@@ -15,6 +15,10 @@ class Holiday(Base):
     is_yearly = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(BigInteger, nullable=True)
 
     def __repr__(self):
         return f"<Holiday({self.name}, {self.start_date})>"

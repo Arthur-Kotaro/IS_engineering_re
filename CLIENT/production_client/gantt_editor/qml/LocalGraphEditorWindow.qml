@@ -6,9 +6,9 @@ import GanttEditor 1.0
 ApplicationWindow
 {
     id: mainWindow
-    width: 1800
+    width: 1900
     height: 750
-    minimumWidth: 1800
+    minimumWidth: 1900
     minimumHeight: 750
     visible: true
     title: "Локальный график: " + (projectController.projectData ? projectController.projectData.projectName : "")
@@ -44,8 +44,15 @@ ApplicationWindow
     property alias helpDialog: helpDialog
     property alias exportDialog: exportDialog
     property alias taskContextMenu: taskContextMenu
+    property alias taskDetailsDialog: taskDetailsDialog
+    property alias cascadeUpdateDialog: cascadeUpdateDialog
 
     Component.onCompleted: {
+        console.log("[LGWindow] onCompleted:",
+                    " gridArea.width=", gridArea ? gridArea.width : -1,
+                    " gridArea.height=", gridArea ? gridArea.height : -1,
+                    " calendarHeader.contentWidth=", calendarHeader ? calendarHeader.contentWidth : -1,
+                    " calendarHeader.height=", calendarHeader ? calendarHeader.height : -1)
         if (mainWindow.hasGridArea()) mainWindow.gridArea.updateData()
         if (calendarHeader) calendarHeader.refresh()
     }
@@ -177,6 +184,8 @@ ApplicationWindow
     AboutDialog { id: aboutDialog }
     HelpDialog { id: helpDialog }
     ExportDialog { id: exportDialog }
+    TaskDetailsDialog { id: taskDetailsDialog }
+    CascadeUpdateDialog { id: cascadeUpdateDialog }
 
     Rectangle {
         id: toast
@@ -195,5 +204,20 @@ ApplicationWindow
         NumberAnimation { id: toastShow; target: toast; property: "opacity"; to: 1.0; duration: 200 }
         NumberAnimation { id: toastHide; target: toast; property: "opacity"; to: 0.0; duration: 300 }
         function show(message) { toastText.text = message; toastShow.start(); toastTimer.restart() }
+    }
+
+    Connections
+    {
+        target: projectController
+        function onCascadeUpdateRequested(successors, baseReason) {
+            if (mainWindow.cascadeUpdateDialog)
+                mainWindow.cascadeUpdateDialog.openWith(successors, baseReason, function(list, finalReason) {
+                    for (var i = 0; i < list.length; i++) {
+                        var s = list[i]
+                        projectController.localGraphController.updateLocalTaskDates(
+                            s.taskId, new Date(s.newStart), new Date(s.newEnd))
+                    }
+                })
+        }
     }
 }

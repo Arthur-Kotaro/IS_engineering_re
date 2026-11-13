@@ -8,6 +8,8 @@ class ProjectCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     priority: int = 0
+    project_type: str = Field(..., min_length=1, max_length=50)
+    typology: str = Field(..., min_length=1, max_length=50)
     chief_engineer_id: int
     planning_engineer_id: int
     status: str = "draft"
@@ -28,6 +30,8 @@ class ProjectResponse(BaseModel):
     description: Optional[str]
     priority: int
     status: str
+    project_type: str
+    typology: str
     chief_engineer_id: Optional[int]
     planning_engineer_id: Optional[int]
     created_by: int
@@ -44,6 +48,7 @@ class ProjectMemberResponse(BaseModel):
     user_id: int
     role_code: str
     joined_at: datetime
+    full_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -73,3 +78,26 @@ class CheckAccessResponse(BaseModel):
     reason: Optional[str] = None
     role: Optional[str] = None
     project_status: Optional[str] = None
+
+
+class ProjectTypeResponse(BaseModel):
+    code: str
+    name_ru: str
+    name_en: str
+    description_ru: Optional[str] = None
+    sort_order: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class TypologyResponse(BaseModel):
+    code: str
+    project_type: str
+    name_ru: str
+    name_en: str
+    description_ru: Optional[str] = None
+    sort_order: int = 0
+
+    class Config:
+        from_attributes = True

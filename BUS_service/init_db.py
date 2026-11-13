@@ -1,7 +1,7 @@
 # init_db.py
 import asyncio
 from app.database import engine, Base
-from app.models import LocalGraph, LgTask, LgDependency
+from app.models import LocalGraph, LgTask, LgDependency, LgEvent
 
 
 async def init_db():

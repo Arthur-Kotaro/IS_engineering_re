@@ -154,8 +154,9 @@ Flickable
                     function responsibleText()
                     {
                         if (!taskData) return "—"
-                        var r = taskData.responsible
-                        return (r && r.length > 0) ? r : "—"
+                            var r = taskData.responsible
+                            if (!r || r === "" || r === "0") return "—"
+                                return r
                     }
 
                     function startDateText()
@@ -241,7 +242,7 @@ Flickable
                             {
                                 text: viewLabelText()
                                 anchors.left: parent.left
-                                anchors.leftMargin: 4
+                                anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
                                 font.pixelSize: 12
                                 color: "#444444"

@@ -1,4 +1,5 @@
 # app/services/project_service.py
+import logging
 from typing import Optional, List
 from fastapi import HTTPException
 from app.repositories.project_repo import ProjectRepository
@@ -14,10 +15,15 @@ from app.schemas.project import (
     CheckAccessResponse, ProjectRoleResponse,
 )
 from app.models.project import Project, ProjectStatus
+from app.models.mg_creation_queue import MgCreationQueue, MgCreationQueueStatus
+from app.services.user_client import get_user_name
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectService:
     def __init__(self, db):
+        self.db = db
         self.repo = ProjectRepository(db)
         self.access = AccessService(self.repo)
 
@@ -28,6 +34,8 @@ class ProjectService:
             description=p.description,
             priority=p.priority,
             status=p.status,
+            project_type=p.project_type,
+            typology=p.typology,
             chief_engineer_id=p.chief_engineer_id,
             planning_engineer_id=p.planning_engineer_id,
             created_by=p.created_by,
@@ -41,36 +49,55 @@ class ProjectService:
             title=data.title,
             description=data.description,
             priority=data.priority,
+            project_type=data.project_type,
+            typology=data.typology,
             chief_engineer_id=data.chief_engineer_id,
             planning_engineer_id=data.planning_engineer_id,
             created_by=created_by,
             status=data.status or ProjectStatus.DRAFT,
         )
-        # Автоматически добавляем CE и IPP как участников
         await self.repo.add_member(p.project_id, "chief_engineer", data.chief_engineer_id)
         if data.planning_engineer_id != data.chief_engineer_id:
             await self.repo.add_member(p.project_id, "planning_engineer", data.planning_engineer_id)
+
+        queue_item = MgCreationQueue(
+            project_id=p.project_id,
+            project_type=p.project_type,
+            typology_name=p.typology,
+            cve_id=data.chief_engineer_id,
+            ipp_id=data.planning_engineer_id,
+            status=MgCreationQueueStatus.PENDING,
+        )
+        self.db.add(queue_item)
+        await self.db.commit()
+        logger.info(f"Project {p.project_id} created; queued MG creation (item {queue_item.id})")
+
         return self._to_response(p, members_count=2 if data.planning_engineer_id != data.chief_engineer_id else 1)
 
     async def get_project(self, project_id: int) -> Optional[ProjectDetailResponse]:
         p = await self.repo.get_by_id(project_id, with_members=True)
         if not p:
             return None
-        members = [
-            ProjectMemberResponse(
+
+        members = []
+        for m in p.members:
+            full_name = await get_user_name(m.user_id)
+            members.append(ProjectMemberResponse(
                 member_id=m.member_id,
                 user_id=m.user_id,
                 role_code=m.role_code,
                 joined_at=m.joined_at,
-            )
-            for m in p.members
-        ]
+                full_name=full_name,
+            ))
+
         return ProjectDetailResponse(
             project_id=p.project_id,
             title=p.title,
             description=p.description,
             priority=p.priority,
             status=p.status,
+            project_type=p.project_type,
+            typology=p.typology,
             chief_engineer_id=p.chief_engineer_id,
             planning_engineer_id=p.planning_engineer_id,
             created_by=p.created_by,
@@ -101,11 +128,13 @@ class ProjectService:
         m = await self.repo.add_member(project_id, data.role_code, data.user_id)
         if not m:
             raise HTTPException(400, "User already in project or role invalid")
+        full_name = await get_user_name(m.user_id)
         return ProjectMemberResponse(
             member_id=m.member_id,
             user_id=m.user_id,
             role_code=m.role_code,
             joined_at=m.joined_at,
+            full_name=full_name,
         )
 
     async def remove_member(self, project_id, user_id, current_user_id, token=None) -> bool:

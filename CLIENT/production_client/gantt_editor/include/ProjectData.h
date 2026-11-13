@@ -35,6 +35,13 @@ class ProjectData : public QObject
 
     Q_PROPERTY(QDate linkedPredecessorEndDate READ getLinkedPredecessorEndDate WRITE set_LinkedPredecessorEndDate NOTIFY linkedPredecessorEndDateChanged)
 
+    // Статус МГ / типология
+    Q_PROPERTY(bool isApproved READ get_isApproved WRITE set_IsApproved NOTIFY isApprovedChanged)
+    Q_PROPERTY(QString typologyName READ get_typologyName WRITE set_TypologyName NOTIFY typologyNameChanged)
+    Q_PROPERTY(QString mgId READ get_mgId WRITE set_MgId NOTIFY mgIdChanged)
+    Q_PROPERTY(bool isPure READ get_isPure WRITE set_IsPure NOTIFY isPureChanged)
+    Q_PROPERTY(bool canEdit READ get_canEdit WRITE set_CanEdit NOTIFY canEditChanged)
+
 public:
     explicit ProjectData(QObject *parent = nullptr);
 
@@ -68,6 +75,15 @@ public:
     int get_graphKindInt() const;
     void set_GraphKindInt(int kind);
 
+    bool get_isApproved() const { return m_isApproved; }
+    void set_IsApproved(bool approved);
+
+    QString get_typologyName() const { return m_typologyName; }
+    void set_TypologyName(const QString& t);
+
+    QString get_mgId() const { return m_mgId; }
+    void set_MgId(const QString& id);
+
     Q_INVOKABLE QDate getLinkedTargetStart() const;
     Q_INVOKABLE QDate getLinkedTargetEnd() const;
     void set_LinkedTargetStart(const QDate& date);
@@ -83,6 +99,12 @@ public:
     GroupModel* get_groupModel() const;
     MilestoneModel* get_milestoneModel() const;
     DependencyModel* get_dependencyModel() const;
+
+    bool get_isPure() const { return m_isPure; }
+    void set_IsPure(bool pure);
+
+    bool get_canEdit() const { return m_canEdit; }
+    void set_CanEdit(bool can);
 
     Q_INVOKABLE void clear();
     Q_INVOKABLE QVariantMap toJson() const;
@@ -112,8 +134,16 @@ signals:
     void lastModifiedDateTimeChanged();
     void graphKindChanged();
     void linkedPredecessorEndDateChanged();
+    void isApprovedChanged();
+    void typologyNameChanged();
+    void mgIdChanged();
+    void isPureChanged();
+    void canEditChanged();
 
 private:
+    bool m_isPure = false;
+    bool m_canEdit = false;
+
     QString m_projectName;
     QString m_projectType;
     QDate m_startDate;
@@ -127,6 +157,9 @@ private:
     QDate m_linkedTargetEnd;
     QString m_linkedMasterTaskId;
     QDate m_linkedPredecessorEndDate;
+    bool m_isApproved = false;
+    QString m_typologyName;
+    QString m_mgId;
 
     QStringList m_validationErrors;
 

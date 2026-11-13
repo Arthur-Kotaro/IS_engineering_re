@@ -20,16 +20,12 @@ Rectangle
     property var externalFlickable: null
     property var taskContextMenu: null
 
-    // Состояние тултипа
     property bool tooltipVisible: false
     property var tooltipMouseArea: null
     property bool tooltipFromNode: false
     property var tooltipAnchorItem: null
 
     z: tooltipVisible ? 50 : 0
-
-    signal taskDatesChanged(string taskId, date newStart, date newEnd)
-    signal forecastDatesChanged(string taskId, date newStart, date newEnd)
 
     // ---------- Заголовок группы ----------
     Text
@@ -85,9 +81,6 @@ Rectangle
         externalFlickable: root.externalFlickable
         taskContextMenu: root.taskContextMenu
         parentRow: root
-
-        onTaskDatesChanged: function(id, s, e) { root.taskDatesChanged(id, s, e) }
-        onForecastDatesChanged: function(id, s, e) { root.forecastDatesChanged(id, s, e) }
 
         onTooltipRequested: function(visible, mouseArea, fromNode) {
             root.tooltipVisible = visible
@@ -149,36 +142,48 @@ Rectangle
         }
         delegate: Rectangle
         {
-            x:
-            {
-                var ps = modelData.start.split(".")
-                if (ps.length === 3)
-                {
-                    var d = new Date(parseInt(ps[2]), parseInt(ps[1]) - 1, parseInt(ps[0]))
-                    return Math.max(0, Math.floor((d - root.displayStart) / 86400000) * root.dayWidth)
-                }
-                return 0
+            id: historyRect
+
+            readonly property date oldStart: {
+                if (!modelData || !modelData.old_start) return new Date()
+                    return new Date(modelData.old_start)
             }
-            width:
-            {
-                var ps = modelData.start.split(".")
-                var pe = modelData.end.split(".")
-                if (ps.length === 3 && pe.length === 3)
-                {
-                    var s = new Date(parseInt(ps[2]), parseInt(ps[1]) - 1, parseInt(ps[0]))
-                    var e = new Date(parseInt(pe[2]), parseInt(pe[1]) - 1, parseInt(pe[0]))
-                    return Math.max(10, (Math.floor((e - s) / 86400000) + 1) * root.dayWidth)
-                }
-                return 10
+            readonly property date oldEnd: {
+                if (!modelData || !modelData.old_end) return new Date()
+                    return new Date(modelData.old_end)
             }
+
+            x: Math.max(0, Math.floor((oldStart - root.displayStart) / 86400000) * root.dayWidth)
+            width: Math.max(10, (Math.floor((oldEnd - oldStart) / 86400000) + 1) * root.dayWidth)
             height: ganttBar.height
             y: ganttBar.y
             color: "#cccccc"
-            opacity: 0.7
+            opacity: hoverArea.containsMouse ? 0.95 : 0.7
             radius: 4
             border.color: "#888888"
             border.width: 1
             z: -1
+
+            MouseArea
+            {
+                id: hoverArea
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.NoButton
+            }
+
+            ToolTip
+            {
+                visible: hoverArea.containsMouse
+                delay: 300
+                text: {
+                    if (!modelData) return ""
+                        var s = (modelData.old_start || "") + " — " + (modelData.old_end || "")
+                        var n = (modelData.new_start || "") + " — " + (modelData.new_end || "")
+                        var r = modelData.reason || "—"
+                        return "Было: " + s + "\nСтало: " + n + "\nПричина: " + r
+                }
+            }
         }
     }
 

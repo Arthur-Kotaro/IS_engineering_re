@@ -39,18 +39,13 @@ Rectangle
         anchors.rightMargin: 4
         spacing: 3
 
-        // ---- Сохранить, Обновить, Экспорт ----
         ToolButton
         {
             icon.source: "qrc:/qml/icons/save.svg"
             icon.width: 20; icon.height: 20
             ToolTip.visible: hovered; ToolTip.delay: 400
             ToolTip.text: "Сохранить (отправить diff на сервер)"
-            onClicked:
-            {
-                if (projectController)
-                    projectController.saveProject()
-            }
+            onClicked: if (projectController) projectController.saveProject()
         }
         ToolButton
         {
@@ -59,10 +54,11 @@ Rectangle
             Layout.preferredWidth: 28
             ToolTip.visible: hovered; ToolTip.delay: 400
             ToolTip.text: "Обновить (snapshot с сервера)"
-            onClicked:
-            {
+            onClicked: {
                 if (projectController && mainWindow.mgId !== "")
                     projectController.loadFromServer(mainWindow.mgId, mainWindow.accessToken)
+                else if (projectController)
+                    projectController.reloadMastergraph()
             }
         }
         ToolButton
@@ -74,10 +70,8 @@ Rectangle
             onClicked: { if (mainWindow && mainWindow.exportDialog) mainWindow.exportDialog.open() }
         }
 
-        // Разделитель
         Rectangle { width: 1; height: 24; color: "#b0b0b0"; Layout.alignment: Qt.AlignVCenter }
 
-        // ---- Блокировка, Настройки ----
         ToolButton
         {
             icon.source: (projectController && projectController.settingsManager.editingLocked)
@@ -120,10 +114,8 @@ Rectangle
             onClicked: appToolBar.expandAll()
         }
 
-        // Разделитель
         Rectangle { width: 1; height: 24; color: "#b0b0b0"; Layout.alignment: Qt.AlignVCenter }
 
-        // ---- Каскад, Список (только для МГ) ----
         Button
         {
             text: "Добавить каскад"
@@ -140,8 +132,7 @@ Rectangle
             font.pixelSize: 11
             onClicked: if (mainWindow.listDialog) mainWindow.listDialog.open()
         }
-        
-        // ---- Добавить задачу (только для ЛГ) ----
+
         Button
         {
             text: "Добавить задачу"
@@ -149,14 +140,16 @@ Rectangle
             Layout.preferredWidth: 150
             font.pixelSize: 11
             onClicked: {
-                var title = "Новая задача ЛГ"
-                projectController.localGraphController.addLocalTask(title, "0", new Date(), new Date())
+                if (projectController && projectController.projectData) {
+                    var gm = projectController.projectData.groupModel
+                    if (gm.rowCount() > 0 && mainWindow.newTaskDialog)
+                        mainWindow.newTaskDialog.openForGroup(gm.getGroupId(0))
+                }
             }
         }
 
         Rectangle { width: 1; height: 24; color: "#b0b0b0"; Layout.alignment: Qt.AlignVCenter }
 
-        // ---- Режим, Масштаб, Экран ----
         ComboBox
         {
             id: viewModeCombo
@@ -216,7 +209,6 @@ Rectangle
 
         Rectangle { width: 1; height: 24; color: "#b0b0b0"; Layout.alignment: Qt.AlignVCenter }
 
-        // ---- Переключатели ----
         Button
         {
             text: "Прогресс"
@@ -269,6 +261,33 @@ Rectangle
                 if (mainWindow.hasGridArea()) mainWindow.gridArea.updateData()
                 if (mainWindow.calendarHeader) mainWindow.calendarHeader.refresh()
             }
+        }
+
+        Rectangle { width: 1; height: 24; color: "#b0b0b0"; Layout.alignment: Qt.AlignVCenter }
+
+        // Индикатор: редактирование / просмотр
+        ToolButton
+        {
+            icon.source: (projectController && projectController.canEdit)
+                         ? "qrc:/qml/icons/edit_on.svg"
+                         : "qrc:/qml/icons/edit_off.svg"
+            icon.width: 20; icon.height: 20
+            ToolTip.visible: hovered; ToolTip.delay: 400
+            ToolTip.text: (projectController && projectController.canEdit) ? "Редактирование" : "Просмотр"
+            onClicked: {}
+        }
+
+        // Индикатор: черновик / чистовик (только МГ)
+        ToolButton
+        {
+            visible: projectController && !projectController.isLocalGraph
+            icon.source: (projectController && projectController.isApproved)
+                         ? "qrc:/qml/icons/approved.svg"
+                         : "qrc:/qml/icons/draft.svg"
+            icon.width: 20; icon.height: 20
+            ToolTip.visible: hovered; ToolTip.delay: 400
+            ToolTip.text: (projectController && projectController.isApproved) ? "Чистовик" : "Черновик"
+            onClicked: {}
         }
 
         Item { Layout.fillWidth: true; Layout.minimumWidth: 4 }

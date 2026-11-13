@@ -126,6 +126,12 @@ Rectangle
 
             displayStart = s
             displayEnd = e
+            console.log("[CalendarHeader] displayStart=", displayStart,
+                        " displayEnd=", displayEnd,
+                        " totalDays=", totalDays,
+                        " contentWidth=", contentWidth,
+                        " linkedStart=", linkedStart, " linkedEnd=", linkedEnd,
+                        " earliest=", earliest, " latest=", latest)
             return
         }
 

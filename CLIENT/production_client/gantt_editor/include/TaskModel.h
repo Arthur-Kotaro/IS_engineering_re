@@ -4,6 +4,8 @@
 #include <QAbstractListModel>
 #include <QDate>
 #include <QList>
+#include <QVariantList>
+#include <QVariantMap>
 #include "GlobalDefines.h"
 #include "HistoryEntry.h"
 
@@ -23,7 +25,7 @@ public:
         QDate forecastStart;
         QDate forecastEnd;
         GanttDefines::TaskStatus status;
-        QList<QPair<QDate, QDate>> dateHistory;
+        QList<QVariantMap> dateHistory;  // [{old_start, old_end, new_start, new_end, reason}]
         QString comment;
         QString groupId;
         QList<HistoryEntry*> history;
@@ -47,11 +49,14 @@ public:
     Q_INVOKABLE void addTaskWithId(const QString& taskId, const QString& groupId, const QString& title,
                                    const QString& responsible, const QDate& startDate, const QDate& endDate,
                                    const QDate& forecastStart, const QDate& forecastEnd, int status,
-                                   int progressCurrent, int progressTotal, int localGraphState);
+                                   int progressCurrent, int progressTotal, int localGraphState,
+                                   const QString& comment = QString(),
+                                   const QVariantList& dateHistory = QVariantList());
     Q_INVOKABLE void removeTask(const QString& taskId);
     Q_INVOKABLE void updateTask(const QString& taskId, const QString& title, const QString& responsible,
                                 const QDate& startDate, const QDate& endDate, int status);
-    Q_INVOKABLE void updateTaskDates(const QString& taskId, const QDate& newStart, const QDate& newEnd, bool addToHistory = true);
+    Q_INVOKABLE void updateTaskDates(const QString& taskId, const QDate& newStart, const QDate& newEnd,
+                                     bool addToHistory = true, const QString& reason = QString());
     Q_INVOKABLE void updateForecastDates(const QString& taskId, const QDate& newForecastStart, const QDate& newForecastEnd);
     Q_INVOKABLE void setTaskStatus(const QString& taskId, GanttDefines::TaskStatus status);
     Q_INVOKABLE void setTaskComment(const QString& taskId, const QString& comment);

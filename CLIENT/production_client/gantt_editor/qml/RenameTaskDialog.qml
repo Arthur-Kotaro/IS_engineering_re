@@ -14,12 +14,11 @@ Dialog
 
     property string taskId: ""
 
-    function openForTask(tId)
-    {
+    function openForTask(tId) {
         if (!tId || tId === "") return
         if (!projectController) return
         if (projectController.settingsManager.editingLocked) {
-            showToast("Редактирование заблокировано")
+            if (mainWindow && mainWindow.toast) mainWindow.toast.show("Редактирование заблокировано")
             return
         }
         taskId = tId
@@ -28,83 +27,30 @@ Dialog
         open()
     }
 
-    function showToast(message)
-    {
-        var w = root.Window.window
-        if (w && w.toast) w.toast.show(message)
-        else if (typeof mainWindow !== "undefined" && mainWindow && mainWindow.toast) mainWindow.toast.show(message)
-        else console.log("TOAST:", message)
-    }
-
     ColumnLayout
     {
         anchors.fill: parent
         anchors.margins: 15
         spacing: 15
 
-        Label
-        {
-            text: "Новое название задачи:"
-            Layout.fillWidth: true
-            font.pixelSize: 13
-        }
-
-        TextField
-        {
-            id: newNameField
-            Layout.fillWidth: true
-            Layout.preferredHeight: 35
-            placeholderText: "Введите название задачи"
-            font.pixelSize: 13
-            focus: true
-            onAccepted:
-            {
-                if (newNameField.text !== "") root.accept()
-            }
-        }
+        Label { text: "Новое название задачи:"; Layout.fillWidth: true; font.pixelSize: 13 }
+        TextField { id: newNameField; Layout.fillWidth: true; Layout.preferredHeight: 35
+            placeholderText: "Введите название"; font.pixelSize: 13; focus: true }
 
         Item { Layout.fillHeight: true }
 
         RowLayout
         {
-            Layout.fillWidth: true
-            spacing: 10
-
-            Button
-            {
-                text: "Отмена"
-                Layout.fillWidth: true
-                Layout.preferredHeight: 35
-                onClicked: root.close()
-            }
-
-            Button
-            {
-                text: "ОК"
-                Layout.fillWidth: true
-                Layout.preferredHeight: 35
+            Layout.fillWidth: true; spacing: 10
+            Button { text: "Отмена"; Layout.fillWidth: true; Layout.preferredHeight: 35
+                onClicked: root.close() }
+            Button { text: "ОК"; Layout.fillWidth: true; Layout.preferredHeight: 35
                 enabled: newNameField.text !== ""
-                onClicked: root.accept()
-            }
+                onClicked: {
+                    if (root.taskId && projectController)
+                        projectController.updateTaskTitle(root.taskId, newNameField.text)
+                    root.close()
+                } }
         }
-    }
-
-    onAccepted:
-    {
-        if (taskId === "" || !projectController || !projectController.projectData) return
-        if (projectController.settingsManager.editingLocked) {
-            showToast("Редактирование заблокировано")
-            return
-        }
-        var task = projectController.projectData.taskModel.getTask(taskId)
-        if (!task) return
-        projectController.projectData.taskModel.updateTask(
-            taskId,
-            newNameField.text,
-            task.responsible,
-            task.startDate,
-            task.endDate,
-            task.status
-        )
     }
 }

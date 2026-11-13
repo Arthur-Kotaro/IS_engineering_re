@@ -28,7 +28,6 @@ Rectangle
     property string hoveredTaskId: ""
     property var timeLineRef: currentTimeLine
 
-    // Свойства для синих границ (целевых)
     property bool showTargetStartLine: false
     property bool showTargetEndLine: false
     property real targetStartLineX: 0
@@ -36,11 +35,13 @@ Rectangle
     property bool targetStartLineArrows: true
     property bool targetEndLineArrows: true
 
-    // Свойства для красной границы (предшественника)
     property bool showPredecessorLine: false
     property real predecessorLineX: 0
 
     property int effectiveRows: totalRows
+
+    readonly property bool isPure: projectController ? projectController.isPure : false
+    readonly property bool canEdit: projectController ? projectController.canEdit : false
 
     onShowDependenciesChanged: dependencyCanvas.refresh()
     onDayWidthChanged:
@@ -64,7 +65,6 @@ Rectangle
         dayWidth: root.dayWidth
     }
 
-    // Левая синяя граница
     TargetDatesLine
     {
         id: targetStartLine
@@ -75,7 +75,6 @@ Rectangle
         lineColor: "#2266cc"
     }
 
-    // Правая синяя граница
     TargetDatesLine
     {
         id: targetEndLine
@@ -86,7 +85,6 @@ Rectangle
         lineColor: "#2266cc"
     }
 
-    // Красная граница (предшественник)
     TargetDatesLine
     {
         id: predecessorLine
@@ -102,6 +100,7 @@ Rectangle
         target: projectController
         function onProjectDataChanged() { updateData() }
         function onProjectLoaded() { updateData() }
+        function onIsPureChanged() { updateData() }
     }
 
     Connections
@@ -141,41 +140,57 @@ Rectangle
         var linkedEnd = projectController.projectData.getLinkedTargetEnd()
         var predEnd = projectController.projectData.getLinkedPredecessorEndDate()
 
-        // 1. Левая синяя (целевое начало)
         if (GridRange.isValidDate(linkedStart))
         {
             var xs = GridRange.dateToX(linkedStart, root.displayStart, root.dayWidth)
-            if (xs >= 0) { 
-                targetStartLineX = xs
-                showTargetStartLine = true 
-            }
+            if (xs >= 0) { targetStartLineX = xs; showTargetStartLine = true }
         }
 
-        // 2. Правая синяя (целевое завершение)
         if (GridRange.isValidDate(linkedEnd))
         {
             var xe = GridRange.dateToX(linkedEnd, root.displayStart, root.dayWidth)
-            if (xe >= 0) { 
-                targetEndLineX = xe + root.dayWidth
-                showTargetEndLine = true 
-            }
+            if (xe >= 0) { targetEndLineX = xe + root.dayWidth; showTargetEndLine = true }
         }
 
-        // 3. Красная (предшественник)
         if (GridRange.isValidDate(predEnd))
         {
             var xp = GridRange.dateToX(predEnd, root.displayStart, root.dayWidth)
-            if (xp >= 0)
-            {
-                predecessorLineX = xp + root.dayWidth
-                showPredecessorLine = true
-            }
+            if (xp >= 0) { predecessorLineX = xp + root.dayWidth; showPredecessorLine = true }
         }
     }
 
     function updateData()
     {
         if (!projectController || !projectController.projectData) return
+
+        if (isPure)
+        {
+            var now = new Date()
+            var s = new Date(now.getFullYear(), now.getMonth(), 1)
+            var e = new Date(now.getFullYear(), now.getMonth() + 2, 0)
+            while (s.getDay() !== 1) s.setDate(s.getDate() - 1)
+            s.setHours(0, 0, 0, 0)
+            e.setHours(23, 59, 59, 999)
+
+            displayStart = s
+            displayEnd = e
+            totalDays = Math.max(1, Math.floor((e - s) / 86400000) + 1)
+            gridWidth = totalDays * dayWidth
+
+            visibleItems = []
+            updateCounter++
+            totalRows = 5
+            effectiveRows = 5
+            contentHeight = 5 * rowHeight
+            root.height = contentHeight
+            tasksRepeater.model = []
+
+            updateTargetDateLines()
+            backgroundCanvas.refresh()
+            dependencyCanvas.refresh()
+            if (currentTimeLine) currentTimeLine.updateLinePosition()
+            return
+        }
 
         var localMode = (projectController.projectData.graphKind === 1)
 
@@ -189,7 +204,6 @@ Rectangle
 
             var dates = []
 
-            // 1. Собираем все возможные даты (если они валидны)
             if (GridRange.isValidDate(linkedStart)) dates.push(new Date(linkedStart))
             if (GridRange.isValidDate(linkedEnd)) dates.push(new Date(linkedEnd))
             if (GridRange.isValidDate(earliest)) dates.push(new Date(earliest))
@@ -198,7 +212,6 @@ Rectangle
 
             var s, e
 
-            // 2. Если дат нет вообще — текущий месяц
             if (dates.length === 0)
             {
                 var now = new Date()
@@ -207,7 +220,6 @@ Rectangle
             }
             else
             {
-                // 3. Ищем минимум и максимум
                 var minD = dates[0]
                 var maxD = dates[0]
                 for (var i = 1; i < dates.length; i++) {
@@ -218,14 +230,11 @@ Rectangle
                 e = new Date(maxD)
             }
 
-            // 4. Добавляем отступы (2 недели слева и 2 недели справа)
             s.setDate(s.getDate() - 14)
             s.setHours(0, 0, 0, 0)
-            
             e.setDate(e.getDate() + 14)
             e.setHours(23, 59, 59, 999)
 
-            // 5. Выравниваем левую границу по понедельнику
             while (s.getDay() !== 1) s.setDate(s.getDate() - 1)
 
             displayStart = s
@@ -278,10 +287,19 @@ Rectangle
         effectiveRows = rowsForHeight
         contentHeight = rowsForHeight * rowHeight
 
-        root.width = gridWidth
         root.height = contentHeight
 
         tasksRepeater.model = visibleItems
+        console.log("[GridArea] isPure=", isPure,
+                    " localMode=", localMode,
+                    " displayStart=", displayStart,
+                    " displayEnd=", displayEnd,
+                    " totalDays=", totalDays,
+                    " gridWidth=", gridWidth,
+                    " totalRows=", totalRows,
+                    " contentHeight=", contentHeight,
+                    " visibleItems=", visibleItems.length,
+                    " width=", root.width)
         updateTargetDateLines()
         backgroundCanvas.refresh()
         dependencyCanvas.refresh()
@@ -331,27 +349,13 @@ Rectangle
         }
     }
 
-    function updateTaskDates(taskId, newStart, newEnd)
-    {
-        if (projectController && projectController.taskController)
-            projectController.taskController.updateTaskDates(taskId, newStart, newEnd)
-    }
-
-    function updateForecastDates(taskId, newStart, newEnd)
-    {
-        if (projectController && projectController.taskController)
-            projectController.taskController.updateForecastDates(taskId, newStart, newEnd)
-    }
-
     Connections
     {
         target: projectController?.projectData?.taskModel ?? null
         function onRowsInserted(parent, first, last) { updateData() }
         function onRowsRemoved(parent, first, last) { updateData() }
         function onModelReset() { updateData() }
-        function onDataChanged(topLeft, bottomRight, roles) {
-            Qt.callLater(root.updateData)
-        }
+        function onDataChanged(topLeft, bottomRight, roles) { Qt.callLater(root.updateData) }
     }
 
     Connections
@@ -397,6 +401,20 @@ Rectangle
         visibleItems: root.visibleItems
     }
 
+    MouseArea
+    {
+        anchors.fill: parent
+        visible: root.isPure
+        acceptedButtons: Qt.RightButton
+        z: 50
+
+        onClicked: function(mouse) {
+            if (mouse.button !== Qt.RightButton) return
+            if (!root.canEdit && !root.isLocalMode) return
+            contextMenu.popup()
+        }
+    }
+
     DependencyCanvas
     {
         id: dependencyCanvas
@@ -432,11 +450,7 @@ Rectangle
             updateCounter: root.updateCounter
             externalFlickable: root.externalFlickable
             taskContextMenu: root.taskContextMenu
-
             hoveredTaskId: root.hoveredTaskId
-
-            onTaskDatesChanged: function(taskId, newStart, newEnd) { root.updateTaskDates(taskId, newStart, newEnd) }
-            onForecastDatesChanged: function(taskId, newStart, newEnd) { root.updateForecastDates(taskId, newStart, newEnd) }
         }
     }
 
@@ -449,5 +463,43 @@ Rectangle
         color: "#666666"
         z: 50
         visible: root.contentHeight > 0
+    }
+
+    Menu
+    {
+        id: contextMenu
+
+        MenuItem
+        {
+            text: "Создать задачу"
+            visible: root.canEdit
+            onTriggered: {
+                if (mainWindow && mainWindow.newTaskDialog) {
+                    var gm = projectController.projectData.groupModel
+                    var gid = gm.rowCount() > 0 ? gm.getGroupId(0) : "default"
+                    mainWindow.newTaskDialog.openForGroup(gid)
+                }
+            }
+        }
+
+        MenuItem
+        {
+            text: "Создать группы по умолчанию"
+            visible: root.isPure && !root.isLocalMode && root.canEdit
+            onTriggered: {
+                if (mainWindow && mainWindow.defaultGroupsDialog)
+                    mainWindow.defaultGroupsDialog.open()
+            }
+        }
+
+        MenuItem
+        {
+            text: "Создать группу"
+            visible: !root.isLocalMode && root.canEdit
+            onTriggered: {
+                if (mainWindow && mainWindow.createGroupDialog)
+                    mainWindow.createGroupDialog.open()
+            }
+        }
     }
 }

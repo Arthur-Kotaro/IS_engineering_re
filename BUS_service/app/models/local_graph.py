@@ -1,9 +1,16 @@
 # app/models/local_graph.py
 import uuid
-from sqlalchemy import Column, String, Integer, Date, Text, DateTime, BigInteger, ForeignKey
+from sqlalchemy import Column, String, Integer, Date, DateTime, BigInteger, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.database import Base
+
+
+class LocalGraphState:
+    NOT_REQUIRED = 0
+    REQUIRED = 1
+    ATTACHED = 2
+    MISSING = 3
 
 
 class LocalGraph(Base):
@@ -18,8 +25,13 @@ class LocalGraph(Base):
     target_end = Column(Date, nullable=True)
     predecessor_end = Column(Date, nullable=True)
     version = Column(Integer, nullable=False, default=1)
+    local_graph_state = Column(Integer, nullable=False, default=LocalGraphState.NOT_REQUIRED)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    is_deleted = Column(Integer, nullable=False, default=0)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(BigInteger, nullable=True)
 
 
 class LgTask(Base):
@@ -29,11 +41,15 @@ class LgTask(Base):
     lg_id = Column(UUID(as_uuid=True), ForeignKey("local_graphs.lg_id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(500), nullable=False)
     responsible_id = Column(BigInteger, nullable=True)
-    status = Column(Integer, nullable=False, default=0)  # 0=planned, 1=completed
+    status = Column(Integer, nullable=False, default=0)
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
     version = Column(Integer, nullable=False, default=1)
+
+    is_deleted = Column(Integer, nullable=False, default=0)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(BigInteger, nullable=True)
 
 
 class LgDependency(Base):
@@ -44,3 +60,9 @@ class LgDependency(Base):
     predecessor_id = Column(UUID(as_uuid=True), ForeignKey("lg_tasks.lg_task_id"), nullable=False)
     successor_id = Column(UUID(as_uuid=True), ForeignKey("lg_tasks.lg_task_id"), nullable=False)
     dep_type = Column(String(20), nullable=False, default="finish_to_start")
+    version = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    is_deleted = Column(Integer, nullable=False, default=0)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(BigInteger, nullable=True)

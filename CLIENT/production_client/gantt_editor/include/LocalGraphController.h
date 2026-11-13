@@ -2,6 +2,8 @@
 #define LOCALGRAPHCONTROLLER_H
 
 #include <QObject>
+#include <QNetworkAccessManager>
+#include <QDate>
 #include "ProjectData.h"
 #include "ResourceManager.h"
 #include "SettingsManager.h"
@@ -17,16 +19,16 @@ public:
                                    GanttApiClient* apiClient,
                                    QObject *parent = nullptr);
 
-    // Установка контекста ЛГ (вызывается из main.cpp)
-    void setLocalGraphContext(const QString& lgId, const QString& busUrl);
+    void setLocalGraphContext(const QString& lgId, const QString& busUrl,
+                              int projectId, int responsibleId, const QString& masterTaskId);
 
     Q_INVOKABLE void markTaskRequiresLocalGraph(const QString& taskId);
     Q_INVOKABLE bool createLocalGraph(const QString& taskId);
     Q_INVOKABLE void detachLocalGraph(const QString& taskId, bool deleteFile);
     Q_INVOKABLE void refreshLocalGraphForecast(const QString& taskId);
 
-    // CRUD для задач внутри ЛГ
-    Q_INVOKABLE void addLocalTask(const QString& title, const QString& responsible, const QDate& startDate, const QDate& endDate);
+    Q_INVOKABLE void addLocalTask(const QString& title, const QString& responsible,
+                                  const QDate& startDate, const QDate& endDate);
     Q_INVOKABLE void updateLocalTaskDates(const QString& taskId, const QDate& newStart, const QDate& newEnd);
     Q_INVOKABLE void setLocalTaskStatus(const QString& taskId, int status);
     Q_INVOKABLE void removeLocalTask(const QString& taskId);
@@ -36,6 +38,7 @@ signals:
     void localGraphCreated(const QString& taskId);
     void localGraphRefreshed(const QString& taskId);
     void localTasksReloaded();
+    void cascadeUpdateRequested(const QVariantList& successors, const QString& baseReason);
 
 private slots:
     void onLocalGraphCreated(const QVariantMap& result);
@@ -47,14 +50,18 @@ private:
     SettingsManager* m_settingsManager;
     GanttApiClient* m_apiClient;
 
+    QNetworkAccessManager* m_networkManager;
+
     QString m_lgId;
     QString m_busUrl;
+    QString m_masterTaskId;
+    int m_projectId = 0;
+    int m_responsibleId = 0;
     QString m_pendingTaskId;
 
     QString getBusUrlForTask(const QString& taskId) const;
-    
-    // Вспомогательный метод для отправки изменений в MG
-    void pushForecastToMg(const QString& taskId, const QDate& forecastStart, const QDate& forecastEnd, int progressCurrent, int progressTotal, int status);
+    void pushForecastToMg(const QString& taskId, const QDate& forecastStart, const QDate& forecastEnd,
+                          int progressCurrent, int progressTotal, int status);
 };
 
 #endif

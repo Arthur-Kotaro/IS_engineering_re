@@ -1,6 +1,5 @@
-# app/models/mg_task.py
 import uuid
-from sqlalchemy import Column, String, Integer, Date, Text, DateTime, BigInteger, ForeignKey
+from sqlalchemy import Column, String, Integer, Date, Text, DateTime, BigInteger, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.database import Base
@@ -23,9 +22,14 @@ class MgTask(Base):
     progress_current = Column(Integer, nullable=False, default=-1)
     progress_total = Column(Integer, nullable=False, default=-1)
     sort_order = Column(Integer, nullable=False, default=0)
+    comment = Column(String(1000), nullable=True)
     version = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(BigInteger, nullable=True)
 
     def __repr__(self):
         return f"<MgTask({self.task_id}, {self.title[:30]})>"

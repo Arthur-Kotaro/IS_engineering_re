@@ -25,84 +25,88 @@ Menu
 
     function updateState()
     {
-        canAcceptForecast = false
-        canEditForecast = true
-        canSetProgress = false
-        localGraphState = 0
-        isTaskCompleted = false
-
+        canAcceptForecast = false; canEditForecast = true; canSetProgress = false
+        localGraphState = 0; isTaskCompleted = false
         if (!taskId || !projectController || !projectController.projectData) return
         var task = projectController.projectData.taskModel.getTask(taskId)
         if (!task) return
-
         isTaskCompleted = (task.status === 1)
         localGraphState = task.localGraphState !== undefined ? task.localGraphState : 0
         canEditForecast = !(localGraphState === 2 || localGraphState === 3)
         canSetProgress = !isTaskCompleted && (localGraphState === 0)
-
         if (projectController.settingsManager.editingLocked) return
         if (isTaskCompleted) return
-
-        var fs = task.forecastStart
-        var fe = task.forecastEnd
-        var ss = task.startDate
-        var se = task.endDate
+        var fs = task.forecastStart; var fe = task.forecastEnd
+        var ss = task.startDate; var se = task.endDate
         if (!fs || !fe || !ss || !se) return
         if (fs.toString() === ss.toString() && fe.toString() === se.toString()) return
         canAcceptForecast = true
     }
 
     MenuItem {
-        text: "Переименовать"
-        enabled: !root.isLocked
-        onTriggered: if (root.taskId && mainWindow && mainWindow.renameTaskDialog) mainWindow.renameTaskDialog.openForTask(root.taskId)
+        text: "Показать подробности"
+        onTriggered: if (root.taskId && mainWindow && mainWindow.taskDetailsDialog)
+                         mainWindow.taskDetailsDialog.openForTask(root.taskId)
     }
 
     MenuItem {
-        text: "Назначить ответственного"
-        enabled: !root.isLocked
-        onTriggered: if (root.taskId && mainWindow && mainWindow.responsibleDialog) mainWindow.responsibleDialog.openForTask(root.taskId)
+        text: "Переименовать"; enabled: !root.isLocked
+        onTriggered: if (root.taskId && mainWindow && mainWindow.renameTaskDialog)
+                         mainWindow.renameTaskDialog.openForTask(root.taskId)
     }
 
     MenuItem {
-        text: "Изменить комментарий"
-        enabled: !root.isLocked
-        onTriggered: if (root.taskId && mainWindow && mainWindow.commentDialog) mainWindow.commentDialog.openForTask(root.taskId)
+        text: "Назначить ответственного"; enabled: !root.isLocked
+        onTriggered: if (root.taskId && mainWindow && mainWindow.responsibleDialog)
+                         mainWindow.responsibleDialog.openForTask(root.taskId)
+    }
+
+    MenuItem {
+        text: "Изменить комментарий"; enabled: !root.isLocked
+        onTriggered: if (root.taskId && mainWindow && mainWindow.commentDialog)
+                         mainWindow.commentDialog.openForTask(root.taskId)
     }
 
     Menu {
         title: "Изменить статус"
         enabled: !root.isLocked
-        MenuItem { text: "🟡 Запланировано"; onTriggered: if(projectController) projectController.projectData.taskModel.setTaskStatus(root.taskId, 0) }
-        MenuItem { text: "🟢 Выполнено"; onTriggered: if(mainWindow) mainWindow.completeTaskDialog.openForTask(root.taskId) }
-        MenuItem { text: "🟠 Имеются риски"; onTriggered: if(projectController) projectController.projectData.taskModel.setTaskStatus(root.taskId, 2) }
-        MenuItem { text: "🔴 Блокировано"; onTriggered: if(projectController) projectController.projectData.taskModel.setTaskStatus(root.taskId, 3) }
+        MenuItem { text: "🟡 Запланировано"
+            onTriggered: if (projectController) projectController.updateTaskStatus(root.taskId, 0) }
+        MenuItem { text: "🟢 Выполнено"
+            onTriggered: if (mainWindow) mainWindow.completeTaskDialog.openForTask(root.taskId) }
+        MenuItem { text: "🟠 Имеются риски"
+            onTriggered: if (projectController) projectController.updateTaskStatus(root.taskId, 2) }
+        MenuItem { text: "🔴 Блокировано"
+            onTriggered: if (projectController) projectController.updateTaskStatus(root.taskId, 3) }
     }
 
     MenuItem {
-        text: "Изменить целевые сроки"
-        enabled: !root.isLocked
-        onTriggered: if (root.taskId && typeof mainWindow !== "undefined" && mainWindow.editTaskDialog) mainWindow.editTaskDialog.openForTask(root.taskId)
+        text: "Изменить целевые сроки"; enabled: !root.isLocked
+        onTriggered: if (root.taskId && mainWindow && mainWindow.editTaskDialog)
+                         mainWindow.editTaskDialog.openForTask(root.taskId)
     }
 
     MenuItem {
         text: "Изменить прогнозные сроки"
         visible: !root.isLocalGraph
         enabled: !root.isLocked && root.canEditForecast && !root.isTaskCompleted
-        onTriggered: if (root.taskId && typeof mainWindow !== "undefined" && mainWindow.editForecastDatesDialog) mainWindow.editForecastDatesDialog.openForTask(root.taskId)
+        onTriggered: if (root.taskId && mainWindow && mainWindow.editForecastDatesDialog)
+                         mainWindow.editForecastDatesDialog.openForTask(root.taskId)
     }
 
     MenuItem {
         text: "Утвердить прогноз"
         visible: !root.isLocalGraph
         enabled: !root.isLocked && root.canAcceptForecast
-        onTriggered: if (root.taskId && projectController) projectController.taskController.acceptForecastAsTarget(root.taskId)
+        onTriggered: if (root.taskId && projectController)
+                         projectController.taskController.acceptForecastAsTarget(root.taskId)
     }
 
     MenuItem {
         text: "Установить прогресс"
         enabled: !root.isLocked && root.canSetProgress
-        onTriggered: if (root.taskId && mainWindow && mainWindow.setProgressDialog) mainWindow.setProgressDialog.openForTask(root.taskId)
+        onTriggered: if (root.taskId && mainWindow && mainWindow.setProgressDialog)
+                         mainWindow.setProgressDialog.openForTask(root.taskId)
     }
 
     MenuSeparator {}
@@ -110,12 +114,45 @@ Menu
     Menu {
         title: "Изменить зависимости"
         enabled: !root.isLocked
-
-        MenuItem { text: "Добавить нисходящую зависимость"; onTriggered: if(mainWindow && mainWindow.dependencyDialog) mainWindow.dependencyDialog.openForTask(root.taskId, true) }
-        MenuItem { text: "Добавить восходящую зависимость"; onTriggered: if(mainWindow && mainWindow.dependencyDialog) mainWindow.dependencyDialog.openForTask(root.taskId, false) }
+        MenuItem { text: "Добавить нисходящую зависимость"
+            onTriggered: if (mainWindow && mainWindow.dependencyDialog)
+                             mainWindow.dependencyDialog.openForTask(root.taskId, true) }
+        MenuItem { text: "Добавить восходящую зависимость"
+            onTriggered: if (mainWindow && mainWindow.dependencyDialog)
+                             mainWindow.dependencyDialog.openForTask(root.taskId, false) }
         MenuSeparator {}
-        MenuItem { text: "Удалить нисходящую зависимость"; onTriggered: if(projectController) projectController.projectData.dependencyModel.removeDownstreamDependency(root.taskId) }
-        MenuItem { text: "Удалить восходящую зависимость"; onTriggered: if(projectController) projectController.projectData.dependencyModel.removeUpstreamDependency(root.taskId) }
+        MenuItem { text: "Удалить все нисходящие зависимости"
+            onTriggered: {
+                if (!projectController || !root.taskId) return
+                var deps = projectController.projectData.dependencyModel
+                var succ = deps.getSuccessors(root.taskId)
+                for (var i = 0; i < succ.length; i++) {
+                    for (var d = 0; d < deps.rowCount(); d++) {
+                        var idx = deps.index(d, 0)
+                        if (deps.data(idx, Qt.UserRole + 2) === root.taskId &&
+                            deps.data(idx, Qt.UserRole + 3) === succ[i]) {
+                            projectController.deleteDependency(deps.data(idx, Qt.UserRole + 1))
+                            break
+                        }
+                    }
+                }
+            } }
+        MenuItem { text: "Удалить все восходящие зависимости"
+            onTriggered: {
+                if (!projectController || !root.taskId) return
+                var deps = projectController.projectData.dependencyModel
+                var preds = deps.getPredecessors(root.taskId)
+                for (var i = 0; i < preds.length; i++) {
+                    for (var d = 0; d < deps.rowCount(); d++) {
+                        var idx = deps.index(d, 0)
+                        if (deps.data(idx, Qt.UserRole + 2) === preds[i] &&
+                            deps.data(idx, Qt.UserRole + 3) === root.taskId) {
+                            projectController.deleteDependency(deps.data(idx, Qt.UserRole + 1))
+                            break
+                        }
+                    }
+                }
+            } }
     }
 
     MenuSeparator {}
@@ -123,18 +160,13 @@ Menu
     MenuItem {
         text: "Открыть локальный график"
         visible: !root.isLocalGraph
-        enabled: true
         onTriggered: {
             if (!root.taskId || !projectController) return
             var task = projectController.projectData.taskModel.getTask(root.taskId)
             if (task) {
                 var groupId = task.groupId
                 var busUrl = projectController.projectData.groupModel.getBusUrl(groupId)
-                if (busUrl) {
-                    projectController.openLocalGraphProcess(root.taskId, busUrl)
-                } else {
-                    console.log("BUS URL not found for group", groupId)
-                }
+                if (busUrl) projectController.openLocalGraphProcess(root.taskId, busUrl)
             }
         }
     }
@@ -142,20 +174,19 @@ Menu
     MenuSeparator {}
 
     MenuItem {
-        text: "Добавить задачу сверху"
-        enabled: !root.isLocked
+        text: "Добавить задачу сверху"; enabled: !root.isLocked
         onTriggered: if (root.onAddTaskAboveCallback) root.onAddTaskAboveCallback(root.taskId)
     }
 
     MenuItem {
-        text: "Добавить задачу снизу"
-        enabled: !root.isLocked
+        text: "Добавить задачу снизу"; enabled: !root.isLocked
         onTriggered: if (root.onAddTaskBelowCallback) root.onAddTaskBelowCallback(root.taskId)
     }
 
+    MenuSeparator {}
+
     MenuItem {
-        text: "Удалить"
-        enabled: !root.isLocked
-        onTriggered: if(root.taskId && projectController) projectController.taskController.removeTask(root.taskId)
+        text: "Удалить"; enabled: !root.isLocked
+        onTriggered: if (root.taskId && projectController) projectController.deleteTask(root.taskId)
     }
 }

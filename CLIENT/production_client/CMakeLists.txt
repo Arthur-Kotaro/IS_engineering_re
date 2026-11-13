@@ -166,6 +166,14 @@ target_include_directories(ProductionClientApp PRIVATE
     ${COMMON_INCLUDE}
 )
 
+# Копировать gantt_editor рядом с ProductionClientApp
+add_custom_command(TARGET ProductionClientApp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:gantt_editor>
+        $<TARGET_FILE_DIR:ProductionClientApp>/gantt_editor
+    COMMENT "Copying gantt_editor to ProductionClientApp dir"
+)
+
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_subdirectory(tools/renderer_preview)
 endif()

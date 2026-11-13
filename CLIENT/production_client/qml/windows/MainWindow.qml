@@ -5,7 +5,6 @@ import Styles 1.0
 import "../components" as Components
 import "../dialogs" as Dialogs
 import "../windows" as Windows
-import GanttEditor 1.0
 
 Rectangle {
     id: root
@@ -406,16 +405,11 @@ Rectangle {
             console.log("Tiles loaded:", tilesList.length)
         }
     }
-
-    GanttEditorWindow {
-        id: ganttEditorWindow
-    }
-
     Connections {
         target: widgetBridge
         function onGanttEditorRequested(projectId, isReadOnly) {
-            console.log("MainWindow: open Gantt for project", projectId, "readonly:", isReadOnly)
-            ganttEditorWindow.openForProject(projectId, isReadOnly)
+            console.log("MainWindow: launch gantt_editor for project", projectId, "readonly:", isReadOnly)
+            widgetBridge.launchGanttEditor(projectId, isReadOnly)
         }
     }
 }

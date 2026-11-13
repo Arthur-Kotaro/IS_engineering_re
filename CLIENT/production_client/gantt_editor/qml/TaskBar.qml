@@ -11,34 +11,29 @@ Rectangle
     property var externalFlickable: null
     property var taskContextMenu: null
     property var parentRow: null
-    property bool isResizing: false // Флаг для фиксации курсора
+    property bool isResizing: false
 
     HoverHandler {
         id: barHover
         onHoveredChanged: {
             if (!hovered) {
-                // Мышь ушла с полосы — сбрасываем курсор в стрелку
                 if (!root.isResizing && projectController)
                     projectController.setCursorShape(0)
             }
         }
     }
 
-    signal taskDatesChanged(string taskId, date newStart, date newEnd)
-    signal forecastDatesChanged(string taskId, date newStart, date newEnd)
     signal tooltipRequested(bool visible, var mouseArea, bool fromNode)
     signal tooltipHidden()
 
-    function isForecastLocked()
-    {
+    function isForecastLocked() {
         if (!rowData) return false
         if (rowData.rowKind !== "forecast") return false
         var lgs = rowData.localGraphState !== undefined ? rowData.localGraphState : 0
         return (lgs === 2 || lgs === 3)
     }
 
-    x:
-    {
+    x: {
         if (!rowData) return 0
         var startVal = (rowData.hasDates === true) ? rowData.taskStart : rowData.forecastStart
         if (!startVal || !root.displayStart) return 0
@@ -46,8 +41,7 @@ Rectangle
         return Math.max(0, daysDiff * root.dayWidth)
     }
 
-    width:
-    {
+    width: {
         if (!rowData) return 10
         var sVal = (rowData.hasDates === true) ? rowData.taskStart : rowData.forecastStart
         var eVal = (rowData.hasDates === true) ? rowData.taskEnd : rowData.forecastEnd
@@ -59,11 +53,9 @@ Rectangle
     height: parent.height - 8
     y: 4
 
-    function getStatusColor()
-    {
+    function getStatusColor() {
         if (!rowData) return "#FFD700"
-        switch (rowData.taskStatus)
-        {
+        switch (rowData.taskStatus) {
             case 0: return "#FFD700"
             case 1: return "#32CD32"
             case 2: return "#FF8C00"
@@ -71,16 +63,11 @@ Rectangle
             default: return "#FFD700"
         }
     }
-
-    function getBarColor()
-    {
-        if (rowData && rowData.rowKind === "forecast")
-            return Qt.lighter(getStatusColor(), 1.2)
+    function getBarColor() {
+        if (rowData && rowData.rowKind === "forecast") return Qt.lighter(getStatusColor(), 1.2)
         return getStatusColor()
     }
-
-    function getBarOpacity()
-    {
+    function getBarOpacity() {
         if (rowData && rowData.rowKind === "forecast") return 0.6
         return 1.0
     }
@@ -94,7 +81,8 @@ Rectangle
     Rectangle
     {
         id: progressFill
-        visible: root.showProgress && rowData && (rowData.progressTotal || 0) > 0 && (rowData.progressCurrent || 0) >= 0 && rowData.isUnapproved !== true
+        visible: root.showProgress && rowData && (rowData.progressTotal || 0) > 0 &&
+                 (rowData.progressCurrent || 0) >= 0 && rowData.isUnapproved !== true
         anchors.left: parent.left; anchors.leftMargin: 3; anchors.verticalCenter: parent.verticalCenter
         height: Math.max(8, parent.height * 0.75)
         width: Math.max(0, (parent.width - 6) * Math.min(1, rowData.progressCurrent / rowData.progressTotal))
@@ -106,7 +94,8 @@ Rectangle
     Text
     {
         id: progressText
-        visible: root.showProgress && rowData && (rowData.progressTotal || 0) > 0 && (rowData.progressCurrent || 0) >= 0 && rowData.isUnapproved !== true && parent.width > 90
+        visible: root.showProgress && rowData && (rowData.progressTotal || 0) > 0 &&
+                 (rowData.progressCurrent || 0) >= 0 && rowData.isUnapproved !== true && parent.width > 90
         anchors.centerIn: parent
         text: rowData ? ("Прогресс: " + rowData.progressCurrent + "/" + rowData.progressTotal) : ""
         font.pixelSize: 11; color: "#222222"; z: 2
@@ -117,8 +106,7 @@ Rectangle
         id: stripesCanvas
         anchors.fill: parent
         visible: rowData && rowData.isUnapproved === true
-        onPaint:
-        {
+        onPaint: {
             var ctx = getContext("2d")
             ctx.clearRect(0, 0, width, height)
             if (!rowData || rowData.isUnapproved !== true || width <= 0 || height <= 0) return
@@ -133,7 +121,23 @@ Rectangle
         onWidthChanged: requestPaint(); onHeightChanged: requestPaint(); onVisibleChanged: if (visible) requestPaint()
     }
 
-    function updateDates()
+    ChangeReasonDialog { id: changeReasonDialog }
+
+    // Завершение изменения (drag или resize)
+    function commitDateChange(newStart, newEnd) {
+        var taskId = rowData ? rowData.taskId : ""
+        var isApproved = projectController && projectController.isApproved
+        var hadDates = rowData && (rowData.hasDates === true)
+        if (isApproved && hadDates) {
+            changeReasonDialog.openWith(function(reason) {
+                projectController.updateTaskDates(taskId, newStart, newEnd, reason)
+            })
+        } else {
+            projectController.updateTaskDates(taskId, newStart, newEnd, "")
+        }
+    }
+
+    function updateDatesFromGeometry()
     {
         var newStartDays = Math.round(x / root.dayWidth)
         var newStart = new Date(root.displayStart)
@@ -143,10 +147,8 @@ Rectangle
         var newEnd = new Date(root.displayStart)
         newEnd.setDate(newEnd.getDate() + newEndDays - 1)
 
-        if (newStart < newEnd)
-        {
-            if (rowData && rowData.rowKind === "forecast") root.forecastDatesChanged(rowData.taskId, newStart, newEnd)
-            else root.taskDatesChanged(rowData.taskId, newStart, newEnd)
+        if (newStart < newEnd) {
+            root.commitDateChange(newStart, newEnd)
         }
     }
 
@@ -155,43 +157,34 @@ Rectangle
     {
         id: moveArea
         anchors.fill: parent
-        anchors.rightMargin: 15 // Оставляем место для resizeHandle
+        anchors.rightMargin: 15
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
 
         property bool suppressClick: false
         property bool showTooltip: false
 
-        Timer
-        {
-            id: tooltipDelay
-            interval: 500; repeat: false
-            onTriggered: { moveArea.showTooltip = true; root.tooltipRequested(true, moveArea, false) }
-        }
+        Timer { id: tooltipDelay; interval: 500; repeat: false
+            onTriggered: { moveArea.showTooltip = true; root.tooltipRequested(true, moveArea, false) } }
 
         onEntered: {
             if (!root.isResizing) {
-                if (!(projectController && projectController.settingsManager.editingLocked) && 
+                if (!(projectController && projectController.settingsManager.editingLocked) &&
                     !root.isForecastLocked() && !(rowData && rowData.isCompleted)) {
-                    if (projectController) projectController.setCursorShape(2) // OpenHand
+                    if (projectController) projectController.setCursorShape(2)
                 }
             }
             tooltipDelay.restart()
         }
-        onExited: { 
-            // Убираем setCursorShape(0), чтобы не сбивать курсор при переходе в resizeArea
-            tooltipDelay.stop(); moveArea.showTooltip = false; root.tooltipHidden()
-        }
-        
+        onExited: { tooltipDelay.stop(); moveArea.showTooltip = false; root.tooltipHidden() }
+
         onPositionChanged: function(mouse) {
-            // Принудительно ставим руку, если мы не тащим и не ресайзим
             if (!drag.active && !root.isResizing) {
-                if (!(projectController && projectController.settingsManager.editingLocked) && 
+                if (!(projectController && projectController.settingsManager.editingLocked) &&
                     !root.isForecastLocked() && !(rowData && rowData.isCompleted)) {
-                    if (projectController) projectController.setCursorShape(2) // OpenHand
+                    if (projectController) projectController.setCursorShape(2)
                 }
             }
-            
             if (!drag.active) return
             if (root.isForecastLocked()) { drag.target = null; return }
             if (projectController && projectController.settingsManager.editingLocked) { drag.target = null; return }
@@ -206,12 +199,15 @@ Rectangle
             if (mouse.button === Qt.RightButton) { drag.target = null; suppressClick = false; return }
             if (root.isForecastLocked()) {
                 if (projectController) projectController.notifyEditingLocked()
-                drag.target = null
-                return
+                drag.target = null; return
             }
-            if (projectController && projectController.settingsManager.editingLocked) { projectController.notifyEditingLocked(); drag.target = null; return }
-            if (rowData && rowData.isCompleted) { if (projectController) projectController.notifyTaskCompleted(); drag.target = null; return }
-
+            if (projectController && projectController.settingsManager.editingLocked) {
+                projectController.notifyEditingLocked(); drag.target = null; return
+            }
+            if (rowData && rowData.isCompleted) {
+                if (projectController) projectController.notifyTaskCompleted()
+                drag.target = null; return
+            }
             drag.target = parent
             drag.axis = Drag.XAxis
             drag.minimumX = 0
@@ -222,14 +218,17 @@ Rectangle
         onReleased: function(mouse)
         {
             if (root.externalFlickable) root.externalFlickable.interactive = true
-            if (drag.active) { drag.target = null; parent.updateDates() }
-            if (projectController) projectController.setCursorShape(2) // OpenHand
+            if (drag.active) { drag.target = null; parent.updateDatesFromGeometry() }
+            if (projectController) projectController.setCursorShape(2)
         }
 
         onClicked: function(mouse)
         {
             if (mouse.button === Qt.RightButton && !suppressClick) {
-                if (rowData && root.taskContextMenu) { root.taskContextMenu.taskId = rowData.taskId; root.taskContextMenu.popup() }
+                if (rowData && root.taskContextMenu) {
+                    root.taskContextMenu.taskId = rowData.taskId
+                    root.taskContextMenu.popup()
+                }
             }
         }
     }
@@ -256,31 +255,25 @@ Rectangle
 
             onEntered: {
                 if (root.isResizing) return
-                if (!(projectController && projectController.settingsManager.editingLocked) && 
+                if (!(projectController && projectController.settingsManager.editingLocked) &&
                     !root.isForecastLocked() && !(rowData && rowData.isCompleted)) {
-                    if (projectController) projectController.setCursorShape(1) // SizeHor
+                    if (projectController) projectController.setCursorShape(1)
                 }
             }
-            onExited: {
-                // Убираем setCursorShape(0), чтобы не сбивать курсор при переходе в moveArea
-            }
+            onExited: {}
 
             onPositionChanged: function(mouse)
             {
-                // Принудительно ставим SizeHor, если мы не тащим
                 if (!pressed && !root.isResizing) {
-                    if (!(projectController && projectController.settingsManager.editingLocked) && 
+                    if (!(projectController && projectController.settingsManager.editingLocked) &&
                         !root.isForecastLocked() && !(rowData && rowData.isCompleted)) {
-                        if (projectController) projectController.setCursorShape(1) // SizeHor
+                        if (projectController) projectController.setCursorShape(1)
                     }
                 }
-
                 if (root.isForecastLocked()) return
                 if (projectController && projectController.settingsManager.editingLocked) return
                 if (rowData && rowData.isCompleted) return
-
-                if (pressed)
-                {
+                if (pressed) {
                     var currentX = mapToItem(root.parentRow, mouse.x, mouse.y).x
                     var delta = currentX - startX
                     var newWidth = startWidth + delta
@@ -291,31 +284,24 @@ Rectangle
 
             onPressed: function(mouse)
             {
-                if (root.isForecastLocked()) {
-                    if (projectController) projectController.notifyEditingLocked()
-                    return
-                }
+                if (root.isForecastLocked()) { if (projectController) projectController.notifyEditingLocked(); return }
                 if (projectController && projectController.settingsManager.editingLocked) { projectController.notifyEditingLocked(); return }
                 if (rowData && rowData.isCompleted) { if (projectController) projectController.notifyTaskCompleted(); return }
-
-                root.isResizing = true // <-- УСТАНОВИТЬ ФЛАГ
-                if (projectController) projectController.setCursorShape(1) // SizeHor
-                
+                root.isResizing = true
+                if (projectController) projectController.setCursorShape(1)
                 if (root.externalFlickable) root.externalFlickable.interactive = false
                 startWidth = root.width
                 startX = mapToItem(root.parentRow, mouse.x, mouse.y).x
-                root.width = startWidth
             }
 
             onReleased: function(mouse)
             {
-                root.isResizing = false // <-- СБРОСИТЬ ФЛАГ
-                if (projectController) projectController.setCursorShape(1) // SizeHor
-                
+                root.isResizing = false
+                if (projectController) projectController.setCursorShape(1)
                 if (root.externalFlickable) root.externalFlickable.interactive = true
                 if (projectController && projectController.settingsManager.editingLocked) return
                 if (rowData && rowData.isCompleted) return
-                root.updateDates()
+                root.updateDatesFromGeometry()
             }
         }
     }

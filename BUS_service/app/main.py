@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.database import engine
 from app.api.v1 import local_graphs
+from app.ws import local_graphs_ws
 
 
 @asynccontextmanager
@@ -16,7 +17,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="BUS Service (Base Universal Service)",
     description="Управление локальными графиками (ЛГ)",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -27,3 +28,4 @@ async def health_check():
 
 
 app.include_router(local_graphs.router)
+app.include_router(local_graphs_ws.router)

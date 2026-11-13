@@ -7,57 +7,73 @@ Dialog
     id: root
     title: "Создание списка задач"
     width: 1380
-    height: 600
+    height: 700
     modal: true
-    standardButtons: Dialog.Ok | Dialog.Cancel
+    standardButtons: Dialog.NoButton
     anchors.centerIn: Overlay.overlay
 
     property int taskCount: 0
     property var listModel: []
     property bool createWithoutDates: false
     property bool isLocalMode: projectController && projectController.projectData && projectController.projectData.graphKind === 1
+    property var conflictMessages: []
 
-    function groupNames()
-    {
+    function groupNames() {
         if (!projectController || !projectController.projectData) return []
-        return projectController.projectData.groupModel.getGroupIds().map(function(id)
-        {
+        return projectController.projectData.groupModel.getGroupIds().map(function(id) {
             return projectController.projectData.groupModel.getGroup(id).name
         })
     }
+    function groupIds() {
+        if (!projectController || !projectController.projectData) return []
+        return projectController.projectData.groupModel.getGroupIds()
+    }
 
-    function buildList()
-    {
+    function buildList() {
         listModel = []
-        for (var i = 0; i < taskCount; i++)
-        {
-            listModel.push({
-                groupIndex: 0,
-                title: "Задача " + (i + 1),
-                responsible: "",
-                startDate: new Date(),
-                duration: 7,
-                comment: ""
-            })
+        for (var i = 0; i < taskCount; i++) {
+            listModel.push({ groupIndex: 0, title: "Задача " + (i + 1), responsible: "",
+                             startDate: new Date(), duration: 7, comment: "" })
         }
         listRepeater.model = listModel
     }
 
-    function resetDialog()
-    {
+    function resetDialog() {
         taskCount = 0
         listModel = []
+        conflictMessages = []
         countField.text = "3"
         createWithoutDates = false
         withoutDatesCheck.checked = false
         listRepeater.model = []
     }
 
-    onOpened:
-    {
-        resetDialog()
-        countField.forceActiveFocus()
+    function localCheckConflicts() {
+        var result = []
+        if (!projectController || !projectController.projectData) return result
+        var gm = projectController.projectData.groupModel
+        var taskModel = projectController.projectData.taskModel
+        var gIds = groupIds()
+        var names = {}
+        for (var i = 0; i < listModel.length; i++) {
+            var item = listModel[i]
+            var gid = gIds[item.groupIndex] || gIds[0]
+            var key = gid + "||" + item.title
+            if (names[key]) result.push("Дублирование имени \"" + item.title + "\" в списке")
+            names[key] = true
+            var existing = taskModel.getTasksForGroup(gid)
+            for (var j = 0; j < existing.length; j++) {
+                var t = taskModel.getTask(existing[j])
+                if (t && t.title === item.title) {
+                    var gname = gm.getGroup(gid).name || gid
+                    result.push("Задача с именем \"" + item.title + "\" уже есть в группе \"" + gname + "\"")
+                }
+            }
+        }
+        return result
     }
+
+    onOpened: { resetDialog(); countField.forceActiveFocus() }
 
     ColumnLayout
     {
@@ -71,35 +87,14 @@ Dialog
             spacing: 10
 
             Label { text: "Количество задач:" }
-            TextField
-            {
-                id: countField
-                Layout.preferredWidth: 60
-                text: "3"
+            TextField { id: countField; Layout.preferredWidth: 60; text: "3"
                 validator: IntValidator { bottom: 1; top: 100 }
-                onEditingFinished:
-                {
-                    root.taskCount = parseInt(text) || 3
-                    root.buildList()
-                }
-            }
+                onEditingFinished: { root.taskCount = parseInt(text) || 3; root.buildList() } }
 
-            CheckBox
-            {
-                id: withoutDatesCheck
-                text: "Создать без сроков"
-                onCheckedChanged: root.createWithoutDates = checked
-            }
+            CheckBox { id: withoutDatesCheck; text: "Создать без сроков"
+                onCheckedChanged: root.createWithoutDates = checked }
 
-            Button
-            {
-                text: "Построить"
-                onClicked:
-                {
-                    root.taskCount = parseInt(countField.text) || 3
-                    root.buildList()
-                }
-            }
+            Button { text: "Построить"; onClicked: { root.taskCount = parseInt(countField.text) || 3; root.buildList() } }
 
             Item { Layout.fillWidth: true }
         }
@@ -122,7 +117,6 @@ Dialog
                 {
                     id: listRepeater
                     model: listModel
-
                     delegate: RowLayout
                     {
                         Layout.fillWidth: true
@@ -131,125 +125,131 @@ Dialog
 
                         Label { text: (index + 1) + "."; Layout.preferredWidth: 25 }
 
-                        ComboBox
-                        {
+                        ComboBox {
                             Layout.preferredWidth: 300
                             visible: !root.isLocalMode
                             model: root.groupNames()
-                            onCurrentIndexChanged:
-                            {
-                                if (listModel[index]) listModel[index].groupIndex = currentIndex
-                            }
+                            onCurrentIndexChanged: { if (listModel[index]) listModel[index].groupIndex = currentIndex }
                         }
-
-                        TextField
-                        {
+                        TextField {
                             Layout.preferredWidth: 200
                             text: modelData ? modelData.title : ""
                             placeholderText: "Название"
-                            onTextChanged:
-                            {
-                                if (listModel[index]) listModel[index].title = text
-                            }
+                            onTextChanged: { if (listModel[index]) listModel[index].title = text }
                         }
-
-                        TextField
-                        {
+                        ComboBox {
                             Layout.fillWidth: true
                             Layout.minimumWidth: 150
-                            placeholderText: "Ответственный"
-                            text: modelData ? modelData.responsible : ""
-                            onTextChanged:
-                            {
-                                if (listModel[index]) listModel[index].responsible = text
+                            model: projectController ? projectController.projectMembers : []
+                            textRole: "full_name"
+                            valueRole: "user_id"
+                            onActivated: {
+                                if (listModel[index]) {
+                                    var m = projectController.projectMembers[currentIndex]
+                                    listModel[index].responsible = String(m.user_id)
+                                }
                             }
                         }
-
-                        TextField
-                        {
+                        TextField {
                             Layout.preferredWidth: 100
                             visible: !root.createWithoutDates
                             placeholderText: "ДД.ММ.ГГГГ"
                             text: modelData ? Qt.formatDateTime(modelData.startDate, "dd.MM.yyyy") : ""
-                            onEditingFinished:
-                            {
+                            onEditingFinished: {
                                 var parts = text.split(".")
-                                if (parts.length === 3)
-                                {
+                                if (parts.length === 3) {
                                     var d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
-                                    if (!isNaN(d.getTime()) && listModel[index])
-                                        listModel[index].startDate = d
+                                    if (!isNaN(d.getTime()) && listModel[index]) listModel[index].startDate = d
                                 }
                             }
                         }
-
-                        TextField
-                        {
+                        TextField {
                             Layout.preferredWidth: 50
                             visible: !root.createWithoutDates
                             text: modelData ? modelData.duration : "7"
                             validator: IntValidator { bottom: 1; top: 365 }
-                            onTextChanged:
-                            {
-                                if (listModel[index]) listModel[index].duration = parseInt(text) || 7
-                            }
+                            onTextChanged: { if (listModel[index]) listModel[index].duration = parseInt(text) || 7 }
                         }
-
-                        Label
-                        {
-                            text: "дн."
-                            visible: !root.createWithoutDates
-                            Layout.preferredWidth: 30
-                        }
-
-                        TextField
-                        {
+                        Label { text: "дн."; visible: !root.createWithoutDates; Layout.preferredWidth: 30 }
+                        TextField {
                             Layout.fillWidth: true
                             Layout.minimumWidth: 200
                             placeholderText: "Комментарий"
                             text: modelData ? modelData.comment : ""
-                            onTextChanged:
-                            {
-                                if (listModel[index]) listModel[index].comment = text
-                            }
+                            onTextChanged: { if (listModel[index]) listModel[index].comment = text }
                         }
                     }
                 }
             }
         }
-    }
 
-    onAccepted:
-    {
-        if (listModel.length === 0) return
-
-        var groupIds = projectController.projectData.groupModel.getGroupIds()
-
-        for (var i = 0; i < listModel.length; i++)
+        ColumnLayout
         {
-            var item = listModel[i]
-            var groupId = groupIds[item.groupIndex] || groupIds[0]
-            var newTaskId = ""
-
-            if (root.createWithoutDates)
+            Layout.fillWidth: true
+            spacing: 2
+            Repeater
             {
-                projectController.taskController.addTaskWithoutDates(groupId, item.title, item.responsible)
-                var tasks = projectController.projectData.taskModel.getTasksForGroup(groupId)
-                newTaskId = tasks[tasks.length - 1]
+                model: root.conflictMessages
+                delegate: Label {
+                    text: modelData
+                    color: "#c62828"
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
             }
-            else
-            {
-                var endDate = new Date(item.startDate)
-                endDate.setDate(endDate.getDate() + item.duration - 1)
-                projectController.taskController.addTask(groupId, item.title, item.responsible, item.startDate, endDate)
-                var tasks2 = projectController.projectData.taskModel.getTasksForGroup(groupId)
-                newTaskId = tasks2[tasks2.length - 1]
-            }
-
-            if (item.comment)
-                projectController.projectData.taskModel.setTaskComment(newTaskId, item.comment)
         }
 
-        if (mainWindow && mainWindow.gridArea) mainWindow.gridArea.updateData()
+        RowLayout
+        {
+            Layout.alignment: Qt.AlignRight
+            spacing: 10
+            Button { text: "Отмена"; onClicked: root.close() }
+            Button
+            {
+                text: "Создать"
+                onClicked:
+                {
+                    root.conflictMessages = root.localCheckConflicts()
+                    if (root.conflictMessages.length > 0) return
+
+                    var tasks = []
+                    var gIds = root.groupIds()
+                    for (var i = 0; i < root.listModel.length; i++)
+                    {
+                        var item = root.listModel[i]
+                        var gid = gIds[item.groupIndex] || gIds[0]
+                        var t = { batch_id: "b" + i, group_id: gid, title: item.title }
+                        if (!root.createWithoutDates) {
+                            var endDate = new Date(item.startDate)
+                            endDate.setDate(endDate.getDate() + item.duration - 1)
+                            t.start_date = Qt.formatDateTime(item.startDate, "yyyy-MM-dd")
+                            t.end_date = Qt.formatDateTime(endDate, "yyyy-MM-dd")
+                        }
+                        if (item.responsible) {
+                            var rid = parseInt(item.responsible)
+                            if (!isNaN(rid) && rid > 0) t.responsible_id = rid
+                        }
+                        tasks.push(t)
+                    }
+                    projectController.createTasksBatch(tasks, [])
+                    root.close()
+                }
+            }
+        }
+    }
+
+    Connections
+    {
+        target: projectController
+        function onTitleConflictDetected(conflicts) {
+            var msgs = []
+            for (var i = 0; i < conflicts.length; i++) {
+                var c = conflicts[i]
+                msgs.push("Задача с именем \"" + c.title + "\" уже есть в группе \"" +
+                          (c.group_name || c.group_id) + "\"")
+            }
+            root.conflictMessages = msgs
+        }
     }
 }

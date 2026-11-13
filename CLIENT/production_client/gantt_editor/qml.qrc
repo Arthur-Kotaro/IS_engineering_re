@@ -3,6 +3,7 @@
     <qresource prefix="/">
         <file>qml/main.qml</file>
         <file>qml/GanttEditorWindow.qml</file>
+        <file>qml/LocalGraphEditorWindow.qml</file>
         <file>qml/ExportView.qml</file>
         <file>qml/InfoPanel.qml</file>
         <file>qml/AppToolBar.qml</file>
@@ -17,7 +18,6 @@
         <file>qml/TaskTooltip.qml</file>
         <file>qml/CalendarHeader.qml</file>
         <file>qml/CalendarPopup.qml</file>
-        <file>qml/WelcomeScreen.qml</file>
         <file>qml/GroupDelegate.qml</file>
         <file>qml/GroupContextMenu.qml</file>
         <file>qml/MilestoneBar.qml</file>
@@ -45,6 +45,12 @@
         <file>qml/ConfirmRemoveTaskDialog.qml</file>
         <file>qml/SetProgressDialog.qml</file>
         <file>qml/TaskContextMenu.qml</file>
+        <file>qml/DefaultGroupsDialog.qml</file>
+        <file>qml/CreateGroupDialog.qml</file>
+        <file>qml/ChangeReasonDialog.qml</file>
+        <file>qml/TaskDetailsDialog.qml</file>
+        <file>qml/CascadeUpdateDialog.qml</file>
+        <file>qml/WelcomeScreen.qml</file>
         <file>qml/utils/GridLayoutBuilder.js</file>
         <file>qml/utils/RowBuilder.js</file>
         <file>qml/utils/DateUtils.js</file>
@@ -60,9 +66,12 @@
         <file>qml/icons/collapse.svg</file>
         <file>qml/icons/expand.svg</file>
         <file>qml/icons/refresh.svg</file>
+        <file>qml/icons/edit_on.svg</file>
+        <file>qml/icons/edit_off.svg</file>
+        <file>qml/icons/draft.svg</file>
+        <file>qml/icons/approved.svg</file>
         <file alias="default_typologies.json">resources/default_typologies.json</file>
         <file alias="default_tasks.json">resources/default_tasks.json</file>
         <file alias="default_holidays.json">resources/default_holidays.json</file>
-        <file>qml/LocalGraphEditorWindow.qml</file>
     </qresource>
 </RCC>
