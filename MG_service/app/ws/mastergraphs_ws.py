@@ -10,14 +10,66 @@ from app.models.mg_dependency import MgDependency
 from app.models.mg_milestone import MgMilestone
 from app.models.task_group import TaskGroup
 from app.ws.manager import manager
+from app.services.access_client import check_project_access
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["WebSocket"])
 
 
+def _extract_user_id(ws: WebSocket) -> int | None:
+    """Извлекает X-User-ID из заголовков (доверяем Nginx)."""
+    user_id_str = ws.headers.get("X-User-ID")
+    if not user_id_str:
+        return None
+    try:
+        return int(user_id_str)
+    except ValueError:
+        return None
+
+
+def _extract_token(ws: WebSocket) -> str | None:
+    auth = ws.headers.get("Authorization", "")
+    return auth.removeprefix("Bearer ").strip() or None
+
+
 @router.websocket("/ws/mastergraphs/{mg_id}")
 async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)):
     print(f"[WS ENDPOINT] connection for mg={mg_id}", flush=True)
+
+    # 1. ВАЖНО: accept() ДО любых проверок (иначе Starlette вернёт 403)
+    await ws.accept()
+
+    # 2. Извлечь X-User-ID
+    user_id = _extract_user_id(ws)
+    
+    # --- ВРЕМЕННЫЙ ЛОГ ДЛЯ ОТЛАДКИ ---
+    print(f"[WS DEBUG] X-User-ID header: {ws.headers.get('X-User-ID')}, extracted user_id: {user_id}", flush=True)
+    # ---------------------------------
+
+    if user_id is None:
+        await ws.close(code=1008, reason="Missing X-User-ID")
+        return
+
+    token = _extract_token(ws)
+    print(f"[WS] token={'yes' if token else 'no'}, user_id={user_id}", flush=True)
+
+    # 3. Найти МГ и проверить доступ
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Mastergraph).where(Mastergraph.mg_id == mg_id, Mastergraph.is_deleted == False)
+        )
+        mg = result.scalar_one_or_none()
+        if not mg:
+            await ws.close(code=1008, reason="Mastergraph not found")
+            return
+
+        access = await check_project_access(mg.project_id, user_id, "view_project", token)
+        print(f"[WS] access={access}", flush=True)
+        if not access.get("has_access"):
+            await ws.close(code=1008, reason="Access denied")
+            return
+
+    # 4. Подключить
     await manager.connect(mg_id, ws)
     try:
         async with AsyncSessionLocal() as session:
@@ -27,13 +79,23 @@ async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)
                 await ws.send_json({"type": "error", "message": "Mastergraph not found"})
                 return
 
-            tasks_result = await session.execute(select(MgTask).where(MgTask.mg_id == mg_id, MgTask.is_deleted == False))
+            tasks_result = await session.execute(
+                select(MgTask).where(MgTask.mg_id == mg_id, MgTask.is_deleted == False)
+            )
             tasks = tasks_result.scalars().all()
-            deps_result = await session.execute(select(MgDependency).where(MgDependency.mg_id == mg_id, MgDependency.is_deleted == False))
+            deps_result = await session.execute(
+                select(MgDependency).where(MgDependency.mg_id == mg_id, MgDependency.is_deleted == False)
+            )
             deps = deps_result.scalars().all()
-            ms_result = await session.execute(select(MgMilestone).where(MgMilestone.mg_id == mg_id, MgMilestone.is_deleted == False).order_by(MgMilestone.sort_order))
+            ms_result = await session.execute(
+                select(MgMilestone)
+                .where(MgMilestone.mg_id == mg_id, MgMilestone.is_deleted == False)
+                .order_by(MgMilestone.sort_order)
+            )
             milestones = ms_result.scalars().all()
-            groups_result = await session.execute(select(TaskGroup).where(TaskGroup.is_deleted == False))
+            groups_result = await session.execute(
+                select(TaskGroup).where(TaskGroup.is_deleted == False)
+            )
             groups = groups_result.scalars().all()
 
             snapshot = {

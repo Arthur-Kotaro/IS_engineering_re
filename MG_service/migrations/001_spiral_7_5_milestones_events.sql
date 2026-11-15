@@ -2,6 +2,9 @@
 -- MG_service: Спираль 7.5 — вехи, история, статус МГ, soft delete
 -- ============================================================
 
+-- 0. Генератор UUID (должен быть ДО первого использования gen_random_uuid())
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- 1. mastergraphs: статус МГ, типология, soft delete
 ALTER TABLE mastergraphs
     ADD COLUMN IF NOT EXISTS is_approved BOOLEAN NOT NULL DEFAULT FALSE,
@@ -89,6 +92,3 @@ CREATE TABLE IF NOT EXISTS mg_status_history (
 );
 
 CREATE INDEX IF NOT EXISTS ix_mg_status_history_mg_created ON mg_status_history(mg_id, created_at);
-
--- 9. Генератор UUID (если ещё нет pgcrypto)
-CREATE EXTENSION IF NOT EXISTS pgcrypto;

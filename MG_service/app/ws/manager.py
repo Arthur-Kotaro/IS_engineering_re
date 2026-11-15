@@ -13,7 +13,6 @@ class ConnectionManager:
         self._lock = asyncio.Lock()
 
     async def connect(self, mg_id: str, ws: WebSocket):
-        await ws.accept()
         async with self._lock:
             self._connections.setdefault(mg_id, set()).add(ws)
             total = len(self._connections[mg_id])

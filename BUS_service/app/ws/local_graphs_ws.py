@@ -1,5 +1,7 @@
 # app/ws/local_graphs_ws.py
 import logging
+import aiohttp
+from uuid import UUID
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy import select
 from sqlalchemy import func
@@ -12,27 +14,97 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["WebSocket"])
 
 
+def _extract_user_id(ws: WebSocket) -> int | None:
+    user_id_str = ws.headers.get("X-User-ID")
+    if not user_id_str:
+        return None
+    try:
+        return int(user_id_str)
+    except ValueError:
+        return None
+
+
+def _extract_token(ws: WebSocket) -> str | None:
+    auth = ws.headers.get("Authorization", "")
+    return auth.removeprefix("Bearer ").strip() or None
+
+
+async def _check_project_access(project_id: int, user_id: int, token: str | None = None) -> bool:
+    project_service_url = "http://localhost:8001"
+    headers = {"X-User-ID": str(user_id)}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    url = f"{project_service_url}/internal/projects/{project_id}/check-access"
+    params = {"user_id": user_id, "permission": "view_project"}
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3.0)) as session:
+            async with session.get(url, params=params, headers=headers) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data.get("has_access", False)
+                logger.warning(f"check_access {project_id}: HTTP {resp.status}")
+    except Exception as e:
+        logger.warning(f"check_access {project_id}: {e}")
+    return False
+
+
 @router.websocket("/ws/local-graphs/{lg_id}")
 async def ws_local_graph(ws: WebSocket, lg_id: str, last_version: int = Query(0)):
+    print(f"[WS LG ENDPOINT] connection for lg={lg_id}", flush=True)
+    
+    # 1. ВАЖНО: accept() ДО любых проверок
+    await ws.accept()
+
+    # 2. Проверка пользователя
+    user_id = _extract_user_id(ws)
+    print(f"[WS LG DEBUG] X-User-ID header: {ws.headers.get('X-User-ID')}, extracted: {user_id}", flush=True)
+    if user_id is None:
+        await ws.close(code=1008, reason="Missing X-User-ID")
+        return
+
+    token = _extract_token(ws)
+
+    # 3. Преобразование lg_id в UUID (для SQLAlchemy/SQLite)
+    try:
+        lg_uuid = UUID(lg_id)
+    except ValueError:
+        await ws.close(code=1008, reason="Invalid lg_id format")
+        return
+
+    # 4. Проверка существования ЛГ и доступа к проекту
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(LocalGraph).where(LocalGraph.lg_id == lg_uuid, LocalGraph.is_deleted == 0)
+        )
+        lg = result.scalar_one_or_none()
+        if not lg:
+            await ws.close(code=1008, reason="LocalGraph not found")
+            return
+
+        has_access = await _check_project_access(lg.project_id, user_id, token)
+        print(f"[WS LG] access to project {lg.project_id}: {has_access}", flush=True)
+        if not has_access:
+            await ws.close(code=1008, reason="Access denied")
+            return
+
+    # 5. Подключение и отправка snapshot
     await manager.connect(lg_id, ws)
     try:
         async with AsyncSessionLocal() as session:
+            # Перечитываем
             result = await session.execute(
-                select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0)
+                select(LocalGraph).where(LocalGraph.lg_id == lg_uuid, LocalGraph.is_deleted == 0)
             )
             lg = result.scalar_one_or_none()
-            if not lg:
-                await ws.send_json({"type": "error", "message": "LocalGraph not found"})
-                return
 
             tasks_result = await session.execute(
-                select(LgTask).where(LgTask.lg_id == lg_id, LgTask.is_deleted == 0)
+                select(LgTask).where(LgTask.lg_id == lg_uuid, LgTask.is_deleted == 0)
             )
             tasks = tasks_result.scalars().all()
 
             tasks_count = await session.execute(
                 select(func.count(LgTask.lg_task_id)).where(
-                    LgTask.lg_id == lg_id, LgTask.is_deleted == 0,
+                    LgTask.lg_id == lg_uuid, LgTask.is_deleted == 0,
                 )
             )
             is_pure = (tasks_count.scalar() or 0) == 0
@@ -65,6 +137,7 @@ async def ws_local_graph(ws: WebSocket, lg_id: str, last_version: int = Query(0)
                 ],
             }
             await ws.send_json(snapshot)
+            print(f"[WS LG ENDPOINT] snapshot sent for lg={lg_id}", flush=True)
 
         while True:
             data = await ws.receive_json()
@@ -73,5 +146,6 @@ async def ws_local_graph(ws: WebSocket, lg_id: str, last_version: int = Query(0)
     except WebSocketDisconnect:
         await manager.disconnect(lg_id, ws)
     except Exception as e:
-        logger.error(f"WS error: {e}")
+        print(f"[WS LG ENDPOINT] error: {e}", flush=True)
+        logger.error(f"WS LG error: {e}")
         await manager.disconnect(lg_id, ws)
