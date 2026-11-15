@@ -45,24 +45,20 @@ QUrl ApiClient::buildUrl(const QString &endpoint) const
     }
 
     QString normalizedEndpoint = endpoint;
+
+    // Если endpoint уже начинается с /api/v1/ — оставляем как есть
     if (!endpoint.startsWith("/api/v1/") && endpoint != "/")
     {
+        // Специфичные auth-эндпоинты
         if (endpoint == "/login" || endpoint == "/refresh" || endpoint == "/logout" ||
             endpoint == "/reset-password" || endpoint == "/password-expiry" ||
             endpoint == "/change-password")
         {
             normalizedEndpoint = "/api/v1/auth" + endpoint;
         }
-        else if (endpoint.startsWith("/users/"))
-        {
-            normalizedEndpoint = "/api/v1" + endpoint;
-        }
-        else if (endpoint.startsWith("/navigation/"))
-        {
-            normalizedEndpoint = "/api/v1" + endpoint;
-        }
         else
         {
+            // Всё остальное (users, navigation, и т.д.) — добавляем /api/v1
             normalizedEndpoint = "/api/v1" + endpoint;
         }
     }

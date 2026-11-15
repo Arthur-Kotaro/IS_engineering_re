@@ -8,6 +8,7 @@ from app.services.access_service import (
     PERM_VIEW_PROJECT,
     PERM_EDIT_PROJECT,
     PERM_MANAGE_MEMBERS,
+    PERM_DELETE_PROJECT,
 )
 from app.schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
@@ -115,11 +116,23 @@ class ProjectService:
         access = await self.access.check_access(project_id, user_id, PERM_EDIT_PROJECT, token)
         if not access["has_access"]:
             raise HTTPException(403, "No edit_project access")
+        
+        # exclude_unset=True позволяет отличить "поле не передано" от "поле = null"
         update_dict = data.model_dump(exclude_unset=True)
         p = await self.repo.update(project_id, **update_dict)
         if not p:
             return None
         return self._to_response(p)
+
+    async def delete_project(self, project_id, user_id, token=None):
+        access = await self.access.check_access(project_id, user_id, PERM_DELETE_PROJECT, token)
+        if not access["has_access"]:
+            raise HTTPException(403, "No delete_project access")
+        
+        deleted = await self.repo.delete(project_id)
+        if not deleted:
+            raise HTTPException(404, "Project not found")
+        logger.info(f"Project {project_id} deleted by user {user_id}")
 
     async def add_member(self, project_id, data: ProjectMemberCreate, current_user_id, token=None) -> ProjectMemberResponse:
         access = await self.access.check_access(project_id, current_user_id, PERM_MANAGE_MEMBERS, token)

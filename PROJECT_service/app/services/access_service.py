@@ -48,7 +48,7 @@ class AccessService:
             return {"has_access": False, "reason": "project_not_found", "role": None}
 
         roles = await self._get_user_roles(user_id, token)
-        if "admin" in roles:
+        if "admin" in roles or "super_admin" in roles:
             return {"has_access": True, "reason": "admin", "role": "admin"}
 
         is_ce = project.chief_engineer_id == user_id
@@ -79,6 +79,12 @@ class AccessService:
             if is_ce:
                 return {"has_access": True, "reason": "chief_engineer", "role": "chief_engineer"}
 
+        if permission == PERM_DELETE_PROJECT:
+            # Пока только chief_engineer имеет право удаления.
+            # В будущем можно делегировать admin.
+            if is_ce:
+                return {"has_access": True, "reason": "chief_engineer", "role": "chief_engineer"}
+
         return {"has_access": False, "reason": "not_authorized", "role": member_role}
 
     async def list_projects_with_access(
@@ -88,7 +94,7 @@ class AccessService:
         token: str = None,
     ) -> List[Dict]:
         roles = await self._get_user_roles(user_id, token)
-        is_admin = "admin" in roles
+        is_admin = "admin" in roles or "super_admin" in roles
 
         all_projects = await self.repo.get_all(0, 10000)
         result = []
@@ -120,6 +126,9 @@ class AccessService:
                 allowed = True
                 reason = "chief_engineer"
             elif permission == PERM_EDIT_PROJECT and is_ce:
+                allowed = True
+                reason = "chief_engineer"
+            elif permission == PERM_DELETE_PROJECT and is_ce:
                 allowed = True
                 reason = "chief_engineer"
 

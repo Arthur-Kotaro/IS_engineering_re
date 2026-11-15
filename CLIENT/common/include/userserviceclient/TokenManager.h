@@ -3,6 +3,7 @@
 
 #include "UsersServiceClient_global.h"
 
+#include <QDateTime>
 #include <QJsonObject>
 #include <QObject>
 #include <QString>
@@ -40,6 +41,7 @@ class USERSERVICECLIENT_EXPORT TokenManager : public QObject
 
   private:
     bool isTokenValid(const QString &token) const;
+    QDateTime getTokenExpiry(const QString &token) const;
 
   private:
     QString m_accessToken;

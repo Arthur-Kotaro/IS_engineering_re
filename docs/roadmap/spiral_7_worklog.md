@@ -360,3 +360,42 @@
 - **Файлы:** `CLIENT/common/src/TokenManager.cpp`, `CLIENT/common/include/userserviceclient/TokenManager.h`.
 - **План:** реализовать `isTokenValid` (проверка `exp` JWT), использовать в `hasValidAccessToken`.
 - **Статус:** ⏳ ожидает.
+
+### ✅ Правка 5: `TokenManager::isTokenValid` (клиент)
+- **Файлы:** `CLIENT/common/src/TokenManager.cpp`, `CLIENT/common/include/userserviceclient/TokenManager.h`.
+- **Что сделано:** реализован `isTokenValid` (декодирование JWT payload, проверка `exp` с запасом 30 сек). `hasValidAccessToken` использует его.
+- **Проверка:** сборка `ProductionClientApp` — без ошибок.
+- **Статус:** ✅ выполнено.
+
+### ✅ Правка 6: `ApiClient::buildUrl` (клиент)
+- **Файлы:** `CLIENT/common/src/ApiClient.cpp`, `CLIENT/common/include/userserviceclient/ApiClient.h`.
+- **Что сделано:** убрано дублирование `else if` (для `/users/`, `/navigation/`). Оставлен один `else` для всего, что не `/api/v1/` и не auth-эндпоинт.
+- **Проверка:** сборка `ProductionClientApp` — без ошибок.
+- **Статус:** ✅ выполнено.
+
+### ✅ Правка 7: `PROJECT_service` (delete, status, update)
+- **Файлы:** `PROJECT_service/app/services/access_service.py`, `api/v1/projects.py`, `repositories/project_repo.py`, `schemas/project.py`, `services/project_service.py`.
+- **Что сделано:**
+  - `access_service.py`: добавлен `PERM_DELETE_PROJECT` (только `chief_engineer`). Добавлена проверка `super_admin`.
+  - `projects.py`: `PATCH /status` — валидация статуса. `delete_project` — endpoint подключён к `svc.delete_project`.
+  - `project_repo.py`: `update` — `setattr` без `if v is not None` (можно очистить поле). Добавлен `delete`.
+  - `project_service.py`: добавлен метод `delete_project`.
+- **Проверка:**
+  - `DELETE /api/v1/projects/4` → `204 No Content` ✅
+  - `PATCH /status?status=active` → `200 OK` ✅
+  - `PATCH /status?status=invalid` → `400 Bad Request` ✅
+  - `PUT` с `{"description": null}` → `200 OK`, `description: null` ✅
+- **Статус:** ✅ выполнено.
+
+---
+
+## 12. Этап 1 (критические баги бэкенда) — ЗАВЕРШЁН
+- Правка 1: миграция 001 ✅
+- Правка 2: отменена (не баг) ❌
+- Правка 3: WS-авторизация (MG, BUS, Nginx) ✅
+- Правка 4: `create_mastergraph` (гонка) ✅
+- Правка 5: `TokenManager::isTokenValid` ✅
+- Правка 6: `ApiClient::buildUrl` ✅
+- Правка 7: `PROJECT_service` (delete, status, update) ✅
+
+**Следующий этап:** Этап 3 (клиент — критические баги) — WS-реконнект, snapshot/diff, токен.

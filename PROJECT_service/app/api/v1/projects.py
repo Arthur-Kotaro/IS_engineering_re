@@ -10,6 +10,7 @@ from app.schemas.project import (
     CheckAccessResponse,
 )
 from app.services.project_service import ProjectService
+from app.models.project import ProjectStatus
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -79,6 +80,50 @@ async def update_project(
     if not p:
         raise HTTPException(404, "Project not found")
     return p
+
+
+@router.patch("/{project_id}/status", response_model=ProjectResponse)
+async def patch_project_status(
+    project_id: int,
+    status: str = Query(..., description="Новый статус проекта"),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Смена статуса проекта. Валидные статусы: draft, active, suspended, completed, cancelled."""
+    valid_statuses = {
+        ProjectStatus.DRAFT,
+        ProjectStatus.ACTIVE,
+        ProjectStatus.SUSPENDED,
+        ProjectStatus.COMPLETED,
+        ProjectStatus.CANCELLED,
+    }
+    if status not in valid_statuses:
+        raise HTTPException(
+            400,
+            f"Invalid status '{status}'. Allowed: {', '.join(sorted(valid_statuses))}",
+        )
+
+    user_id = _user_id(request)
+    token = _token(request)
+    svc = ProjectService(db)
+    data = ProjectUpdate(status=status)
+    p = await svc.update_project(project_id, data, user_id, token)
+    if not p:
+        raise HTTPException(404, "Project not found")
+    return p
+
+
+@router.delete("/{project_id}", status_code=204)
+async def delete_project(
+    project_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    user_id = _user_id(request)
+    token = _token(request)
+    svc = ProjectService(db)
+    await svc.delete_project(project_id, user_id, token)
+    return None
 
 
 @router.get("/{project_id}/check-access", response_model=CheckAccessResponse)

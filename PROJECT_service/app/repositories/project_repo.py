@@ -59,12 +59,23 @@ class ProjectRepository:
         p = await self.get_by_id(project_id)
         if not p:
             return None
+        
+        # Обновляем только те поля, которые переданы (даже если значение None)
         for k, v in kwargs.items():
-            if hasattr(p, k) and v is not None:
+            if hasattr(p, k):
                 setattr(p, k, v)
+        
         await self.db.commit()
         await self.db.refresh(p)
         return p
+
+    async def delete(self, project_id: int) -> bool:
+        p = await self.get_by_id(project_id)
+        if not p:
+            return False
+        await self.db.delete(p)
+        await self.db.commit()
+        return True
 
     async def get_member(self, project_id: int, user_id: int) -> Optional[ProjectMember]:
         result = await self.db.execute(
