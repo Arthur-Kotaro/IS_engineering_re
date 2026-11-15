@@ -1,5 +1,4 @@
 #include "GeneratorHelpers.h"
-
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QString>

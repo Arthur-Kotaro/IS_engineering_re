@@ -102,7 +102,7 @@ async def create_mastergraph(
     data: CreateMastergraphRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    # проверим, существовал ли МГ до создания
+    # Быстрая проверка "был ли МГ раньше" (для поля created; гонка защищена IntegrityError в creator)
     from app.models.mastergraph import Mastergraph
     existing = await db.execute(
         select(Mastergraph).where(

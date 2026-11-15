@@ -4,6 +4,7 @@ from datetime import date
 from typing import Optional
 from uuid import UUID
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.mastergraph import Mastergraph
@@ -32,8 +33,9 @@ async def create_mastergraph_from_typology(
     """
     Создаёт МГ (идемпотентно по project_id) + вехи из типологии.
     Если МГ уже есть — возвращает существующий (без дубликатов вех).
+    Защищён от гонки через IntegrityError (unique constraint на project_id).
     """
-    # 1. Идемпотентность
+    # 1. Быстрая проверка (не гарантирует от гонки, но экономит время)
     existing = await db.execute(
         select(Mastergraph).where(
             Mastergraph.project_id == project_id,
@@ -62,7 +64,26 @@ async def create_mastergraph_from_typology(
         created_by=cve_id,
     )
     db.add(mg)
-    await db.flush()  # получить mg_id
+
+    try:
+        await db.flush()  # получить mg_id, проверить unique constraint
+    except IntegrityError:
+        # Гонка: другой процесс уже создал МГ для этого project_id
+        await db.rollback()
+        logger.warning(f"Race detected: MG for project {project_id} already created by another request")
+        # Читаем существующий МГ
+        existing = await db.execute(
+            select(Mastergraph).where(
+                Mastergraph.project_id == project_id,
+                Mastergraph.is_deleted == False,
+            )
+        )
+        mg = existing.scalar_one_or_none()
+        if mg:
+            return mg
+        raise MastergraphCreationError(
+            f"Failed to create MG for project {project_id} (concurrent creation)"
+        )
 
     # 4. Создаём вехи
     milestones_data = build_milestones(typology)

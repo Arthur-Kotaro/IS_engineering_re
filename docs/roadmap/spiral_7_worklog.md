@@ -345,3 +345,18 @@
 
 ### 🟡 Правки 5–9: (TokenManager, ApiClient, delete_project, status, update) — **ожидают**
 - **Статус:** ⏳ ожидают.
+
+### ✅ Правка 4: `create_mastergraph` (идемпотентность и гонка)
+- **Файлы:** `MG_service/app/services/mastergraph_creator.py`, `MG_service/app/api/v1/internal.py`.
+- **Что сделано:**
+  - `create_mastergraph_from_typology`: обработка `IntegrityError` при `db.flush()`. Если гонка — `rollback`, чтение существующего МГ, возврат.
+  - `internal.py`: оставлена быстрая проверка `was_existing` (для поля `created`), но защита от гонки — через `IntegrityError`.
+- **Проверка:**
+  - Повторный запрос → `created: false` (МГ не дублируется).
+  - Два одновременных запроса → один `mg_id`, в БД ровно один МГ.
+- **Статус:** ✅ выполнено.
+
+### 🟡 Правка 5: `TokenManager::isTokenValid` (клиент) — **следующая**
+- **Файлы:** `CLIENT/common/src/TokenManager.cpp`, `CLIENT/common/include/userserviceclient/TokenManager.h`.
+- **План:** реализовать `isTokenValid` (проверка `exp` JWT), использовать в `hasValidAccessToken`.
+- **Статус:** ⏳ ожидает.
