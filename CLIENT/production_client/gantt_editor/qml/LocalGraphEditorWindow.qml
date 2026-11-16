@@ -113,6 +113,11 @@ ApplicationWindow
                     id: calendarHeader
                     x: -flickableRight.contentX
                     width: calendarHeader.contentWidth
+                    
+                    // ИСПРАВЛЕНО: CalendarHeader берёт данные из GridArea (единый источник правды)
+                    displayStart: gridArea.displayStart
+                    displayEnd: gridArea.displayEnd
+                    dayWidth: gridArea.dayWidth
                 }
 
                 Flickable

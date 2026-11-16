@@ -21,6 +21,7 @@ void AuthService::parseJwtPayload(const QString &token, QJsonObject &payload)
     if (parts.size() >= 2)
     {
         QString payloadBase64 = parts[1];
+        payloadBase64.replace('-', '+').replace('_', '/');
         while (payloadBase64.length() % 4)
             payloadBase64 += '=';
         QByteArray payloadJson = QByteArray::fromBase64(payloadBase64.toLatin1());
@@ -124,15 +125,30 @@ void AuthService::refreshToken(const QString &refreshToken)
     QJsonObject refreshData;
     refreshData["refresh_token"] = refreshToken;
 
-    // Исправлено: правильный путь
     m_apiClient->post("/refresh", refreshData,
                       [this](const ApiResponse &response)
                       {
                           if (response.success)
                           {
                               QJsonObject data = response.data.object();
-                              emit tokenRefreshed(data["access_token"].toString(),
-                                                  data["refresh_token"].toString());
+                              QString newAccess = data["access_token"].toString();
+                              QString newRefresh = data["refresh_token"].toString();
+                              
+                              // Обновляем текущую сессию
+                              m_currentSession.accessToken = newAccess;
+                              m_currentSession.refreshToken = newRefresh;
+                              m_apiClient->setAuthToken(newAccess);
+                              
+                              // Обновляем payload (если изменился user_id / роли)
+                              parseJwtPayload(newAccess, m_currentSession.userPayload);
+                              updateSessionFromTokens();
+                              
+                              emit tokenRefreshed(newAccess, newRefresh);
+                          }
+                          else
+                          {
+                              qDebug() << "Refresh token failed:" << response.errorString;
+                              emit sessionExpired();
                           }
                       });
 }
@@ -143,7 +159,6 @@ void AuthService::logout(const QString &refreshToken)
     if (!refreshToken.isEmpty())
         logoutData["refresh_token"] = refreshToken;
 
-    // Исправлено: правильный путь
     m_apiClient->post("/logout", logoutData,
                       [this](const ApiResponse &response)
                       {
@@ -161,13 +176,17 @@ void AuthService::changePassword(const QString &currentPassword, const QString &
     changeData["new_password"] = newPassword;
     changeData["confirm_password"] = confirmPassword;
 
-    // Исправлено: правильный путь
     m_apiClient->post("/change-password", changeData,
                       [this](const ApiResponse &response)
                       {
                           if (response.success)
                           {
                               QJsonObject data = response.data.object();
+                              
+                              // После смены пароля — очищаем токен (сессия недействительна)
+                              m_apiClient->clearAuthToken();
+                              m_currentSession = UserSession();
+                              
                               emit passwordChanged(true, data["message"].toString());
                               emit sessionExpired();
                           }

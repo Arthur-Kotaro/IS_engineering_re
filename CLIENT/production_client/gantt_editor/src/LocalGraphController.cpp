@@ -205,7 +205,10 @@ void LocalGraphController::updateLocalTaskDates(const QString& taskId, const QDa
             bool addToHistory = m_projectData->get_isApproved();
             m_projectData->get_taskModel()->updateTaskDates(taskId, newStart, newEnd, addToHistory, "");
             m_projectData->recalculateEndDate();
-            emit localTasksReloaded();
+            
+            // ИСПРАВЛЕНО: НЕ вызываем emit localTasksReloaded(), 
+            // чтобы ProjectController не перезагружал ЛГ и не сбрасывал can_edit.
+            // GridArea перерисуется по сигналу taskDatesChanged из TaskModel.
 
             // Каскад: последователи, чьи start_date < newEnd
             QVariantList successors;
@@ -253,7 +256,8 @@ void LocalGraphController::setLocalTaskStatus(const QString& taskId, int status)
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (reply->error() == QNetworkReply::NoError) {
-            emit localTasksReloaded();
+            // Обновление статуса не меняет структуру, поэтому можно не перезагружать
+            // emit localTasksReloaded();
         } else {
             emit errorOccurred("setLocalTaskStatus: " + reply->errorString());
         }

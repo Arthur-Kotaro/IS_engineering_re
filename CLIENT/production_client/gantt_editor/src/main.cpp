@@ -15,6 +15,7 @@
 #include <QEventLoop>
 #include <QByteArray>
 #include <QMessageBox>
+#include <QProcessEnvironment>
 
 #include "ProjectController.h"
 #include "TaskModel.h"
@@ -77,13 +78,18 @@ int main(int argc, char *argv[])
     const QString tokenFile = parser.value(tokenFileOption);
     const bool isReadOnly = parser.isSet(readOnlyOption);
 
-    QString token;
-    if (!tokenFile.isEmpty()) {
+    // 1. Приоритет: переменная окружения GANTT_TOKEN (безопаснее файла)
+    QString token = qEnvironmentVariable("GANTT_TOKEN");
+
+    // 2. Fallback: --token-file (с удалением после чтения)
+    if (token.isEmpty() && !tokenFile.isEmpty()) {
         QFile f(tokenFile);
         if (f.open(QIODevice::ReadOnly)) {
             token = QString::fromUtf8(f.readAll()).trimmed();
             f.close();
         }
+        // ВАЖНО: удаляем временный файл после чтения
+        QFile::remove(tokenFile);
     }
 
     const int currentUserId = decode_user_id(token);
@@ -129,6 +135,9 @@ int main(int argc, char *argv[])
         qInfo().noquote() << "[LG] GET by-task:" << byTaskUrl << " X-User-ID:" << currentUserId;
         QNetworkRequest req{QUrl(byTaskUrl)};
         req.setRawHeader("X-User-ID", QByteArray::number(currentUserId));
+        if (!token.isEmpty()) {
+            req.setRawHeader("Authorization", "Bearer " + token.toUtf8());
+        }
         QNetworkReply* reply = mgr.get(req);
         QEventLoop loop;
         QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
@@ -182,6 +191,9 @@ int main(int argc, char *argv[])
         qInfo().noquote() << "[LG] GET tasks:" << tasksUrl;
         QNetworkRequest tReq{QUrl(tasksUrl)};
         tReq.setRawHeader("X-User-ID", QByteArray::number(currentUserId));
+        if (!token.isEmpty()) {
+            tReq.setRawHeader("Authorization", "Bearer " + token.toUtf8());
+        }
         QNetworkReply* tReply = mgr.get(tReq);
         QEventLoop tLoop;
         QObject::connect(tReply, &QNetworkReply::finished, &tLoop, &QEventLoop::quit);

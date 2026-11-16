@@ -14,8 +14,10 @@ Rectangle
     property date firstMilestoneDate: new Date()
     property date lastMilestoneDate: new Date()
 
+    // ИСПРАВЛЕНО: displayStart, displayEnd, dayWidth передаются снаружи (из GridArea)
     property date displayStart: new Date()
     property date displayEnd: new Date()
+    property int dayWidth: projectController && projectController.settingsManager.zoomLevel === 1 ? 10 : 30
 
     readonly property bool isLocalMode: {
         return projectController && projectController.projectData
@@ -39,6 +41,26 @@ Rectangle
         return projectController.settingsManager.isHoliday(date)
     }
 
+    // ИСПРАВЛЕНО: Для ЛГ (isLocalMode) мы НЕ вычисляем диапазон, а берём переданный из GridArea.
+    // Для МГ — вычисляем, как раньше (там GridArea не управляет displayStart).
+    function updateDisplayRange()
+    {
+        if (isLocalMode) {
+            // Данные уже пришли из GridArea через property binding.
+            // Просто перестраиваем данные для отрисовки.
+            return
+        }
+
+        var earliest = projectController?.projectData?.getEarliestDate()
+        var latest = projectController?.projectData?.getLatestDate()
+        if (!earliest || !latest) return
+        
+        var start = getMondayBefore(earliest, 4)
+        var end = getSecondSundayAfter(latest)
+        if (displayStart.toDateString() !== start.toDateString()) displayStart = start
+        if (displayEnd.toDateString() !== end.toDateString()) displayEnd = end
+    }
+
     function getSecondSundayAfter(date)
     {
         var d = new Date(date)
@@ -58,94 +80,6 @@ Rectangle
         return d
     }
 
-    function computeLocalDisplayRange(linkedStart, linkedEnd, earliest, latest)
-    {
-        var s = new Date(linkedStart)
-        var e = new Date(linkedEnd)
-
-        var durationDays = Math.floor((e - s) / 86400000) + 1
-        if (durationDays < 30)
-        {
-            var ms = new Date(s.getFullYear(), s.getMonth(), 1)
-            ms.setDate(ms.getDate() - 14)
-            ms.setHours(0, 0, 0, 0)
-            var me = new Date(e.getFullYear(), e.getMonth() + 1, 0)
-            me.setDate(me.getDate() + 14)
-            me.setHours(23, 59, 59, 999)
-            s = ms
-            e = me
-        }
-        else
-        {
-            s.setDate(s.getDate() - 14)
-            s.setHours(0, 0, 0, 0)
-            e.setDate(e.getDate() + 14)
-            e.setHours(23, 59, 59, 999)
-        }
-
-        if (isValidDate(earliest) && earliest < s) s = new Date(earliest)
-        if (isValidDate(latest) && latest > e) e = new Date(latest)
-
-        while (s.getDay() !== 1) s.setDate(s.getDate() - 1)
-
-        return { start: s, end: e }
-    }
-
-    function updateDisplayRange()
-    {
-        var localMode = (projectController && projectController.projectData
-        && projectController.projectData.graphKind === 1)
-
-        if (localMode)
-        {
-            var linkedStart = projectController.projectData.getLinkedTargetStart()
-            var linkedEnd = projectController.projectData.getLinkedTargetEnd()
-
-            var earliest = projectController.projectData.getEarliestDate()
-            var latest = projectController.projectData.getLatestDate()
-
-            var s, e
-
-            if (isValidDate(linkedStart) && isValidDate(linkedEnd))
-            {
-                var range = computeLocalDisplayRange(linkedStart, linkedEnd, earliest, latest)
-                s = range.start
-                e = range.end
-            }
-            else
-            {
-                var now = new Date()
-                s = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-                e = new Date(now.getFullYear(), now.getMonth() + 2, 0)
-                s.setHours(0, 0, 0, 0)
-                e.setHours(23, 59, 59, 999)
-                if (isValidDate(earliest) && earliest < s) s = new Date(earliest)
-                    if (isValidDate(latest) && latest > e) e = new Date(latest)
-                        while (s.getDay() !== 1) s.setDate(s.getDate() - 1)
-            }
-
-            displayStart = s
-            displayEnd = e
-            console.log("[CalendarHeader] displayStart=", displayStart,
-                        " displayEnd=", displayEnd,
-                        " totalDays=", totalDays,
-                        " contentWidth=", contentWidth,
-                        " linkedStart=", linkedStart, " linkedEnd=", linkedEnd,
-                        " earliest=", earliest, " latest=", latest)
-            return
-        }
-
-        var earliest = projectController?.projectData?.getEarliestDate()
-        var latest = projectController?.projectData?.getLatestDate()
-        if (!earliest || !latest) return
-            var start = getMondayBefore(earliest, 4)
-            var end = getSecondSundayAfter(latest)
-            if (displayStart.toDateString() !== start.toDateString()) displayStart = start
-                if (displayEnd.toDateString() !== end.toDateString()) displayEnd = end
-    }
-
-    property int dayWidth: projectController && projectController.settingsManager.zoomLevel === 1 ? 10 : 30
-    onDayWidthChanged: { if (milestoneBar) milestoneBar.dayWidth = dayWidth }
     property int totalDays: Math.max(1, Math.floor((displayEnd - displayStart) / 86400000) + 1)
     property real contentWidth: totalDays * dayWidth
 

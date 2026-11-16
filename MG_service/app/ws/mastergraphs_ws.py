@@ -11,13 +11,13 @@ from app.models.mg_milestone import MgMilestone
 from app.models.task_group import TaskGroup
 from app.ws.manager import manager
 from app.services.access_client import check_project_access
+from app.services.user_client import get_user_name
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["WebSocket"])
 
 
 def _extract_user_id(ws: WebSocket) -> int | None:
-    """Извлекает X-User-ID из заголовков (доверяем Nginx)."""
     user_id_str = ws.headers.get("X-User-ID")
     if not user_id_str:
         return None
@@ -35,25 +35,15 @@ def _extract_token(ws: WebSocket) -> str | None:
 @router.websocket("/ws/mastergraphs/{mg_id}")
 async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)):
     print(f"[WS ENDPOINT] connection for mg={mg_id}", flush=True)
-
-    # 1. ВАЖНО: accept() ДО любых проверок (иначе Starlette вернёт 403)
     await ws.accept()
 
-    # 2. Извлечь X-User-ID
     user_id = _extract_user_id(ws)
-    
-    # --- ВРЕМЕННЫЙ ЛОГ ДЛЯ ОТЛАДКИ ---
-    print(f"[WS DEBUG] X-User-ID header: {ws.headers.get('X-User-ID')}, extracted user_id: {user_id}", flush=True)
-    # ---------------------------------
-
     if user_id is None:
         await ws.close(code=1008, reason="Missing X-User-ID")
         return
 
     token = _extract_token(ws)
-    print(f"[WS] token={'yes' if token else 'no'}, user_id={user_id}", flush=True)
 
-    # 3. Найти МГ и проверить доступ
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(Mastergraph).where(Mastergraph.mg_id == mg_id, Mastergraph.is_deleted == False)
@@ -64,25 +54,40 @@ async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)
             return
 
         access = await check_project_access(mg.project_id, user_id, "view_project", token)
-        print(f"[WS] access={access}", flush=True)
         if not access.get("has_access"):
             await ws.close(code=1008, reason="Access denied")
             return
 
-    # 4. Подключить
     await manager.connect(mg_id, ws)
     try:
         async with AsyncSessionLocal() as session:
             result = await session.execute(select(Mastergraph).where(Mastergraph.mg_id == mg_id))
             mg = result.scalar_one_or_none()
-            if not mg:
-                await ws.send_json({"type": "error", "message": "Mastergraph not found"})
-                return
 
             tasks_result = await session.execute(
                 select(MgTask).where(MgTask.mg_id == mg_id, MgTask.is_deleted == False)
             )
             tasks = tasks_result.scalars().all()
+            
+            # Подтягиваем ФИО ответственных
+            enriched_tasks = []
+            for t in tasks:
+                resp_name = None
+                if t.responsible_id:
+                    resp_name = await get_user_name(t.responsible_id)
+                enriched_tasks.append({
+                    "task_id": str(t.task_id), "group_id": t.group_id, "title": t.title,
+                    "responsible_id": t.responsible_id, "responsible_name": resp_name,
+                    "status": t.status,
+                    "start_date": t.start_date.isoformat() if t.start_date else None,
+                    "end_date": t.end_date.isoformat() if t.end_date else None,
+                    "forecast_start": t.forecast_start.isoformat() if t.forecast_start else None,
+                    "forecast_end": t.forecast_end.isoformat() if t.forecast_end else None,
+                    "progress_current": t.progress_current, "progress_total": t.progress_total,
+                    "sort_order": t.sort_order, "version": t.version,
+                    "comment": t.comment, "parent_task_id": str(t.parent_task_id) if t.parent_task_id else None,
+                })
+
             deps_result = await session.execute(
                 select(MgDependency).where(MgDependency.mg_id == mg_id, MgDependency.is_deleted == False)
             )
@@ -106,18 +111,7 @@ async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)
                 "version": mg.version,
                 "is_approved": mg.is_approved,
                 "typology_name": mg.typology_name,
-                "tasks": [
-                    {
-                        "task_id": str(t.task_id), "group_id": t.group_id, "title": t.title,
-                        "responsible_id": t.responsible_id, "status": t.status,
-                        "start_date": t.start_date.isoformat() if t.start_date else None,
-                        "end_date": t.end_date.isoformat() if t.end_date else None,
-                        "forecast_start": t.forecast_start.isoformat() if t.forecast_start else None,
-                        "forecast_end": t.forecast_end.isoformat() if t.forecast_end else None,
-                        "progress_current": t.progress_current, "progress_total": t.progress_total,
-                        "sort_order": t.sort_order, "version": t.version,
-                    } for t in tasks
-                ],
+                "tasks": enriched_tasks,
                 "dependencies": [
                     {"dep_id": str(d.dep_id), "predecessor_id": str(d.predecessor_id),
                      "successor_id": str(d.successor_id), "dep_type": d.dep_type, "version": d.version}

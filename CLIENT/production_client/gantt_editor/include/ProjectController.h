@@ -74,7 +74,7 @@ public:
                                              const QString& responsible);
     Q_INVOKABLE void createTasksBatch(const QVariantList& tasks, const QVariantList& dependencies);
 
-    // Задачи: обновление
+    // Задачи: обновление (МГ)
     Q_INVOKABLE void updateTaskDates(const QString& taskId, const QDate& start, const QDate& end,
                                      const QString& reason = QString());
     Q_INVOKABLE void updateTaskForecast(const QString& taskId, const QDate& fs, const QDate& fe,
@@ -85,6 +85,9 @@ public:
     Q_INVOKABLE void updateTaskComment(const QString& taskId, const QString& comment);
     Q_INVOKABLE void updateTaskTitle(const QString& taskId, const QString& title);
     Q_INVOKABLE void deleteTask(const QString& taskId);
+
+    // Задачи: обновление (ЛГ)
+    Q_INVOKABLE void updateLocalTaskDates(const QString& taskId, const QDate& start, const QDate& end);
 
     // Вехи
     Q_INVOKABLE void updateMilestoneDate(const QString& milestoneId, const QDate& newDate,
@@ -133,6 +136,7 @@ signals:
     void canEditChanged();
     void isApprovedChanged();
     void graphKindChanged();
+    void wsConnectionStateChanged(const QString& state);
 
     void defaultGroupsLoaded(const QVariantList& groups);
     void groupCreated(bool success, const QString& message);
@@ -183,6 +187,7 @@ private:
     int m_lgProjectId = 0;
     int m_lgResponsibleId = 0;
     int m_projectId = 0;
+    int m_currentMgVersion = 0;
 
     QJsonArray m_editableProjects;
     QJsonArray m_viewableProjects;

@@ -430,6 +430,8 @@ void WidgetBridge::submitForm(const QString &endpoint, const QString &method,
         reply = m_networkManager->post(request, payload);
     else if (method == "PUT")
         reply = m_networkManager->put(request, payload);
+    else if (method == "DELETE")
+        reply = m_networkManager->deleteResource(request);
     else
         reply = m_networkManager->post(request, payload);
 
@@ -470,19 +472,19 @@ void WidgetBridge::openGanttEditor(int projectId, bool isReadOnly)
 void WidgetBridge::launchGanttEditor(int projectId, bool isReadOnly)
 {
     qDebug() << "WidgetBridge::launchGanttEditor: projectId=" << projectId
-             << "readOnly=" << isReadOnly;
+    << "readOnly=" << isReadOnly;
 
     QString appDir = QCoreApplication::applicationDirPath();
     QStringList candidates;
-#ifdef Q_OS_WIN
+    #ifdef Q_OS_WIN
     candidates << appDir + "/gantt_editor.exe"
-               << appDir + "/gantt_editor/gantt_editor.exe"
-               << appDir + "/../gantt_editor/gantt_editor.exe";
-#else
+    << appDir + "/gantt_editor/gantt_editor.exe"
+    << appDir + "/../gantt_editor/gantt_editor.exe";
+    #else
     candidates << appDir + "/gantt_editor"
-               << appDir + "/gantt_editor/gantt_editor"
-               << appDir + "/../gantt_editor/gantt_editor";
-#endif
+    << appDir + "/gantt_editor/gantt_editor"
+    << appDir + "/../gantt_editor/gantt_editor";
+    #endif
 
     QString program;
     for (const QString& c : candidates)
@@ -499,11 +501,14 @@ void WidgetBridge::launchGanttEditor(int projectId, bool isReadOnly)
 
     QStringList arguments;
     arguments << "--mode=master"
-              << "--project-id=" + QString::number(projectId);
+    << "--project-id=" + QString::number(projectId);
     if (isReadOnly) arguments << "--read-only";
 
+    // Передаём токен через временный файл (gantt_editor удалит после чтения)
     if (!m_currentToken.isEmpty()) {
-        QString tokenFile = QString("/tmp/gantt_token_master_%1.txt").arg(projectId);
+        QString tokenFile = QString("/tmp/gantt_token_master_%1_%2.txt")
+        .arg(projectId)
+        .arg(QDateTime::currentMSecsSinceEpoch());
         QFile f(tokenFile);
         if (f.open(QIODevice::WriteOnly)) {
             f.write(m_currentToken.toUtf8());

@@ -123,9 +123,22 @@ Rectangle
 
     ChangeReasonDialog { id: changeReasonDialog }
 
-    // Завершение изменения (drag или resize)
+    // ИСПРАВЛЕНО: Разделение логики для МГ и ЛГ
     function commitDateChange(newStart, newEnd) {
         var taskId = rowData ? rowData.taskId : ""
+        var isLocal = projectController && projectController.projectData &&
+                      projectController.projectData.graphKind === 1
+        
+        if (isLocal) {
+            // ЛГ: вызываем LocalGraphController (HTTP PUT в BUS_service)
+            console.log("TaskBar: local graph date change", taskId, newStart, newEnd)
+            if (projectController && projectController.localGraphController) {
+                projectController.localGraphController.updateLocalTaskDates(taskId, newStart, newEnd)
+            }
+            return
+        }
+        
+        // МГ: обычный путь через ProjectController
         var isApproved = projectController && projectController.isApproved
         var hadDates = rowData && (rowData.hasDates === true)
         if (isApproved && hadDates) {

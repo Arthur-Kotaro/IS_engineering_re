@@ -146,7 +146,15 @@ void ProjectController::loadFromServer(const QString& mgId, const QString& token
     m_apiClient->setToken(token);
     m_apiClient->loadMastergraph(mgId);
     m_apiClient->loadHolidays();
+
+    // Передаём last_version для WS
+    m_webSocket->setLastVersion(m_currentMgVersion);
     m_webSocket->connectToServer(QString("ws://localhost:8080/ws/mastergraphs/%1").arg(mgId), token);
+
+    // Связываем состояние WS с сигналом
+    connect(m_webSocket, &WebSocketClient::connectionStateChanged, this, [this]() {
+        emit wsConnectionStateChanged(m_webSocket->connectionState());
+    });
 }
 
 void ProjectController::openForProject(int projectId, bool isReadOnly, const QString& token)
@@ -268,7 +276,22 @@ void ProjectController::initLocalGraphData(const QVariantMap& lgData, const QVar
     if (!lgId.isEmpty() && !busUrl.isEmpty()) {
         QString wsUrl = busUrl;
         wsUrl.replace("http://", "ws://");
+
+        // Обновляем last_version (если есть в ответе)
+        int lgVersion = lgData.value("version").toInt(0);
+        m_currentMgVersion = lgVersion; // используем общее поле для версии (работает и для ЛГ)
+
+        m_webSocket->setLastVersion(m_currentMgVersion);
+
+        // ВАЖНО: передаём user_id для X-User-ID (для прямого подключения к BUS)
+        m_webSocket->setUserId(m_lgResponsibleId);
+
         m_webSocket->connectToServer(QString("%1/ws/local-graphs/%2").arg(wsUrl, lgId), m_token);
+
+        // Связываем состояние WS с сигналом (для индикатора в UI)
+        connect(m_webSocket, &WebSocketClient::connectionStateChanged, this, [this]() {
+            emit wsConnectionStateChanged(m_webSocket->connectionState());
+        });
     }
 }
 
@@ -317,7 +340,37 @@ void ProjectController::onApiError(const QString& message)
 
 void ProjectController::onWsSnapshot(const QJsonObject& snapshot)
 {
-    Q_UNUSED(snapshot)
+    qDebug() << "ProjectController::onWsSnapshot, tasks:" << snapshot.value("tasks").toArray().size();
+
+    m_currentMgVersion = snapshot.value("version").toInt(m_currentMgVersion);
+
+    if (m_projectData->get_graphKind() == GanttDefines::GraphKind::Local) {
+        // ЛГ: обновляем только задачи (группа "default" уже создана)
+        QJsonArray tasks = snapshot.value("tasks").toArray();
+        // Очищаем только задачи, группы не трогаем
+        m_projectData->get_taskModel()->clear();
+        for (const QJsonValue& tv : tasks)
+        {
+            QJsonObject t = tv.toObject();
+            m_projectData->get_taskModel()->addTaskWithId(
+                t.value("lg_task_id").toString(),
+                "default",
+                t.value("title").toString(),
+                QString::number(t.value("responsible_id").toInt()),
+                QDate::fromString(t.value("start_date").toString(), Qt::ISODate),
+                QDate::fromString(t.value("end_date").toString(), Qt::ISODate),
+                QDate::fromString(t.value("start_date").toString(), Qt::ISODate),
+                QDate::fromString(t.value("end_date").toString(), Qt::ISODate),
+                t.value("status").toInt(), -1, -1, 0);
+        }
+        m_projectData->recalculateEndDate();
+        qDebug() << "ProjectController: local graph snapshot applied (tasks only)";
+    } else {
+        // МГ: полная загрузка (с группами и вехами)
+        m_projectData->fromJson(snapshot.toVariantMap());
+        qDebug() << "ProjectController: mastergraph snapshot applied via fromJson";
+    }
+    emit projectDataChanged();
 }
 
 void ProjectController::onWsDiff(const QJsonObject& diff)
@@ -328,19 +381,54 @@ void ProjectController::onWsDiff(const QJsonObject& diff)
         QString op = change.value("op").toString();
         QString entity = change.value("entity").toString();
         QString id = change.value("id").toString();
-        if (entity == "task" && op == "update") {
-            QJsonObject fields = change.value("fields").toObject();
-            QVariantMap task = m_projectData->get_taskModel()->getTask(id);
-            if (task.isEmpty()) continue;
-            QDate fs = QDate::fromString(fields.value("forecast_start").toString(), Qt::ISODate);
-            QDate fe = QDate::fromString(fields.value("forecast_end").toString(), Qt::ISODate);
-            if (fs.isValid() && fe.isValid())
-                m_projectData->get_taskModel()->updateForecastDates(id, fs, fe);
-            int pc = fields.value("progress_current").toInt(-1);
-            int pt = fields.value("progress_total").toInt(-1);
-            if (pt > 0) m_projectData->get_taskModel()->setTaskProgress(id, pc, pt);
-            int st = fields.value("status").toInt(-1);
-            if (st >= 0) m_projectData->get_taskModel()->setTaskStatus(id, static_cast<GanttDefines::TaskStatus>(st));
+
+        if (entity == "task") {
+            if (op == "create" || op == "update") {
+                QJsonObject fields = change.value("fields").toObject();
+                QVariantMap task = m_projectData->get_taskModel()->getTask(id);
+                if (!task.isEmpty()) {
+                    // Обновляем поля
+                    if (fields.contains("forecast_start") || fields.contains("forecast_end")) {
+                        QDate fs = QDate::fromString(fields.value("forecast_start").toString(), Qt::ISODate);
+                        QDate fe = QDate::fromString(fields.value("forecast_end").toString(), Qt::ISODate);
+                        if (fs.isValid() && fe.isValid())
+                            m_projectData->get_taskModel()->updateForecastDates(id, fs, fe);
+                    }
+                    if (fields.contains("progress_current") && fields.contains("progress_total")) {
+                        int pc = fields.value("progress_current").toInt(-1);
+                        int pt = fields.value("progress_total").toInt(-1);
+                        if (pt > 0) m_projectData->get_taskModel()->setTaskProgress(id, pc, pt);
+                    }
+                    if (fields.contains("status")) {
+                        int st = fields.value("status").toInt(-1);
+                        if (st >= 0) m_projectData->get_taskModel()->setTaskStatus(id, static_cast<GanttDefines::TaskStatus>(st));
+                    }
+                    if (fields.contains("responsible_id")) {
+                        // обновление ответственного — через полную перезагрузку (пока)
+                        reloadMastergraph();
+                    }
+                }
+            } else if (op == "delete") {
+                m_projectData->get_taskModel()->removeTask(id);
+            }
+        } else if (entity == "milestone") {
+            if (op == "update" || op == "reschedule") {
+                QJsonObject fields = change.value("fields").toObject();
+                QDate planned = QDate::fromString(fields.value("planned_date").toString(), Qt::ISODate);
+                if (planned.isValid()) {
+                    m_projectData->get_milestoneModel()->rescheduleMilestone(id, planned);
+                }
+            } else if (op == "complete") {
+                m_projectData->get_milestoneModel()->setMilestoneCompleted(id);
+            }
+        } else if (entity == "dependency") {
+            if (op == "create") {
+                reloadMastergraph(); // Пока перезагружаем
+            } else if (op == "delete") {
+                m_projectData->get_dependencyModel()->removeDependency(id);
+            }
+        } else if (entity == "group") {
+            reloadMastergraph(); // Пока перезагружаем
         }
     }
     emit projectDataChanged();
@@ -787,4 +875,14 @@ void ProjectController::createCustomGroupWithPosition(const QString& name, const
               if (status == 200) { emit groupCreated(true, "Группа создана"); reloadMastergraph(); }
               else { emit groupCreated(false, "Ошибка создания группы"); }
           });
+}
+
+void ProjectController::updateLocalTaskDates(const QString& taskId, const QDate& start, const QDate& end)
+{
+    if (m_localGraphController) {
+        m_localGraphController->updateLocalTaskDates(taskId, start, end);
+    } else {
+        qWarning() << "ProjectController::updateLocalTaskDates: localGraphController is null";
+        emit errorOccurred("Локальный график не инициализирован");
+    }
 }
