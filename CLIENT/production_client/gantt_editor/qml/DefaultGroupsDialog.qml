@@ -6,8 +6,8 @@ Dialog
 {
     id: root
     title: "Создать группы по умолчанию"
-    width: 500
-    height: 500
+    width: 600
+    height: Math.min(800, contentColumn.implicitHeight + 40)
     modal: true
     standardButtons: Dialog.NoButton
     anchors.centerIn: Overlay.overlay
@@ -39,6 +39,7 @@ Dialog
 
     ColumnLayout
     {
+        id: contentColumn
         anchors.fill: parent
         anchors.margins: 15
         spacing: 10
@@ -65,11 +66,12 @@ Dialog
         ScrollView
         {
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            Layout.preferredHeight: Math.min(600, groupListLayout.implicitHeight + 20)
             clip: true
 
             ColumnLayout
             {
+                id: groupListLayout
                 width: parent.width
                 spacing: 4
 
@@ -111,7 +113,7 @@ Dialog
                 enabled: root.selectedIds.length > 0
                 onClicked: {
                     if (projectController)
-                        projectController.createGroups(root.selectedIds)
+                        projectController.createGroupsWithPosition(root.selectedIds, "top", "")
                     root.close()
                 }
             }

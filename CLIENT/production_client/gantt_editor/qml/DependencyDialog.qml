@@ -100,10 +100,21 @@ Dialog
                     id: mouseArea; anchors.fill: parent; hoverEnabled: true
                     onClicked: {
                         root.targetTaskId = modelData.taskId
-                        if (root.downstream)
-                            projectController.createDependency(root.sourceTaskId, root.targetTaskId)
-                        else
-                            projectController.createDependency(root.targetTaskId, root.sourceTaskId)
+                        var isLocal = projectController.projectData.graphKind === 1
+                        console.log("[DependencyDialog] clicked taskId=", modelData.taskId, "source=", root.sourceTaskId, "downstream=", root.downstream, "isLocal=", isLocal)
+                        if (isLocal) {
+                            // ЛГ — через LocalGraphController (HTTP в BUS)
+                            if (root.downstream)
+                                projectController.localGraphController.addLocalDependency(root.sourceTaskId, root.targetTaskId)
+                            else
+                                projectController.localGraphController.addLocalDependency(root.targetTaskId, root.sourceTaskId)
+                        } else {
+                            // МГ — через ProjectController (MG)
+                            if (root.downstream)
+                                projectController.createDependency(root.sourceTaskId, root.targetTaskId)
+                            else
+                                projectController.createDependency(root.targetTaskId, root.sourceTaskId)
+                        }
                         root.close()
                     }
                 }

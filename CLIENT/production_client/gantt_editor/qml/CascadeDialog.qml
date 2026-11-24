@@ -255,6 +255,7 @@ Dialog
                         var gid = gIds[item.groupIndex] || gIds[0]
                         var batchId = "b" + i
                         var t = { batch_id: batchId, group_id: gid, title: item.title }
+                        if (item.comment) t.comment = item.comment
                         if (!root.createWithoutDates)
                         {
                             var endDate = new Date(currentDate)

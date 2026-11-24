@@ -186,23 +186,30 @@ void ProjectController::openForProject(int projectId, bool isReadOnly, const QSt
     });
 }
 
-void ProjectController::openLocalGraphProcess(const QString& taskId, const QString& busUrl)
+bool ProjectController::openLocalGraphProcess(const QString& taskId, const QString& busUrl)
 {
+    if (busUrl.isEmpty()) {
+        emit errorOccurred("Не удалось определить BUS для группы задачи");
+        return false;
+    }
     QString appDir = QCoreApplication::applicationDirPath();
     QStringList candidates;
-#ifdef Q_OS_WIN
+    #ifdef Q_OS_WIN
     candidates << appDir + "/gantt_editor.exe" << appDir + "/gantt_editor/gantt_editor.exe"
-               << appDir + "/../gantt_editor/gantt_editor.exe";
-#else
+    << appDir + "/../gantt_editor/gantt_editor.exe";
+    #else
     candidates << appDir + "/gantt_editor" << appDir + "/gantt_editor/gantt_editor"
-               << appDir + "/../gantt_editor/gantt_editor";
-#endif
+    << appDir + "/../gantt_editor/gantt_editor";
+    #endif
     QString program;
     for (const QString& c : candidates) {
         QFileInfo fi(c);
         if (fi.exists() && fi.isFile() && fi.isExecutable()) { program = c; break; }
     }
-    if (program.isEmpty()) { emit errorOccurred("Не найден исполняемый файл gantt_editor"); return; }
+    if (program.isEmpty()) {
+        emit errorOccurred("Не найден исполняемый файл gantt_editor");
+        return false;
+    }
     QStringList arguments;
     arguments << "--mode=local" << "--task-id=" + taskId << "--bus-url=" + busUrl;
     if (!m_token.isEmpty()) {
@@ -215,6 +222,8 @@ void ProjectController::openLocalGraphProcess(const QString& taskId, const QStri
     << "\n  args:" << arguments.join(" ");
     bool ok = QProcess::startDetached(program, arguments);
     qInfo() << "[MG→LG] started:" << ok;
+    if (!ok) emit errorOccurred("Не удалось запустить редактор ЛГ");
+    return ok;
 }
 
 void ProjectController::initLocalGraphData(const QVariantMap& lgData, const QVariantList& tasks, const QString& busUrl)
@@ -316,7 +325,12 @@ void ProjectController::onLocalGraphLoaded(const QVariantMap& lgData, const QVar
 
 void ProjectController::onLocalTasksReloaded()
 {
-    if (m_lgTaskId.isEmpty() || m_busUrl.isEmpty()) return;
+    qDebug() << "[ProjectController] onLocalTasksReloaded: m_lgTaskId=" << m_lgTaskId
+    << "m_busUrl=" << m_busUrl;
+    if (m_lgTaskId.isEmpty() || m_busUrl.isEmpty()) {
+        qDebug() << "[ProjectController] onLocalTasksReloaded: SKIP (empty lgTaskId/busUrl)";
+        return;
+    }
     m_apiClient->loadLocalGraph(m_lgTaskId, m_busUrl);
 }
 
@@ -344,17 +358,16 @@ void ProjectController::onWsSnapshot(const QJsonObject& snapshot)
 
     m_currentMgVersion = snapshot.value("version").toInt(m_currentMgVersion);
 
-    if (m_projectData->get_graphKind() == GanttDefines::GraphKind::Local) {
-        // ЛГ: обновляем только задачи (группа "default" уже создана)
+    if (m_projectData->get_graphKind() == GanttDefines::GraphKind::Local)
+    {
+        // ЛГ: обновляем задачи + зависимости (группа "default" уже создана)
         QJsonArray tasks = snapshot.value("tasks").toArray();
-        // Очищаем только задачи, группы не трогаем
         m_projectData->get_taskModel()->clear();
         for (const QJsonValue& tv : tasks)
         {
             QJsonObject t = tv.toObject();
             m_projectData->get_taskModel()->addTaskWithId(
-                t.value("lg_task_id").toString(),
-                "default",
+                t.value("lg_task_id").toString(), "default",
                 t.value("title").toString(),
                 QString::number(t.value("responsible_id").toInt()),
                 QDate::fromString(t.value("start_date").toString(), Qt::ISODate),
@@ -363,8 +376,19 @@ void ProjectController::onWsSnapshot(const QJsonObject& snapshot)
                 QDate::fromString(t.value("end_date").toString(), Qt::ISODate),
                 t.value("status").toInt(), -1, -1, 0);
         }
+        // Зависимости ЛГ
+        QJsonArray deps = snapshot.value("dependencies").toArray();
+        m_projectData->get_dependencyModel()->clear();
+        for (const QJsonValue& dv : deps)
+        {
+            QJsonObject d = dv.toObject();
+            m_projectData->get_dependencyModel()->addDependencyWithId(
+                d.value("dep_id").toString(),
+                d.value("predecessor_id").toString(),
+                d.value("successor_id").toString());
+        }
         m_projectData->recalculateEndDate();
-        qDebug() << "ProjectController: local graph snapshot applied (tasks only)";
+        qDebug() << "ProjectController: local graph snapshot applied (tasks + deps)";
     } else {
         // МГ: полная загрузка (с группами и вехами)
         m_projectData->fromJson(snapshot.toVariantMap());
@@ -376,23 +400,54 @@ void ProjectController::onWsSnapshot(const QJsonObject& snapshot)
 void ProjectController::onWsDiff(const QJsonObject& diff)
 {
     QJsonArray changes = diff.value("changes").toArray();
+    qDebug() << "[ProjectController] onWsDiff: type=" << diff.value("type").toString()
+    << "changes=" << changes.size();
     for (const QJsonValue& ch : changes) {
         QJsonObject change = ch.toObject();
         QString op = change.value("op").toString();
         QString entity = change.value("entity").toString();
         QString id = change.value("id").toString();
+        QJsonObject fields = change.value("fields").toObject();
+
+        qDebug() << "[ProjectController] onWsDiff: entity=" << entity
+        << "op=" << op << "id=" << id << "fields=" << fields;
 
         if (entity == "task") {
             if (op == "create" || op == "update") {
-                QJsonObject fields = change.value("fields").toObject();
                 QVariantMap task = m_projectData->get_taskModel()->getTask(id);
                 if (!task.isEmpty()) {
-                    // Обновляем поля
+                    // forecast_start / forecast_end — применяем НЕЗАВИСИМО.
+                    // Если одно из полей отсутствует или null — берём текущее из модели.
                     if (fields.contains("forecast_start") || fields.contains("forecast_end")) {
-                        QDate fs = QDate::fromString(fields.value("forecast_start").toString(), Qt::ISODate);
-                        QDate fe = QDate::fromString(fields.value("forecast_end").toString(), Qt::ISODate);
-                        if (fs.isValid() && fe.isValid())
+                        QDate currentFs = task.value("forecastStart").toDate();
+                        QDate currentFe = task.value("forecastEnd").toDate();
+
+                        QDate fs = currentFs;
+                        QDate fe = currentFe;
+
+                        if (fields.contains("forecast_start")) {
+                            QJsonValue v = fields.value("forecast_start");
+                            if (!v.isNull() && !v.isUndefined()) {
+                                QDate parsed = QDate::fromString(v.toString(), Qt::ISODate);
+                                if (parsed.isValid()) fs = parsed;
+                            }
+                        }
+                        if (fields.contains("forecast_end")) {
+                            QJsonValue v = fields.value("forecast_end");
+                            if (!v.isNull() && !v.isUndefined()) {
+                                QDate parsed = QDate::fromString(v.toString(), Qt::ISODate);
+                                if (parsed.isValid()) fe = parsed;
+                            }
+                        }
+
+                        qDebug() << "[ProjectController] onWsDiff: forecast update"
+                        << "taskId=" << id
+                        << "fs=" << fs << "(current=" << currentFs << ")"
+                        << "fe=" << fe << "(current=" << currentFe << ")";
+
+                        if (fs.isValid() && fe.isValid() && (fs != currentFs || fe != currentFe)) {
                             m_projectData->get_taskModel()->updateForecastDates(id, fs, fe);
+                        }
                     }
                     if (fields.contains("progress_current") && fields.contains("progress_total")) {
                         int pc = fields.value("progress_current").toInt(-1);
@@ -402,6 +457,10 @@ void ProjectController::onWsDiff(const QJsonObject& diff)
                     if (fields.contains("status")) {
                         int st = fields.value("status").toInt(-1);
                         if (st >= 0) m_projectData->get_taskModel()->setTaskStatus(id, static_cast<GanttDefines::TaskStatus>(st));
+                    }
+                    if (fields.contains("local_graph_state")) {
+                        int lgs = fields.value("local_graph_state").toInt(-1);
+                        if (lgs >= 0) m_projectData->get_taskModel()->setLocalGraphState(id, lgs);
                     }
                     if (fields.contains("responsible_id")) {
                         // обновление ответственного — через полную перезагрузку (пока)
@@ -413,7 +472,6 @@ void ProjectController::onWsDiff(const QJsonObject& diff)
             }
         } else if (entity == "milestone") {
             if (op == "update" || op == "reschedule") {
-                QJsonObject fields = change.value("fields").toObject();
                 QDate planned = QDate::fromString(fields.value("planned_date").toString(), Qt::ISODate);
                 if (planned.isValid()) {
                     m_projectData->get_milestoneModel()->rescheduleMilestone(id, planned);
@@ -481,10 +539,13 @@ void ProjectController::createGroups(const QStringList& groupIds)
     QJsonObject payload; payload["group_ids"] = arr;
     _post(QString("/api/v1/mastergraphs/%1/groups").arg(m_mgId), payload,
           [this](int status, const QByteArray& data) {
-        Q_UNUSED(data)
-        if (status == 200) { emit groupCreated(true, "Группы созданы"); reloadMastergraph(); }
-        else { emit groupCreated(false, "Ошибка создания групп"); }
-    });
+              Q_UNUSED(data)
+              if (status == 200) {
+                  emit groupCreated(true, "Группы созданы");
+                  reloadMastergraph(); // <-- ДОБАВЛЕНО: перезагружаем данные, чтобы GridArea перерисовался
+              }
+              else { emit groupCreated(false, "Ошибка создания групп"); }
+          });
 }
 
 void ProjectController::createCustomGroup(const QString& name)
@@ -847,7 +908,7 @@ void ProjectController::renameGroup(const QString& groupId, const QString& newNa
          });
 }
 
-void ProjectController::createGroupsWithPosition(const QStringList& groupIds, const QString& position)
+void ProjectController::createGroupsWithPosition(const QStringList& groupIds, const QString& position, const QString& afterGroupId)
 {
     if (m_mgId.isEmpty()) { emit groupCreated(false, "МГ не инициализирован"); return; }
     QJsonArray arr;
@@ -855,22 +916,26 @@ void ProjectController::createGroupsWithPosition(const QStringList& groupIds, co
     QJsonObject payload;
     payload["group_ids"] = arr;
     payload["position"] = position;
+    if (!afterGroupId.isEmpty()) payload["after_group_id"] = afterGroupId;
     _post(QString("/api/v1/mastergraphs/%1/groups").arg(m_mgId), payload,
-          [this](int status, const QByteArray& data) {
+          [this](int status, const QByteArray& data)
+          {
               Q_UNUSED(data)
               if (status == 200) { emit groupCreated(true, "Группы созданы"); reloadMastergraph(); }
               else { emit groupCreated(false, "Ошибка создания групп"); }
           });
 }
 
-void ProjectController::createCustomGroupWithPosition(const QString& name, const QString& position)
+void ProjectController::createCustomGroupWithPosition(const QString& name, const QString& position, const QString& afterGroupId)
 {
     if (m_mgId.isEmpty()) { emit groupCreated(false, "МГ не инициализирован"); return; }
     QJsonObject payload;
     payload["name"] = name;
     payload["position"] = position;
+    if (!afterGroupId.isEmpty()) payload["after_group_id"] = afterGroupId;
     _post(QString("/api/v1/mastergraphs/%1/groups/custom").arg(m_mgId), payload,
-          [this](int status, const QByteArray& data) {
+          [this](int status, const QByteArray& data)
+          {
               Q_UNUSED(data)
               if (status == 200) { emit groupCreated(true, "Группа создана"); reloadMastergraph(); }
               else { emit groupCreated(false, "Ошибка создания группы"); }

@@ -9,12 +9,13 @@ from sqlalchemy import select, func
 import aiohttp
 
 from app.database import get_db
-from app.models.local_graph import LocalGraph, LgTask, LocalGraphState
+from app.models.local_graph import LocalGraph, LgTask, LgDependency, LocalGraphState
 from app.models.lg_event import LgEvent, LgEventType, LgEntityType
 from app.schemas.local_graph import (
     LocalGraphInitRequest, LocalGraphResponse,
     LgTaskResponse, LgTaskCreate, LgTaskUpdate,
     ForecastRecalcRequest, ForecastRecalcResponse,
+    LgDependencyCreate, LgDependencyResponse, LgDependencyListResponse,
 )
 from app.ws.manager import manager
 
@@ -97,6 +98,12 @@ async def _build_snapshot(lg_id: UUID, db: AsyncSession) -> dict:
         select(func.count(LgTask.lg_task_id)).where(LgTask.lg_id == lg_id, LgTask.is_deleted == 0)
     )
     is_pure = (tasks_count.scalar() or 0) == 0
+
+    deps_result = await db.execute(
+        select(LgDependency).where(LgDependency.lg_id == lg_id, LgDependency.is_deleted == 0)
+    )
+    deps = deps_result.scalars().all()
+
     return {
         "type": "snapshot",
         "lg_id": str(lg.lg_id),
@@ -117,6 +124,12 @@ async def _build_snapshot(lg_id: UUID, db: AsyncSession) -> dict:
              "end_date": t.end_date.isoformat() if t.end_date else None,
              "sort_order": t.sort_order, "version": t.version}
             for t in tasks
+        ],
+        "dependencies": [
+            {"dep_id": str(d.dep_id), "lg_id": str(d.lg_id),
+             "predecessor_id": str(d.predecessor_id), "successor_id": str(d.successor_id),
+             "dep_type": d.dep_type, "version": d.version}
+            for d in deps
         ],
     }
 
@@ -163,7 +176,6 @@ async def init_local_graph(data: LocalGraphInitRequest, db: AsyncSession = Depen
     )
     is_pure = (tasks_count.scalar() or 0) == 0
 
-    # WS broadcast: снапшот обновился (границы и т.д.)
     await _broadcast_snapshot(lg.lg_id, db)
 
     return {
@@ -343,6 +355,115 @@ async def delete_lg_task(lg_id: UUID, task_id: UUID, request: Request, db: Async
     return None
 
 
+# ---------------- Зависимости ЛГ ----------------
+
+@router.get("/{lg_id}/dependencies", response_model=LgDependencyListResponse)
+async def get_lg_dependencies(lg_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(LgDependency).where(LgDependency.lg_id == lg_id, LgDependency.is_deleted == 0)
+    )
+    deps = result.scalars().all()
+    return {
+        "lg_id": lg_id,
+        "dependencies": [
+            {"dep_id": d.dep_id, "lg_id": d.lg_id,
+             "predecessor_id": d.predecessor_id, "successor_id": d.successor_id,
+             "dep_type": d.dep_type, "version": d.version}
+            for d in deps
+        ],
+    }
+
+
+@router.post("/{lg_id}/dependencies", response_model=LgDependencyResponse, status_code=201)
+async def create_lg_dependency(lg_id: UUID, data: LgDependencyCreate, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = _user_id(request)
+    lg_res = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0))
+    lg = lg_res.scalar_one_or_none()
+    if not lg:
+        raise HTTPException(404, "LocalGraph not found")
+    await _check_edit_access(lg, user_id)
+
+    if data.predecessor_id == data.successor_id:
+        raise HTTPException(400, "predecessor_id == successor_id")
+
+    tasks_res = await db.execute(
+        select(LgTask.lg_task_id).where(
+            LgTask.lg_id == lg_id,
+            LgTask.lg_task_id.in_([data.predecessor_id, data.successor_id]),
+            LgTask.is_deleted == 0,
+        )
+    )
+    found = set(t for t, in tasks_res.all())
+    if len(found) != 2:
+        raise HTTPException(400, "Task not found in this local graph")
+
+    existing = await db.execute(
+        select(LgDependency).where(
+            LgDependency.lg_id == lg_id,
+            LgDependency.predecessor_id == data.predecessor_id,
+            LgDependency.successor_id == data.successor_id,
+            LgDependency.is_deleted == 0,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, "Dependency already exists")
+
+    dep = LgDependency(
+        lg_id=lg_id,
+        predecessor_id=data.predecessor_id,
+        successor_id=data.successor_id,
+        dep_type=data.dep_type,
+    )
+    db.add(dep)
+    await db.flush()
+
+    await _log_event(db, lg_id, LgEntityType.DEPENDENCY, dep.dep_id, LgEventType.CREATE,
+                     new_value={"predecessor_id": str(data.predecessor_id),
+                                "successor_id": str(data.successor_id)},
+                     actor_id=user_id)
+
+    await db.commit()
+    await db.refresh(dep)
+
+    await _broadcast_snapshot(lg_id, db)
+    await _recalc_and_push(lg_id, db)
+    return dep
+
+
+@router.delete("/{lg_id}/dependencies/{dep_id}", status_code=204)
+async def delete_lg_dependency(lg_id: UUID, dep_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = _user_id(request)
+    lg_res = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0))
+    lg = lg_res.scalar_one_or_none()
+    if not lg:
+        raise HTTPException(404, "LocalGraph not found")
+    await _check_edit_access(lg, user_id)
+
+    result = await db.execute(
+        select(LgDependency).where(
+            LgDependency.dep_id == dep_id,
+            LgDependency.lg_id == lg_id,
+            LgDependency.is_deleted == 0,
+        )
+    )
+    dep = result.scalar_one_or_none()
+    if not dep:
+        raise HTTPException(404, "Dependency not found")
+
+    dep.is_deleted = 1
+    dep.deleted_at = func.now()
+    dep.deleted_by = user_id
+
+    await _log_event(db, lg_id, LgEntityType.DEPENDENCY, dep.dep_id, LgEventType.DELETE,
+                     old_value={"predecessor_id": str(dep.predecessor_id),
+                                "successor_id": str(dep.successor_id)},
+                     actor_id=user_id)
+
+    await db.commit()
+    await _broadcast_snapshot(lg_id, db)
+    return None
+
+
 # ---------------- Пересчёт прогноза ----------------
 
 @router.post("/{lg_id}/recalc", response_model=ForecastRecalcResponse)
@@ -379,7 +500,9 @@ async def _compute_forecast(lg: LocalGraph, db: AsyncSession) -> ForecastRecalcR
         forecast_end = max(ends) if ends else lg.target_end
         progress_current = completed
         progress_total = len(tasks)
-        status = 1 if completed == len(tasks) else 0
+        # Завершение МГ-задачи — только явное действие пользователя
+        # (кнопка «Завершить» в ЛГ → отдельный endpoint POST /{lg_id}/complete).
+        status = 0
     else:
         forecast_start = lg.target_start
         forecast_end = lg.target_end

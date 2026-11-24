@@ -171,7 +171,7 @@ Dialog
                 Button {
                     text: "Создать"
                     enabled: root.selectedIds.length > 0
-                    onClicked: projectController.createGroupsWithPosition(root.selectedIds, root.position)
+                    onClicked: projectController.createGroupsWithPosition(root.selectedIds, root.position, root.afterGroupId)
                 }
             }
         }
@@ -200,7 +200,7 @@ Dialog
                 Button {
                     text: "Создать"
                     enabled: nameField.text !== ""
-                    onClicked: projectController.createCustomGroupWithPosition(nameField.text, root.position)
+                    onClicked: projectController.createCustomGroupWithPosition(nameField.text, root.position, root.afterGroupId)
                 }
             }
         }

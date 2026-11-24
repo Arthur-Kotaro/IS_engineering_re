@@ -115,6 +115,7 @@ Item
         GroupContextMenu
         {
             id: groupContextMenu
+            showGroupWizard: projectController && !projectController.isLocalGraph
             onAddTaskClicked: {
                 if (projectController && projectController.projectData) {
                     mainWindow.newTaskDialog.openForGroup(groupId)
@@ -158,9 +159,9 @@ Item
 
                 function titleText() {
                     if (!taskData) return ""
-                    var prefix = ""
-                    if (taskData.localGraphState !== undefined && taskData.localGraphState !== 0) prefix = "🔗 "
-                    return prefix + taskData.title
+                        var prefix = ""
+                        if (taskData.localGraphState === 2) prefix = "🔗 "
+                            return prefix + taskData.title
                 }
 
                 function responsibleText() {

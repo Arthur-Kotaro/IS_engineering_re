@@ -123,25 +123,29 @@ Rectangle
 
     ChangeReasonDialog { id: changeReasonDialog }
 
-    // ИСПРАВЛЕНО: Разделение логики для МГ и ЛГ
+    // ИСПРАВЛЕНО (п. 4): для прогноза причина НЕ требуется — ни в черновике, ни в чистовике.
     function commitDateChange(newStart, newEnd) {
         var taskId = rowData ? rowData.taskId : ""
         var isLocal = projectController && projectController.projectData &&
                       projectController.projectData.graphKind === 1
-        
+
         if (isLocal) {
-            // ЛГ: вызываем LocalGraphController (HTTP PUT в BUS_service)
             console.log("TaskBar: local graph date change", taskId, newStart, newEnd)
             if (projectController && projectController.localGraphController) {
                 projectController.localGraphController.updateLocalTaskDates(taskId, newStart, newEnd)
             }
             return
         }
-        
-        // МГ: обычный путь через ProjectController
+
+        // МГ
         var isApproved = projectController && projectController.isApproved
         var hadDates = rowData && (rowData.hasDates === true)
-        if (isApproved && hadDates) {
+        var isForecast = rowData && (rowData.rowKind === "forecast")
+
+        if (isForecast) {
+            // Прогноз в МГ — причина не требуется
+            projectController.updateTaskForecast(taskId, newStart, newEnd, "")
+        } else if (isApproved && hadDates) {
             changeReasonDialog.openWith(function(reason) {
                 projectController.updateTaskDates(taskId, newStart, newEnd, reason)
             })
@@ -165,7 +169,6 @@ Rectangle
         }
     }
 
-    // Полоса (Drag)
     MouseArea
     {
         id: moveArea
@@ -246,7 +249,6 @@ Rectangle
         }
     }
 
-    // Правый край (Resize)
     Rectangle
     {
         id: resizeHandle

@@ -33,16 +33,24 @@ public:
     Q_INVOKABLE void setLocalTaskStatus(const QString& taskId, int status);
     Q_INVOKABLE void removeLocalTask(const QString& taskId);
 
+    Q_INVOKABLE void addLocalDependency(const QString& predecessorId, const QString& successorId);
+    Q_INVOKABLE void removeLocalDependency(const QString& depId);
+    Q_INVOKABLE void loadLocalDependencies();
+
 signals:
     void errorOccurred(const QString& message);
     void localGraphCreated(const QString& taskId);
     void localGraphRefreshed(const QString& taskId);
     void localTasksReloaded();
+    void localDependenciesReloaded();
     void cascadeUpdateRequested(const QVariantList& successors, const QString& baseReason);
 
 private slots:
     void onLocalGraphCreated(const QVariantMap& result);
     void onForecastRecalculated(const QVariantMap& result);
+    void onLgDependencyCreated(const QVariantMap& result);
+    void onLgDependencyDeleted(const QString& depId);
+    void onLgDependenciesLoaded(const QVariantList& deps);
 
 private:
     ProjectData* m_projectData;

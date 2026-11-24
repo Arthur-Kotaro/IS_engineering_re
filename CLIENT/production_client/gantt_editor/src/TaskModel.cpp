@@ -118,17 +118,8 @@ void TaskModel::addTaskWithId(const QString& taskId, const QString& groupId, con
     task.startDate = startDate;
     task.endDate = endDate;
     task.status = static_cast<GanttDefines::TaskStatus>(status);
-
-    if (task.status == GanttDefines::TaskStatus::Completed)
-    {
-        task.forecastStart = startDate;
-        task.forecastEnd = endDate;
-    }
-    else
-    {
-        task.forecastStart = forecastStart.isValid() ? forecastStart : startDate;
-        task.forecastEnd = forecastEnd.isValid() ? forecastEnd : endDate;
-    }
+    task.forecastStart = forecastStart.isValid() ? forecastStart : startDate;
+    task.forecastEnd = forecastEnd.isValid() ? forecastEnd : endDate;
 
     task.groupId = groupId;
     task.comment = comment;
@@ -188,19 +179,13 @@ void TaskModel::updateTask(const QString& taskId, const QString& title, const QS
         task.endDate = endDate;
         task.status = static_cast<GanttDefines::TaskStatus>(status);
 
-        if (task.status == GanttDefines::TaskStatus::Completed)
-        {
-            task.forecastStart = startDate;
-            task.forecastEnd = endDate;
-        }
-
         QModelIndex modelIndex = createIndex(index, 0);
         emit dataChanged(modelIndex, modelIndex);
     }
 }
 
 void TaskModel::updateTaskDates(const QString& taskId, const QDate& newStart, const QDate& newEnd,
-                                 bool addToHistory, const QString& reason)
+                                bool addToHistory, const QString& reason)
 {
     int index = findTaskIndex(taskId);
     if (index >= 0 && newStart <= newEnd)
@@ -224,17 +209,25 @@ void TaskModel::updateTaskDates(const QString& taskId, const QDate& newStart, co
         task.startDate = newStart;
         task.endDate = newEnd;
 
-        if (!hadDates || task.status == GanttDefines::TaskStatus::Completed)
+        // Прогноз заполняется целевыми ТОЛЬКО когда у задачи впервые появляются
+        // целевые сроки И ЛГ не предусмотрен (NotRequired).
+        // - Если ЛГ есть (Required/Attached/Missing) — прогноз придёт из ЛГ
+        //   через WS diff, не приравниваем к целевым.
+        // - Если задача уже Completed — прогноз (факт) уже зафиксирован,
+        //   изменение целевых его не трогает.
+        bool forecastFilledFromTarget = false;
+        if (!hadDates && task.localGraphState == GanttDefines::LocalGraphState::NotRequired)
         {
             task.forecastStart = newStart;
             task.forecastEnd = newEnd;
+            forecastFilledFromTarget = true;
         }
 
         QModelIndex modelIndex = createIndex(index, 0);
         emit dataChanged(modelIndex, modelIndex);
         emit taskDatesChanged(taskId);
 
-        if (!hadDates || task.status == GanttDefines::TaskStatus::Completed)
+        if (forecastFilledFromTarget)
         {
             emit taskForecastDatesChanged(taskId);
         }
@@ -264,16 +257,10 @@ void TaskModel::setTaskStatus(const QString& taskId, GanttDefines::TaskStatus st
     if (index >= 0)
     {
         Task& task = m_tasks[index];
+        if (task.status == status) return;
         task.status = status;
-
-        if (task.status == GanttDefines::TaskStatus::Completed)
-        {
-            task.forecastStart = task.startDate;
-            task.forecastEnd = task.endDate;
-        }
-
         QModelIndex modelIndex = createIndex(index, 0);
-        emit dataChanged(modelIndex, modelIndex);
+        emit dataChanged(modelIndex, modelIndex, {GanttDefines::StatusRole});
     }
 }
 

@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -21,6 +22,9 @@ LocalGraphController::LocalGraphController(ProjectData* projectData,
 {
     connect(m_apiClient, &GanttApiClient::localGraphCreated, this, &LocalGraphController::onLocalGraphCreated);
     connect(m_apiClient, &GanttApiClient::forecastRecalculated, this, &LocalGraphController::onForecastRecalculated);
+    connect(m_apiClient, &GanttApiClient::lgDependencyCreated, this, &LocalGraphController::onLgDependencyCreated);
+    connect(m_apiClient, &GanttApiClient::lgDependencyDeleted, this, &LocalGraphController::onLgDependencyDeleted);
+    connect(m_apiClient, &GanttApiClient::lgDependenciesLoaded, this, &LocalGraphController::onLgDependenciesLoaded);
 }
 
 void LocalGraphController::setLocalGraphContext(const QString& lgId, const QString& busUrl,
@@ -31,6 +35,8 @@ void LocalGraphController::setLocalGraphContext(const QString& lgId, const QStri
     m_projectId = projectId;
     m_responsibleId = responsibleId;
     m_masterTaskId = masterTaskId;
+    // BUS-запросы должны ставить X-User-ID — передаём userId в GanttApiClient
+    m_apiClient->setUserId(m_responsibleId);
     qDebug() << "LocalGraphController::setLocalGraphContext: lgId=" << lgId
              << "busUrl=" << busUrl << "projectId=" << projectId
              << "responsibleId=" << responsibleId << "masterTaskId=" << masterTaskId;
@@ -152,11 +158,19 @@ void LocalGraphController::refreshLocalGraphForecast(const QString& taskId)
     m_apiClient->recalcForecast(taskId, busUrl, payload);
 }
 
-// ---- CRUD для задач ЛГ ----
+// ============================================================
+// CRUD для задач ЛГ.
+// Единый принцип: клиент шлёт команду, сервер применяет,
+// BUS рассылает WS snapshot, клиент перерисовывает из snapshot.
+// НИКАКИХ локальных изменений TaskModel/DependencyModel,
+// НИКАКИХ emit localTasksReloaded/localDependenciesReloaded.
+// ============================================================
 
 void LocalGraphController::addLocalTask(const QString& title, const QString& responsible,
                                          const QDate& startDate, const QDate& endDate)
 {
+    qDebug() << "LocalGraphController::addLocalTask title=" << title
+             << "lgId=" << m_lgId << "busUrl=" << m_busUrl << "responsibleId=" << m_responsibleId;
     if (m_lgId.isEmpty() || m_busUrl.isEmpty()) {
         emit errorOccurred("Локальный график не инициализирован");
         return;
@@ -176,9 +190,11 @@ void LocalGraphController::addLocalTask(const QString& title, const QString& res
     QNetworkReply* reply = m_networkManager->post(req, doc.toJson(QJsonDocument::Compact));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
-        if (reply->error() == QNetworkReply::NoError) {
-            emit localTasksReloaded();
-        } else {
+        int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        QByteArray body = reply->readAll();
+        qDebug() << "[LocalGraphController] addLocalTask FINISHED status=" << status
+                 << "error=" << reply->error() << "body=" << body;
+        if (reply->error() != QNetworkReply::NoError) {
             emit errorOccurred("addLocalTask: " + reply->errorString());
         }
     });
@@ -200,43 +216,38 @@ void LocalGraphController::updateLocalTaskDates(const QString& taskId, const QDa
     QNetworkReply* reply = m_networkManager->put(req, doc.toJson(QJsonDocument::Compact));
     connect(reply, &QNetworkReply::finished, this, [this, reply, taskId, newStart, newEnd]() {
         reply->deleteLater();
-        if (reply->error() == QNetworkReply::NoError) {
-            // Локально — обновить TaskModel (для мгновенного UI)
-            bool addToHistory = m_projectData->get_isApproved();
-            m_projectData->get_taskModel()->updateTaskDates(taskId, newStart, newEnd, addToHistory, "");
-            m_projectData->recalculateEndDate();
-            
-            // ИСПРАВЛЕНО: НЕ вызываем emit localTasksReloaded(), 
-            // чтобы ProjectController не перезагружал ЛГ и не сбрасывал can_edit.
-            // GridArea перерисуется по сигналу taskDatesChanged из TaskModel.
-
-            // Каскад: последователи, чьи start_date < newEnd
-            QVariantList successors;
-            auto* depModel = m_projectData->get_dependencyModel();
-            auto* taskModel = m_projectData->get_taskModel();
-            QStringList succIds = depModel->getSuccessors(taskId);
-            for (const QString& sid : succIds) {
-                QVariantMap st = taskModel->getTask(sid);
-                if (st.isEmpty()) continue;
-                QDate sStart = st.value("startDate").toDate();
-                QDate sEnd = st.value("endDate").toDate();
-                if (!sStart.isValid() || !sEnd.isValid()) continue;
-                if (sStart < newEnd) {
-                    int duration = sStart.daysTo(sEnd);
-                    QDate newStart2 = newEnd;
-                    QDate newEnd2 = newStart2.addDays(duration);
-                    successors.append(QVariantMap{
-                        {"taskId", sid},
-                        {"title", st.value("title")},
-                        {"newStart", newStart2.toString(Qt::ISODate)},
-                        {"newEnd", newEnd2.toString(Qt::ISODate)},
-                    });
-                }
-            }
-            if (!successors.isEmpty()) emit cascadeUpdateRequested(successors, "");
-        } else {
+        int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        qDebug() << "[LocalGraphController] updateLocalTaskDates FINISHED status=" << status
+                 << "taskId=" << taskId << "newStart=" << newStart << "newEnd=" << newEnd;
+        if (reply->error() != QNetworkReply::NoError) {
             emit errorOccurred("updateLocalTaskDates: " + reply->errorString());
+            return;
         }
+        // Каскад — клиентская подсказка пользователю (до WS snapshot).
+        // TODO: перенести каскад на сервер (в BUS), чтобы клиент не дублировал логику.
+        QVariantList successors;
+        auto* depModel = m_projectData->get_dependencyModel();
+        auto* taskModel = m_projectData->get_taskModel();
+        QStringList succIds = depModel->getSuccessors(taskId);
+        for (const QString& sid : succIds) {
+            QVariantMap st = taskModel->getTask(sid);
+            if (st.isEmpty()) continue;
+            QDate sStart = st.value("startDate").toDate();
+            QDate sEnd = st.value("endDate").toDate();
+            if (!sStart.isValid() || !sEnd.isValid()) continue;
+            if (sStart < newEnd) {
+                int duration = sStart.daysTo(sEnd);
+                QDate newStart2 = newEnd;
+                QDate newEnd2 = newStart2.addDays(duration);
+                successors.append(QVariantMap{
+                    {"taskId", sid},
+                    {"title", st.value("title")},
+                    {"newStart", newStart2.toString(Qt::ISODate)},
+                    {"newEnd", newEnd2.toString(Qt::ISODate)},
+                });
+            }
+        }
+        if (!successors.isEmpty()) emit cascadeUpdateRequested(successors, "");
     });
 }
 
@@ -253,12 +264,12 @@ void LocalGraphController::setLocalTaskStatus(const QString& taskId, int status)
 
     QJsonDocument doc = QJsonDocument::fromVariant(payload);
     QNetworkReply* reply = m_networkManager->put(req, doc.toJson(QJsonDocument::Compact));
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, taskId, status]() {
         reply->deleteLater();
-        if (reply->error() == QNetworkReply::NoError) {
-            // Обновление статуса не меняет структуру, поэтому можно не перезагружать
-            // emit localTasksReloaded();
-        } else {
+        int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        qDebug() << "[LocalGraphController] setLocalTaskStatus FINISHED status=" << httpStatus
+                 << "taskId=" << taskId << "newStatus=" << status;
+        if (reply->error() != QNetworkReply::NoError) {
             emit errorOccurred("setLocalTaskStatus: " + reply->errorString());
         }
     });
@@ -272,24 +283,57 @@ void LocalGraphController::removeLocalTask(const QString& taskId)
     req.setRawHeader("X-User-ID", QByteArray::number(m_responsibleId));
 
     QNetworkReply* reply = m_networkManager->deleteResource(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, taskId]() {
         reply->deleteLater();
-        if (reply->error() == QNetworkReply::NoError) {
-            emit localTasksReloaded();
-        } else {
+        int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        qDebug() << "[LocalGraphController] removeLocalTask FINISHED status=" << status
+                 << "taskId=" << taskId;
+        if (reply->error() != QNetworkReply::NoError) {
             emit errorOccurred("removeLocalTask: " + reply->errorString());
         }
     });
 }
 
-// ---- Слоты ----
+// ============================================================
+// Зависимости ЛГ. Тот же принцип.
+// ============================================================
+
+void LocalGraphController::loadLocalDependencies()
+{
+    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) return;
+    m_apiClient->loadLgDependencies(m_lgId, m_busUrl);
+}
+
+void LocalGraphController::addLocalDependency(const QString& predecessorId, const QString& successorId)
+{
+    qDebug() << "[LocalGraphController] addLocalDependency pred=" << predecessorId
+             << "succ=" << successorId << "lgId=" << m_lgId << "responsibleId=" << m_responsibleId;
+    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) {
+        emit errorOccurred("Локальный график не инициализирован");
+        return;
+    }
+    m_apiClient->createLgDependency(m_lgId, m_busUrl, predecessorId, successorId);
+}
+
+void LocalGraphController::removeLocalDependency(const QString& depId)
+{
+    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) {
+        emit errorOccurred("Локальный график не инициализирован");
+        return;
+    }
+    m_apiClient->deleteLgDependency(m_lgId, m_busUrl, depId);
+}
+
+// ============================================================
+// Слоты (ответы на команды). НЕ меняют модели напрямую —
+// модели меняются только из WS snapshot (onWsSnapshot).
+// ============================================================
 
 void LocalGraphController::onLocalGraphCreated(const QVariantMap& result)
 {
     qDebug() << "=== onLocalGraphCreated:" << result.value("lg_id");
     if (m_pendingTaskId.isEmpty()) return;
-    m_projectData->get_taskModel()->setLocalGraphState(
-        m_pendingTaskId, static_cast<int>(GanttDefines::LocalGraphState::Attached));
+    // local_graph_state обновится из следующего snapshot (WS или reloadMastergraph).
     emit localGraphCreated(m_pendingTaskId);
     m_pendingTaskId.clear();
 }
@@ -298,24 +342,37 @@ void LocalGraphController::onForecastRecalculated(const QVariantMap& result)
 {
     qDebug() << "=== onForecastRecalculated";
     if (m_pendingTaskId.isEmpty()) return;
-
-    QDate start = QDate::fromString(result.value("forecast_start").toString(), Qt::ISODate);
-    QDate end = QDate::fromString(result.value("forecast_end").toString(), Qt::ISODate);
-    int progressCurrent = result.value("progress_current").toInt();
-    int progressTotal = result.value("progress_total").toInt();
-    int status = result.value("status").toInt();
-
-    if (start.isValid() && end.isValid())
-        m_projectData->get_taskModel()->updateForecastDates(m_pendingTaskId, start, end);
-
-    if (progressTotal > 0)
-        m_projectData->get_taskModel()->setTaskProgress(m_pendingTaskId, progressCurrent, progressTotal);
-
-    if (status == 1)
-        m_projectData->get_taskModel()->setTaskStatus(m_pendingTaskId, GanttDefines::TaskStatus::Completed);
-
-    m_projectData->recalculateEndDate();
-    m_projectData->set_Modified(true);
+    // Прогноз обновится из WS snapshot.
     emit localGraphRefreshed(m_pendingTaskId);
     m_pendingTaskId.clear();
+}
+
+void LocalGraphController::onLgDependencyCreated(const QVariantMap& result)
+{
+    qDebug() << "=== onLgDependencyCreated:" << result.value("dep_id");
+    // Зависимость придёт из WS snapshot. Ничего не делаем.
+}
+
+void LocalGraphController::onLgDependencyDeleted(const QString& depId)
+{
+    qDebug() << "=== onLgDependencyDeleted:" << depId;
+    // Удаление придёт из WS snapshot. Ничего не делаем.
+}
+
+void LocalGraphController::onLgDependenciesLoaded(const QVariantList& deps)
+{
+    qDebug() << "=== onLgDependenciesLoaded: count=" << deps.size();
+    // Полная перезагрузка зависимостей — используется ТОЛЬКО при явном
+    // loadLocalDependencies() (например, из onWsSnapshot, если snapshot
+    // не содержит dependencies, или по кнопке «Обновить»).
+    // Заполняет DependencyModel из списка сервера (серверный dep_id).
+    auto* depModel = m_projectData->get_dependencyModel();
+    depModel->clear();
+    for (const QVariant& dv : deps) {
+        QVariantMap d = dv.toMap();
+        depModel->addDependencyWithId(
+            d.value("dep_id").toString(),
+            d.value("predecessor_id").toString(),
+            d.value("successor_id").toString());
+    }
 }

@@ -26,6 +26,8 @@ from app.services.user_client import get_user_name
 from app.services import mastergraph_service as mgsvc
 
 logger = logging.getLogger(__name__)
+# Кэш local_graph_state в памяти MG: task_id -> state
+_lg_state_cache: dict[str, int] = {}
 router = APIRouter(prefix="/mastergraphs", tags=["Mastergraphs"])
 
 
@@ -97,7 +99,14 @@ async def _build_detail_response(db, mg, tasks, deps, groups) -> dict:
         if t.responsible_id:
             resp_name = await get_user_name(t.responsible_id)
         bus_url = get_bus_url_for_group(t.group_id)
-        lg_state = await get_local_graph_state(bus_url, str(t.task_id)) if bus_url else 0
+        task_key = str(t.task_id)
+        lg_state_raw = await get_local_graph_state(bus_url, task_key) if bus_url else 0
+        if lg_state_raw is None:
+            # BUS недоступен — берём из кэша, если есть; иначе 0
+            lg_state = _lg_state_cache.get(task_key, 0)
+        else:
+            lg_state = lg_state_raw
+            _lg_state_cache[task_key] = lg_state
         enriched_tasks.append({
             "task_id": t.task_id, "mg_id": t.mg_id, "group_id": t.group_id,
             "parent_task_id": t.parent_task_id, "title": t.title,
@@ -308,6 +317,7 @@ async def create_tasks_batch(mg_id: UUID, data: BatchCreateRequest, request: Req
             "start_date": date.fromisoformat(t.start_date) if t.start_date else None,
             "end_date": date.fromisoformat(t.end_date) if t.end_date else None,
             "sort_order": t.sort_order,
+            "comment": t.comment,
         })
     deps_data = [{"predecessor_batch_id": d.predecessor_batch_id,
                   "successor_batch_id": d.successor_batch_id} for d in data.dependencies]
@@ -506,13 +516,32 @@ async def create_mg_groups(mg_id: UUID, data: CreateGroupsRequest, request: Requ
     if not access.get("has_access"):
         raise HTTPException(403, "Access denied")
 
-    # Вычислить базовый sort_order
-    if data.position == "top":
-        base = await repo.min_sort_order(mg_id)
-    else:
-        base = await repo.next_sort_order(mg_id)
-
     mg_repo = MgGroupRepository(db)
+    n = len(data.group_ids)
+
+    if data.after_group_id:
+        after_order = await mg_repo.get_sort_order(mg_id, data.after_group_id)
+        if after_order is None:
+            logger.warning(
+                f"create_mg_groups: after_group_id {data.after_group_id!r} not found in mg {mg_id}, "
+                f"falling back to position={data.position!r}"
+            )
+            if data.position == "top":
+                base = await repo.min_sort_order(mg_id) - (n - 1)
+            else:
+                base = await repo.next_sort_order(mg_id)
+        else:
+            await mg_repo.shift_sort_orders_after(mg_id, after_order, n)
+            if data.position == "top":
+                base = after_order
+            else:
+                base = after_order + 1
+    else:
+        if data.position == "top":
+            base = await repo.min_sort_order(mg_id) - (n - 1)
+        else:
+            base = await repo.next_sort_order(mg_id)
+
     created = []
     for i, gid in enumerate(data.group_ids):
         mg_g = await mg_repo.add(mg_id, gid, sort_order=base + i)
@@ -547,13 +576,35 @@ async def create_custom_group(mg_id: UUID, data: CreateCustomGroupRequest, reque
     db.add(tg)
     await db.flush()
 
-    if data.position == "top":
-        sort_order = await repo.min_sort_order(mg_id)
-    else:
-        sort_order = await repo.next_sort_order(mg_id)
-
     mg_repo = MgGroupRepository(db)
-    await mg_repo.add(mg_id, group_id, sort_order=sort_order)
+    if data.after_group_id:
+        after_order = await mg_repo.get_sort_order(mg_id, data.after_group_id)
+        if after_order is None:
+            logger.warning(
+                f"create_custom_group: after_group_id {data.after_group_id!r} not found in mg {mg_id}, "
+                f"falling back to position={data.position!r}"
+            )
+            if data.position == "top":
+                sort_order = await repo.min_sort_order(mg_id)
+            else:
+                sort_order = await repo.next_sort_order(mg_id)
+        else:
+            await mg_repo.shift_sort_orders_after(mg_id, after_order, 1)
+            if data.position == "top":
+                sort_order = after_order
+            else:
+                sort_order = after_order + 1
+    else:
+        if data.position == "top":
+            sort_order = await repo.min_sort_order(mg_id)
+        else:
+            sort_order = await repo.next_sort_order(mg_id)
+
+    mg_g = await mg_repo.add(mg_id, group_id, sort_order=sort_order)
+    if mg_g is None:
+        # Атомарность: не оставляем «сироту» в task_groups
+        await db.rollback()
+        raise HTTPException(500, f"Failed to attach group '{group_id}' to mastergraph")
     await db.commit()
 
     groups = await repo.get_groups_for_mg(mg_id)

@@ -1,5 +1,6 @@
 #include "DependencyModel.h"
 #include <QUuid>
+#include <QSet>
 
 DependencyModel::DependencyModel(QObject *parent) : QAbstractListModel(parent) {}
 
@@ -63,26 +64,35 @@ bool DependencyModel::hasCycle(const QString& startTaskId, const QString& newPre
 }
 
 bool DependencyModel::addDependency(const QString& predecessorId, const QString& successorId) {
-    if (hasCycle(successorId, predecessorId)) {
-        qDebug() << "addDependency: cycle detected!";
+    return addDependencyWithId(generateId(), predecessorId, successorId);
+}
+
+bool DependencyModel::addDependencyWithId(const QString& depId, const QString& predecessorId, const QString& successorId) {
+    // 1. Дубликат по depId (серверный ID уже есть)
+    if (findDependencyIndex(depId) >= 0) {
         return false;
     }
-    
+    // 2. Дубликат по паре (predecessor, successor)
     for (const auto& dep : m_dependencies) {
         if (dep.predecessorId == predecessorId && dep.successorId == successorId) {
             return false;
         }
     }
-    
+    // 3. Цикл
+    if (hasCycle(successorId, predecessorId)) {
+        qDebug() << "addDependencyWithId: cycle detected!";
+        return false;
+    }
+
     beginInsertRows(QModelIndex(), m_dependencies.size(), m_dependencies.size());
     Dependency dep;
-    dep.id = generateId();
+    dep.id = depId;
     dep.predecessorId = predecessorId;
     dep.successorId = successorId;
     dep.type = GanttDefines::DependencyType::FinishToStart;
     m_dependencies.append(dep);
     endInsertRows();
-    
+
     emit dependencyAdded(predecessorId, successorId);
     return true;
 }

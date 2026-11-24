@@ -43,8 +43,6 @@ Dialog
         root.open()
     }
 
-    ChangeReasonDialog { id: changeReasonDialog }
-
     ColumnLayout
     {
         anchors.fill: parent
@@ -111,16 +109,9 @@ Dialog
                 {
                     if (root.forecastStart <= root.forecastEnd)
                     {
-                        var isApproved = projectController && projectController.isApproved
-                        if (isApproved) {
-                            changeReasonDialog.openWith(function(reason) {
-                                projectController.updateTaskForecast(root.taskId, root.forecastStart, root.forecastEnd, reason)
-                                root.close()
-                            })
-                        } else {
-                            projectController.updateTaskForecast(root.taskId, root.forecastStart, root.forecastEnd, "")
-                            root.close()
-                        }
+                        // Прогноз — причина НЕ требуется
+                        projectController.updateTaskForecast(root.taskId, root.forecastStart, root.forecastEnd, "")
+                        root.close()
                     }
                     else errorLabel.visible = true
                 }

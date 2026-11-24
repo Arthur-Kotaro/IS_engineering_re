@@ -115,6 +115,7 @@ class BatchTaskItem(BaseModel):
     end_date: Optional[str] = None
     sort_order: int = 0
     parent_batch_id: Optional[str] = None
+    comment: Optional[str] = None
 
 
 class BatchDependencyItem(BaseModel):

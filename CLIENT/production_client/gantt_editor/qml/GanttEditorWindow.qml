@@ -59,6 +59,7 @@ ApplicationWindow
     property alias taskDetailsDialog: taskDetailsDialog
     property alias defaultGroupsDialog: defaultGroupsDialog
     property alias createGroupDialog: createGroupDialog
+    property alias groupWizardDialog: groupWizardDialog
     property alias cascadeUpdateDialog: cascadeUpdateDialog
 
     Connections
@@ -240,6 +241,7 @@ ApplicationWindow
     TaskDetailsDialog { id: taskDetailsDialog }
     DefaultGroupsDialog { id: defaultGroupsDialog }
     CreateGroupDialog { id: createGroupDialog }
+    GroupWizardDialog { id: groupWizardDialog }
     CascadeUpdateDialog { id: cascadeUpdateDialog }
 
     Rectangle

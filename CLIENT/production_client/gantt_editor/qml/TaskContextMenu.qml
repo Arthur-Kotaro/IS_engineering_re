@@ -43,6 +43,18 @@ Menu
         canAcceptForecast = true
     }
 
+    function setStatus(status) {
+        if (root.isLocalGraph) {
+            // ЛГ: через localGraphController (HTTP PUT в BUS)
+            if (projectController && projectController.localGraphController)
+                projectController.localGraphController.setLocalTaskStatus(root.taskId, status)
+        } else {
+            // МГ: через ProjectController (MG)
+            if (projectController)
+                projectController.updateTaskStatus(root.taskId, status)
+        }
+    }
+
     MenuItem {
         text: "Показать подробности"
         onTriggered: if (root.taskId && mainWindow && mainWindow.taskDetailsDialog)
@@ -70,14 +82,17 @@ Menu
     Menu {
         title: "Изменить статус"
         enabled: !root.isLocked
-        MenuItem { text: "🟡 Запланировано"
-            onTriggered: if (projectController) projectController.updateTaskStatus(root.taskId, 0) }
+        MenuItem { text: "🟡 Запланировано"; onTriggered: root.setStatus(0) }
         MenuItem { text: "🟢 Выполнено"
-            onTriggered: if (mainWindow) mainWindow.completeTaskDialog.openForTask(root.taskId) }
-        MenuItem { text: "🟠 Имеются риски"
-            onTriggered: if (projectController) projectController.updateTaskStatus(root.taskId, 2) }
-        MenuItem { text: "🔴 Блокировано"
-            onTriggered: if (projectController) projectController.updateTaskStatus(root.taskId, 3) }
+            onTriggered: {
+                if (root.isLocalGraph) {
+                    root.setStatus(1)
+                } else if (mainWindow) {
+                    mainWindow.completeTaskDialog.openForTask(root.taskId)
+                }
+            } }
+            MenuItem { text: "🟠 Имеются риски"; onTriggered: root.setStatus(2) }
+            MenuItem { text: "🔴 Блокировано"; onTriggered: root.setStatus(3) }
     }
 
     MenuItem {
@@ -131,7 +146,12 @@ Menu
                         var idx = deps.index(d, 0)
                         if (deps.data(idx, Qt.UserRole + 2) === root.taskId &&
                             deps.data(idx, Qt.UserRole + 3) === succ[i]) {
-                            projectController.deleteDependency(deps.data(idx, Qt.UserRole + 1))
+                            if (root.isLocalGraph) {
+                                if (projectController.localGraphController)
+                                    projectController.localGraphController.removeLocalDependency(deps.data(idx, Qt.UserRole + 1))
+                            } else {
+                                projectController.deleteDependency(deps.data(idx, Qt.UserRole + 1))
+                            }
                             break
                         }
                     }
@@ -147,7 +167,12 @@ Menu
                         var idx = deps.index(d, 0)
                         if (deps.data(idx, Qt.UserRole + 2) === preds[i] &&
                             deps.data(idx, Qt.UserRole + 3) === root.taskId) {
-                            projectController.deleteDependency(deps.data(idx, Qt.UserRole + 1))
+                            if (root.isLocalGraph) {
+                                if (projectController.localGraphController)
+                                    projectController.localGraphController.removeLocalDependency(deps.data(idx, Qt.UserRole + 1))
+                            } else {
+                                projectController.deleteDependency(deps.data(idx, Qt.UserRole + 1))
+                            }
                             break
                         }
                     }
@@ -155,19 +180,21 @@ Menu
             } }
     }
 
-    MenuSeparator {}
+    MenuSeparator { visible: !root.isLocalGraph }
 
     MenuItem {
         text: "Открыть локальный график"
         visible: !root.isLocalGraph
         onTriggered: {
             if (!root.taskId || !projectController) return
-            var task = projectController.projectData.taskModel.getTask(root.taskId)
-            if (task) {
-                var groupId = task.groupId
-                var busUrl = projectController.projectData.groupModel.getBusUrl(groupId)
-                if (busUrl) projectController.openLocalGraphProcess(root.taskId, busUrl)
-            }
+                var task = projectController.projectData.taskModel.getTask(root.taskId)
+                if (task) {
+                    var groupId = task.groupId
+                    var busUrl = projectController.projectData.groupModel.getBusUrl(groupId)
+                    if (busUrl) projectController.openLocalGraphProcess(root.taskId, busUrl)
+                        else if (mainWindow && mainWindow.toast)
+                            mainWindow.toast.show("Не удалось определить BUS для группы задачи")
+                }
         }
     }
 
@@ -187,6 +214,13 @@ Menu
 
     MenuItem {
         text: "Удалить"; enabled: !root.isLocked
-        onTriggered: if (root.taskId && projectController) projectController.deleteTask(root.taskId)
+        onTriggered: {
+            if (!root.taskId || !projectController) return
+                if (root.isLocalGraph) {
+                    projectController.localGraphController.removeLocalTask(root.taskId)
+                } else {
+                    projectController.deleteTask(root.taskId)
+                }
+        }
     }
 }

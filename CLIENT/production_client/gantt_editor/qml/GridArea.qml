@@ -162,7 +162,7 @@ Rectangle
     function updateData()
     {
         if (!projectController || !projectController.projectData) return
-
+        console.log("[GridArea] updateData START")
         if (isPure)
         {
             var now = new Date()

@@ -12,6 +12,9 @@ Dialog
     standardButtons: Dialog.NoButton
     anchors.centerIn: Overlay.overlay
 
+    property string position: "bottom" // "top" или "bottom"
+    property string afterGroupId: ""
+
     ColumnLayout
     {
         anchors.fill: parent
@@ -46,10 +49,24 @@ Dialog
         }
     }
 
+    function openFor(position, afterGroupId) {
+        root.position = position || "bottom"
+        root.afterGroupId = afterGroupId || ""
+        nameField.text = ""
+        root.open()
+    }
+
     onOpened: nameField.text = ""
 
     onAccepted: {
-        if (projectController && nameField.text !== "")
-            projectController.createCustomGroup(nameField.text)
+        if (projectController && nameField.text !== "") {
+            if (root.position === "top") {
+                projectController.createCustomGroupWithPosition(nameField.text, "top")
+            } else {
+                // Если задан afterGroupId, но у нас пока нет метода вставки после конкретной группы,
+                // используем существующий метод (снизу)
+                projectController.createCustomGroupWithPosition(nameField.text, "bottom")
+            }
+        }
     }
 }

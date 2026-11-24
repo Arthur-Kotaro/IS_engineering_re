@@ -6,6 +6,7 @@ Menu
     id: root
     property string groupId: ""
     property string groupName: ""
+    property bool showGroupWizard: true
 
     signal addTaskClicked()
     signal renameClicked()
@@ -15,9 +16,9 @@ Menu
 
     MenuItem { text: "Добавить задачу"; onTriggered: root.addTaskClicked() }
     MenuItem { text: "Переименовать"; onTriggered: root.renameClicked() }
-    MenuSeparator {}
-    MenuItem { text: "Добавить группу сверху"; onTriggered: root.addAboveClicked() }
-    MenuItem { text: "Добавить группу снизу"; onTriggered: root.addBelowClicked() }
-    MenuSeparator {}
+    MenuSeparator { visible: root.showGroupWizard }
+    MenuItem { text: "Добавить группу сверху"; visible: root.showGroupWizard; onTriggered: root.addAboveClicked() }
+    MenuItem { text: "Добавить группу снизу"; visible: root.showGroupWizard; onTriggered: root.addBelowClicked() }
+    MenuSeparator { visible: root.showGroupWizard }
     MenuItem { text: "Удалить"; onTriggered: root.deleteClicked() }
 }

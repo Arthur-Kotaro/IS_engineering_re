@@ -24,6 +24,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     Q_INVOKABLE bool addDependency(const QString& predecessorId, const QString& successorId);
+    Q_INVOKABLE bool addDependencyWithId(const QString& depId, const QString& predecessorId, const QString& successorId);
     Q_INVOKABLE void removeDependency(const QString& dependencyId);
     Q_INVOKABLE void removeDependenciesForTask(const QString& taskId);
     Q_INVOKABLE void removeDownstreamDependency(const QString& taskId);

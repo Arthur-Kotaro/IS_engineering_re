@@ -1,4 +1,5 @@
 # app/repositories/mg_group_repo.py
+import logging
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import select
@@ -7,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.mg_group import MgGroup
 from app.models.task_group import TaskGroup
 from app.config import load_bus_instances
+
+logger = logging.getLogger(__name__)
 
 
 class MgGroupRepository:
@@ -71,6 +74,23 @@ class MgGroupRepository:
         )
         mg = result.scalar_one_or_none()
         if not mg:
+            # Диагностика: почему не нашли
+            any_result = await self.db.execute(
+                select(MgGroup).where(
+                    MgGroup.mg_id == mg_id,
+                    MgGroup.group_id == group_id,
+                )
+            )
+            existing = any_result.scalar_one_or_none()
+            if existing:
+                logger.warning(
+                    f"remove: MgGroup exists but is_deleted={existing.is_deleted}, "
+                    f"mg={mg_id}, group={group_id!r}"
+                )
+            else:
+                logger.warning(
+                    f"remove: MgGroup not found at all, mg={mg_id}, group={group_id!r}"
+                )
             return False
         mg.is_deleted = True
         mg.deleted_at = func.now()
@@ -96,3 +116,28 @@ class MgGroupRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_sort_order(self, mg_id: UUID, group_id: str) -> Optional[int]:
+        """Возвращает sort_order активной группы или None, если группы нет."""
+        result = await self.db.execute(
+            select(MgGroup.sort_order).where(
+                MgGroup.mg_id == mg_id,
+                MgGroup.group_id == group_id,
+                MgGroup.is_deleted == False,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def shift_sort_orders_after(self, mg_id: UUID, after_sort_order: int, delta: int) -> None:
+        """Сдвигает sort_order всех активных групп со значением > after_sort_order на delta."""
+        from sqlalchemy import update
+        await self.db.execute(
+            update(MgGroup)
+            .where(
+                MgGroup.mg_id == mg_id,
+                MgGroup.sort_order > after_sort_order,
+                MgGroup.is_deleted == False,
+            )
+            .values(sort_order=MgGroup.sort_order + delta)
+        )
+        await self.db.flush()

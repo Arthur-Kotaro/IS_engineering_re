@@ -8,10 +8,12 @@ from app.models.mastergraph import Mastergraph
 from app.models.mg_task import MgTask
 from app.models.mg_dependency import MgDependency
 from app.models.mg_milestone import MgMilestone
-from app.models.task_group import TaskGroup
+from app.repositories.mastergraph_repo import MastergraphRepository
 from app.ws.manager import manager
 from app.services.access_client import check_project_access
 from app.services.user_client import get_user_name
+from app.services.bus_client import get_bus_url_for_group, get_local_graph_state
+from app.api.v1.mastergraphs import _lg_state_cache
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["WebSocket"])
@@ -68,16 +70,25 @@ async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)
                 select(MgTask).where(MgTask.mg_id == mg_id, MgTask.is_deleted == False)
             )
             tasks = tasks_result.scalars().all()
-            
+
             # Подтягиваем ФИО ответственных
             enriched_tasks = []
             for t in tasks:
                 resp_name = None
                 if t.responsible_id:
                     resp_name = await get_user_name(t.responsible_id)
+                bus_url = get_bus_url_for_group(t.group_id)
+                task_key = str(t.task_id)
+                lg_state_raw = await get_local_graph_state(bus_url, task_key) if bus_url else 0
+                if lg_state_raw is None:
+                    lg_state = _lg_state_cache.get(task_key, 0)
+                else:
+                    lg_state = lg_state_raw
+                    _lg_state_cache[task_key] = lg_state
                 enriched_tasks.append({
                     "task_id": str(t.task_id), "group_id": t.group_id, "title": t.title,
                     "responsible_id": t.responsible_id, "responsible_name": resp_name,
+                    "local_graph_state": lg_state,
                     "status": t.status,
                     "start_date": t.start_date.isoformat() if t.start_date else None,
                     "end_date": t.end_date.isoformat() if t.end_date else None,
@@ -98,10 +109,10 @@ async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)
                 .order_by(MgMilestone.sort_order)
             )
             milestones = ms_result.scalars().all()
-            groups_result = await session.execute(
-                select(TaskGroup).where(TaskGroup.is_deleted == False)
-            )
-            groups = groups_result.scalars().all()
+
+            # Группы — тот же источник правды, что и REST: только привязанные к МГ, с sort_order
+            repo = MastergraphRepository(session)
+            groups = await repo.get_groups_for_mg(mg.mg_id)
 
             snapshot = {
                 "type": "snapshot",
@@ -125,10 +136,7 @@ async def ws_mastergraph(ws: WebSocket, mg_id: str, last_version: int = Query(0)
                      "status": m.status, "sort_order": m.sort_order, "version": m.version}
                     for m in milestones
                 ],
-                "groups": [
-                    {"group_id": g.group_id, "name": g.name, "description": g.description, "bus_instance_id": g.bus_instance_id}
-                    for g in groups
-                ],
+                "groups": groups,
             }
             await ws.send_json(snapshot)
             print(f"[WS ENDPOINT] snapshot sent for mg={mg_id}", flush=True)

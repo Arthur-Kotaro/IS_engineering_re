@@ -77,3 +77,28 @@ class ForecastRecalcResponse(BaseModel):
     progress_current: int = -1
     progress_total: int = -1
     status: int = 0
+
+
+# ---------------- Зависимости ЛГ ----------------
+
+class LgDependencyCreate(BaseModel):
+    predecessor_id: UUID
+    successor_id: UUID
+    dep_type: str = "finish_to_start"
+
+
+class LgDependencyResponse(BaseModel):
+    dep_id: UUID
+    lg_id: UUID
+    predecessor_id: UUID
+    successor_id: UUID
+    dep_type: str
+    version: int
+
+    class Config:
+        from_attributes = True
+
+
+class LgDependencyListResponse(BaseModel):
+    lg_id: UUID
+    dependencies: List[LgDependencyResponse] = []

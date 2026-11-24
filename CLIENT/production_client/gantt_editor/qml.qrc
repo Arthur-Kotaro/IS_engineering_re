@@ -47,6 +47,7 @@
         <file>qml/TaskContextMenu.qml</file>
         <file>qml/DefaultGroupsDialog.qml</file>
         <file>qml/CreateGroupDialog.qml</file>
+        <file>qml/GroupWizardDialog.qml</file>
         <file>qml/ChangeReasonDialog.qml</file>
         <file>qml/TaskDetailsDialog.qml</file>
         <file>qml/CascadeUpdateDialog.qml</file>

@@ -56,7 +56,7 @@ public:
     QVariantList get_projectMembers() const { return m_projectMembers; }
 
     Q_INVOKABLE void loadFromServer(const QString& mgId, const QString& token);
-    Q_INVOKABLE void openLocalGraphProcess(const QString& taskId, const QString& busUrl);
+    Q_INVOKABLE bool openLocalGraphProcess(const QString& taskId, const QString& busUrl);
     Q_INVOKABLE void openForProject(int projectId, bool isReadOnly, const QString& token);
 
     void initLocalGraphData(const QVariantMap& lgData, const QVariantList& tasks, const QString& busUrl);
@@ -121,8 +121,8 @@ public:
     Q_INVOKABLE void saveProject();
 
     Q_INVOKABLE void renameGroup(const QString& groupId, const QString& newName);
-    Q_INVOKABLE void createGroupsWithPosition(const QStringList& groupIds, const QString& position);
-    Q_INVOKABLE void createCustomGroupWithPosition(const QString& name, const QString& position);
+    Q_INVOKABLE void createGroupsWithPosition(const QStringList& groupIds, const QString& position, const QString& afterGroupId = QString());
+    Q_INVOKABLE void createCustomGroupWithPosition(const QString& name, const QString& position, const QString& afterGroupId = QString());
 
 signals:
     void inEditModeChanged();

@@ -12,6 +12,7 @@ from app.models.mg_task import MgTask
 from app.models.mg_milestone import MgMilestone, MgMilestoneStatus
 from app.models.mg_status_history import MgStatusHistory
 from app.models.mg_dependency import MgDependency
+from app.models.mg_group import MgGroup
 from app.models.mg_event import MgEntityType, MgEventType
 from app.repositories.event_repo import EventRepository
 from app.repositories.milestone_repo import MilestoneRepository
@@ -71,6 +72,18 @@ async def _is_cve(db: AsyncSession, mg: Mastergraph, user_id: int, token: Option
     return True
 
 
+async def _check_group_attached(db: AsyncSession, mg_id: UUID, group_id: str) -> bool:
+    """Проверяет, что группа привязана к МГ (есть в mg_groups)."""
+    result = await db.execute(
+        select(MgGroup.mg_group_id).where(
+            MgGroup.mg_id == mg_id,
+            MgGroup.group_id == group_id,
+            MgGroup.is_deleted == False,
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
 async def _check_task_title_conflicts(
     db: AsyncSession, mg_id: UUID, pairs: List[Tuple[str, str]]
 ) -> List[Tuple[str, str]]:
@@ -89,8 +102,6 @@ async def _check_task_title_conflicts(
 
 async def _get_predecessor_end(db: AsyncSession, mg_id: UUID, task_id: UUID) -> Optional[str]:
     """Возвращает end_date ближайшего предшественника (если есть)."""
-    from app.models.mg_dependency import MgDependency
-    from app.models.mg_task import MgTask
     dep_res = await db.execute(
         select(MgDependency).where(
             MgDependency.mg_id == mg_id,
@@ -156,6 +167,9 @@ async def create_task(
     if not tg.scalar_one_or_none():
         raise MastergraphError(f"Group '{group_id}' not found")
 
+    if not await _check_group_attached(db, mg_id, group_id):
+        raise MastergraphError(f"Group '{group_id}' is not attached to this mastergraph")
+
     repo = MastergraphRepository(db)
     conflicts = await _check_task_title_conflicts(db, mg_id, [(group_id, title)])
     if conflicts:
@@ -195,7 +209,6 @@ async def create_task(
     await db.commit()
     await db.refresh(task)
 
-    # MG → BUS: уведомить о сроках (если ответственный задан)
     if task.responsible_id:
         await _notify_bus_about_dates(db, mg, task)
 
@@ -226,6 +239,19 @@ async def create_tasks_batch(
     missing_groups = group_ids - existing_groups
     if missing_groups:
         raise MastergraphError(f"Groups not found: {missing_groups}")
+
+    # Проверка привязки к МГ (mg_groups)
+    mg_res = await db.execute(
+        select(MgGroup.group_id).where(
+            MgGroup.mg_id == mg_id,
+            MgGroup.group_id.in_(group_ids),
+            MgGroup.is_deleted == False,
+        )
+    )
+    attached_groups = set(g for g, in mg_res.all())
+    not_attached = group_ids - attached_groups
+    if not_attached:
+        raise MastergraphError(f"Groups not attached to this mastergraph: {not_attached}")
 
     pairs = [(t["group_id"], t["title"]) for t in tasks_data]
     conflicts = await _check_task_title_conflicts(db, mg_id, pairs)
@@ -291,17 +317,16 @@ async def create_tasks_batch(
             )
 
         await db.commit()
-    except IntegrityError as e:
+    except IntegrityError:
         await db.rollback()
         raise TaskTitleConflictError([(t["group_id"], t["title"]) for t in tasks_data])
-    except Exception as e:
+    except Exception:
         await db.rollback()
         raise
 
     for t in created_tasks:
         await db.refresh(t)
 
-    # MG → BUS: для каждой задачи с ответственным
     for t in created_tasks:
         if t.responsible_id:
             await _notify_bus_about_dates(db, mg, t)
@@ -368,7 +393,6 @@ async def create_dependency(
     await db.commit()
     await db.refresh(dep)
 
-    # MG → BUS: уведомить successor о сроке предшественника
     succ_res = await db.execute(select(MgTask).where(MgTask.task_id == successor_id))
     succ = succ_res.scalar_one_or_none()
     if succ and succ.responsible_id:
@@ -630,6 +654,7 @@ async def update_task(
                 "new": str(value) if value is not None else None,
             })
 
+    dates_new = None
     if dates_old is not None:
         dates_new = {
             "start_date": task.start_date.isoformat() if task.start_date else None,
@@ -670,7 +695,6 @@ async def update_task(
     await db.commit()
     await db.refresh(task)
 
-    # MG → BUS: уведомить, если изменились сроки ИЛИ ответственный
     responsible_changed = any(c["field"] == "responsible_id" for c in changes)
     dates_changed = (dates_old is not None and dates_old != dates_new)
     if (dates_changed or responsible_changed) and task.responsible_id:

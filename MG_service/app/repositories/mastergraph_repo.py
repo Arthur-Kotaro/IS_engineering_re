@@ -91,7 +91,7 @@ class MastergraphRepository:
                 "name": tg.name,
                 "description": tg.description,
                 "bus_instance_id": tg.bus_instance_id,
-                "bus_url": bus_instances.get(g.group_id, {}).get("url"),
+                "bus_url": bus_instances.get(g.group_id, bus_instances.get("other_bus", {})).get("url"),
             }
             for g, tg in rows
         ]
