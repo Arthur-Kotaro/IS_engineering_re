@@ -1,7 +1,7 @@
 # Дорожная карта спиралей
 
 **Версия:** 6.1
-**Дата обновления:** 2026-11-24
+**Дата обновления:** 2026-11-27
 **Статус:** Спираль 7 (Макет MG → ERP) в работе.
 
 ## Статус
@@ -32,24 +32,23 @@
   - [x] **`GanttApiClient::setUserId`** + X-User-ID только в BUS-методах (фикс 401).
   - [x] **`local_graph_state`: чтение из BUS, кэш в MG, индикатор `=== 2`**.
   - [x] **Прогноз vs целевой**: убрано приравнивание forecast к target при `Completed`; `_compute_forecast` не ставит `status = 1` автоматически.
-  - [ ] **Порция B: кнопка «Завершить» в ЛГ** (BUS endpoint `POST /{lg_id}/complete` + клиент + диалог + MG).
+  - [x] **Баг 5** (создание групп не перерисовывает) — `reloadMastergraph()` в `createGroupsWithPosition` (в коде).
+  - [x] **Баг 7 (refresh IPC)**: `TokenRefreshServer` + `TokenRefreshClient` + `ApiClient` очередь + `AuthService::handleTokenExpired` + `WebSocketClient` refresh. **Собрано, не проверено в рантайме** (ПК не актуален, БД не актуальны).
+  - [ ] **Проверка Баг 7**: Сценарий 1 (production_client refresh после 15 мин), Сценарий 2 (gantt_editor IPC refresh + переподключение WS). На чистой среде.
+  - [ ] **Порция B**: кнопка «Завершить» в ЛГ (BUS endpoint `POST /{lg_id}/complete` + клиент + диалог + MG). **Правка дана, не применена/не проверена.**
+  - [ ] **Баг 2**: масштаб не пересчитывает вехи. **Правка дана** (`MilestoneBar.qml` + `CalendarHeader.qml`), не проверено.
+  - [ ] **Баг 4**: `DefaultGroupsDialog` binding loop. **Правка дана**, не проверено.
+  - [ ] **Баг 6 + 3d**: блокировка прогноза (`lgs === 2`), dateless (1) редактируется. **Правка дана**, не проверено.
+  - [ ] **Баг 1**: после вехи GridArea пустеет. **Нужен лог** (`[GridArea] displayStart/End/totalRows` + `fromJson milestones: N`).
+  - [ ] **Баг 3**: GridArea ↔ CalendarHeader рассинхрон (МГ). **TimelineController**.
+  - [ ] **TimelineController** (единый `displayStart/End/dayWidth`).
+  - [ ] **Zoom level «Месяц»**.
+  - [ ] **Целевой период проекта** (Project → MG → Client).
+  - [ ] **Wizard инициализации МГ**.
+  - [ ] **Согласование МГ** (workflow).
   - [ ] Outbox (полный: MG → BUS, BUS → MG).
   - [ ] N+1 (batch, join, group by).
   - [ ] Refactoring (разбиение больших файлов) — **Шаг 7**.
-  - [ ] TimelineController (единый `displayStart/End/dayWidth`).
-  - [ ] Zoom level «Месяц».
-  - [ ] Целевой период проекта (Project → MG → Client).
-  - [ ] Wizard инициализации МГ.
-  - [ ] Согласование МГ (workflow).
-  - [ ] Refresh токена / поддержка WS-соединений.
-  - [ ] Баг 1 (веха → GridArea).
-  - [ ] Баг 2 (масштаб → вехи) — решается в TimelineController.
-  - [ ] Баг 3 (GridArea ↔ CalendarHeader) — решается в TimelineController.
-  - [ ] Баг 4 (окно групп).
-  - [ ] Баг 5 (группы не перерисовывают).
-  - [ ] Баг 6 (блокировка прогноза при пустом ЛГ).
-  - [ ] Баг 7 (токен истёк).
-  - [ ] `DefaultGroupsDialog` binding loop (CheckBox.checked).
   - [ ] 3d: 4 состояния `local_graph_state` + «BUS недоступен».
   - [ ] Автосоздание ЛГ при `init_local_graph` (архитектурное).
 

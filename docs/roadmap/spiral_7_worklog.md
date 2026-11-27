@@ -1,8 +1,9 @@
 # Спираль 7. Макет MG → ERP. Worklog
 
 **Дата начала:** 2026-11-14
-**Статус:** В работе (сессия вопросов-ответов завершена, готовимся к правкам).
-**Связанные документы:** `phase_1_plan.md`, `CURRENT_STATE.md`, `spirals.md`
+**Дата обновления:** 2026-11-27
+**Статус:** В работе. Сессия 2 (ЛГ/МГ + IPC refresh) — собрано, не проверено в рантайме.
+**Связанные документы:** `phase_1_plan.md`, `spirals.md`, `progress.md`
 
 ## 1. Цель спирали
 
@@ -39,6 +40,8 @@
 | 25 | **Согласование МГ:** кнопка «Черновик/Чистовик» → workflow (см. раздел 13). | Управляемость. |
 | 26 | **Единый паттерн C для ЛГ:** клиент шлёт команду → сервер применяет → WS snapshot всем → клиент перерисовывает. Никаких optimistic update / локальных изменений `TaskModel` в CRUD. | Сервер — единственный источник истины. Будущее: бизнес-сервисы автоматически пересчитывают ЛГ всех проектов, клиент — тонкий терминал. |
 | 27 | **Явное завершение МГ-задачи из ЛГ** (кнопка «Завершить»). Автоматическое завершение (когда все ЛГ-задачи Completed) — отменено. | Целевой срок задаёт только человек; «псевдо-фактический» срок (forecast = target при Completed) — баг. |
+| 28 | **Refresh токена через IPC** (production_client ↔ gantt_editor). `TokenRefreshServer` (QLocalServer `engineering_re_token_refresh`) + `TokenRefreshClient` (QLocalSocket). | gantt_editor — отдельный процесс без AuthService. Refresh делает production_client, передаёт новый токен через IPC. |
+| 29 | **`ApiClient` — очередь запросов после refresh.** При `401 Token expired` → callback → refresh → повтор из `m_pendingAfterRefresh`. | Прозрачный refresh для пользователя. |
 
 ## 3. События и уведомления (PROJECT_service → другие)
 
@@ -124,140 +127,107 @@
 - CI/CD — Спираль 12.
 - Страница выбора МГ с разделами по статусам (UI Composer).
 
-## 5. Найденные проблемы и баги
+## 5. Баги и проблемы — единая таблица
 
-### 🔴 Критические
+**Статусы:** ✅ исправлен (проверено) / 🟡 исправлен (не проверено в рантайме) / ❌ открыт / ⏸ отложен / 🚫 отменён.
+
+### 5.1. Сессия 1 (2026-11-16)
+
 | № | Проблема | Файл | Статус |
 |---|---|---|---|
-| 1 | Миграция 001 (pgcrypto) | MG_service | ✅ исправлен |
-| 2 | `update_task` UnboundLocalError | MG_service | ❌ отменён (не баг) |
-| 3 | WS-авторизация MG | MG_service | ✅ исправлен |
-| 4 | WS-авторизация BUS | BUS_service | ✅ исправлен |
-| 5 | `create_mastergraph` гонка | MG_service | ✅ исправлен |
-| 6 | `TokenManager::isTokenValid` | CLIENT | ✅ исправлен |
-| 7 | `ApiClient::buildUrl` | CLIENT | ✅ исправлен |
-| 8 | `delete_project` не работает | PROJECT_service | ✅ исправлен |
-| 9 | `PATCH /status` без валидации | PROJECT_service | ✅ исправлен |
-| 10 | `ProjectRepository.update` не очищает | PROJECT_service | ✅ исправлен |
-| 11 | **Н1:** ЛГ не открывается | WS/клиент | ✅ исправлен (X-User-ID) |
-| 12 | **Н2:** Пересортировка задач | TaskModel | ❌ открыт |
-| 13 | **Н3:** Ширина GridArea ≠ CalendarHeader | QML | ❌ открыт (решается в TimelineController) |
+| 1 | Миграция 001 (pgcrypto) | MG_service | ✅ |
+| 2 | `update_task` UnboundLocalError | MG_service | 🚫 (не баг) |
+| 3 | WS-авторизация MG | MG_service | ✅ |
+| 4 | WS-авторизация BUS | BUS_service | ✅ |
+| 5 | `create_mastergraph` гонка | MG_service | ✅ |
+| 6 | `TokenManager::isTokenValid` | CLIENT | ✅ |
+| 7 | `ApiClient::buildUrl` | CLIENT | ✅ |
+| 8 | `delete_project` не работает | PROJECT_service | ✅ |
+| 9 | `PATCH /status` без валидации | PROJECT_service | ✅ |
+| 10 | `ProjectRepository.update` не очищает | PROJECT_service | ✅ |
+| 11 | **Н1:** ЛГ не открывается | WS/клиент | ✅ (X-User-ID) |
+| 12 | **Н2:** Пересортировка задач | TaskModel | ❌ |
+| 13 | **Н3:** Ширина GridArea ≠ CalendarHeader | QML | ❌ (TimelineController) |
+| 14 | Outbox отсутствует | сервисы | ❌ |
+| 15 | N+1 | сервисы | ❌ |
+| 16 | `aiohttp` на каждый вызов | сервисы | ❌ |
+| 17 | `create_project` без транзакции | PROJECT_service | ❌ |
+| 18 | `mg_creation_worker` без `FOR UPDATE` | PROJECT_service | ❌ |
+| 19 | WS без реконнекта | WebSocketClient | ✅ |
+| 20 | `onWsSnapshot` пустой | ProjectController | ✅ |
+| 21 | `onWsDiff` только task/update | ProjectController | ✅ (частично) |
+| 22 | Токен через файл | main.cpp | ✅ (env) |
+| 23 | `refreshToken` не обновляет сессию | AuthService | ✅ |
+| 24 | `changePassword` не очищает токен | AuthService | ✅ |
+| 25 | `submitForm` DELETE → POST | WidgetBridge | ✅ |
+| 26 | SSL VerifyNone | ApiClient | ❌ |
+| 27 | **Н4:** Нет подсветки просроченных в МГ | QML | ❌ |
+| 28 | **Н5:** Нельзя выбрать ответственного в ЛГ | BUS_service | ❌ |
+| 29 | **Н6:** Пиктограмма пароля | AuthWindow.qml | ❌ |
+| 30 | `localhost:8080` хардкод | QML/C++ | ❌ |
+| 31 | Двойное переключение темы | TopBar | ❌ |
+| 32 | Двойная логика закрытия вкладки | MainWindow.qml | ❌ |
+| 33 | `topBar` не в области видимости | NotificationsWindow | ❌ |
+| 34 | WidgetLoader бесконечный цикл | WidgetLoader.qml | ❌ |
+| 35 | CMAKE_CXX_STANDARD 17 | CMakeLists | ❌ |
+| 36 | QML с диска, не из qrc | main.cpp | ❌ |
+| 37 | resources.qrc мёртвые записи | resources.qrc | ❌ |
+| 38 | gantt qml.qrc артефакты | qml.qrc | ❌ |
+| 39 | Threads::Threads без find_package | common/CMakeLists | ❌ |
+| 40 | GlobalSettings.fontSize не обновляется | GlobalSettings.qml | ❌ |
+| 41 | DataManager::m_cache растёт | DataManager.cpp | ❌ |
+| 42 | Диалоги без индикатора загрузки | QML | ❌ |
 
-### 🟡 Важные
+### 5.2. Сессия 2 (2026-11-24): ЛГ/МГ
+
 | № | Проблема | Файл | Статус |
 |---|---|---|---|
-| 14 | Outbox отсутствует | сервисы | ❌ открыт |
-| 15 | N+1 | сервисы | ❌ открыт |
-| 16 | `aiohttp` на каждый вызов | сервисы | ❌ открыт |
-| 17 | `create_project` без транзакции | PROJECT_service | ❌ открыт |
-| 18 | `mg_creation_worker` без `FOR UPDATE` | PROJECT_service | ❌ открыт |
-| 19 | WS без реконнекта | WebSocketClient | ✅ исправлен |
-| 20 | `onWsSnapshot` пустой | ProjectController | ✅ исправлен |
-| 21 | `onWsDiff` только task/update | ProjectController | ✅ исправлен (частично) |
-| 22 | Токен через файл | main.cpp | ✅ исправлен (env) |
-| 23 | `refreshToken` не обновляет сессию | AuthService | ✅ исправлен |
-| 24 | `changePassword` не очищает токен | AuthService | ✅ исправлен |
-| 25 | `submitForm` DELETE → POST | WidgetBridge | ✅ исправлен |
-| 26 | SSL VerifyNone | ApiClient | ❌ открыт |
-| 27 | **Н4:** Нет подсветки просроченных в МГ | QML | ❌ открыт |
-| 28 | **Н5:** Нельзя выбрать ответственного в ЛГ | BUS_service | ❌ открыт |
-| 29 | **Н6:** Пиктограмма пароля | AuthWindow.qml | ❌ открыт |
-| 30 | `localhost:8080` хардкод | QML/C++ | ❌ открыт |
-| 31 | Двойное переключение темы | TopBar | ❌ открыт |
-| 32 | Двойная логика закрытия вкладки | MainWindow.qml | ❌ открыт |
-| 33 | `topBar` не в области видимости | NotificationsWindow | ❌ открыт |
-| 34 | WidgetLoader бесконечный цикл | WidgetLoader.qml | ❌ открыт |
-| 35 | CMAKE_CXX_STANDARD 17 | CMakeLists | ❌ открыт |
-| 36 | QML с диска, не из qrc | main.cpp | ❌ открыт |
-| 37 | resources.qrc мёртвые записи | resources.qrc | ❌ открыт |
-| 38 | gantt qml.qrc артефакты | qml.qrc | ❌ открыт |
-| 39 | Threads::Threads без find_package | common/CMakeLists | ❌ открыт |
-| 40 | GlobalSettings.fontSize не обновляется | GlobalSettings.qml | ❌ открыт |
-| 41 | DataManager::m_cache растёт | DataManager.cpp | ❌ открыт |
-| 42 | Диалоги без индикатора загрузки | QML | ❌ открыт |
-| 43 | **Баг 1:** После вехи GridArea пустеет | ProjectController | ❌ открыт |
-| 44 | **Баг 2:** Масштаб не пересчитывает вехи | MilestoneBar | ❌ открыт (решается в TimelineController) |
-| 45 | **Баг 5:** Создание групп не перерисовывает | ProjectController | ❌ открыт (A1) |
-| 46 | **Баг 6:** Блокировка прогноза при пустом ЛГ | TaskBar/BUS | ❌ открыт |
-| 47 | **Баг 7:** Токен истёк → нет соединения | ApiClient/AuthService | ❌ открыт (G) |
-| 48 | **Баг 4:** Окно групп мало | DefaultGroupsDialog | ❌ открыт (A2) |
+| 43 | **Баг 8:** GroupWizardDialog не объявлен в GanttEditorWindow.qml → окно МГ не грузилось. В ЛГ пункты «сверху/снизу» скрыты. | `GanttEditorWindow.qml`, `qml.qrc`, `GroupContextMenu.qml`, `GroupDelegate.qml` | ✅ |
+| 44 | **Баг 8b:** позиционирование групп (стандартные/кастомные) — `after_group_id` + `shift_sort_orders_after`; fallback при not found. `DefaultGroupsDialog` → `"top"`. | `ProjectController.h/.cpp`, `GroupWizardDialog.qml`, `DefaultGroupsDialog.qml`, `mastergraphs.py`, `mg_group_repo.py` | ✅ |
+| 45 | WS snapshot (МГ): `groups` из `get_groups_for_mg` (единый источник с REST, `sort_order`). Fallback `bus_url` на `other_bus`. | `mastergraphs_ws.py`, `mastergraph_repo.py` | ✅ |
+| 46 | Атомарность `create_custom_group` (rollback при ошибке MgGroup). Проверка привязки группы к МГ в `create_task`/`batch`. | `mastergraphs.py`, `mastergraph_service.py` | ✅ |
+| 47 | Комментарии в каскаде (`BatchTaskItem.comment`). | `schemas/mastergraph.py`, `mastergraphs.py`, `CascadeDialog.qml` | ✅ |
+| 48 | Прогноз в МГ: причина не запрашивается для forecast. | `TaskBar.qml`, `EditForecastDatesDialog.qml` | ✅ |
+| 49 | ЛГ: единый паттерн C (сервер — истина, WS snapshot → перерисовка). CRUD без локальных изменений `TaskModel`. | `LocalGraphController.cpp`, `ProjectController.cpp`, `local_graphs.py`, `local_graphs_ws.py` | ✅ |
+| 50 | ЛГ-зависимости: BUS endpoints + `DependencyModel::addDependencyWithId` + `GanttApiClient` + `LocalGraphController`. | `local_graphs.py`, `schemas/local_graph.py`, `DependencyModel.h/.cpp`, `GanttApiClient.h/.cpp`, `LocalGraphController.h/.cpp`, `DependencyDialog.qml`, `TaskContextMenu.qml` | ✅ |
+| 51 | `GanttApiClient::setUserId` + X-User-ID только в BUS-методах (фикс 401). | `GanttApiClient.h/.cpp`, `LocalGraphController.cpp` | ✅ |
+| 52 | `local_graph_state`: чтение из BUS (не всегда 2), кэш в MG, индикатор только при `=== 2`. | `bus_client.py`, `mastergraphs.py`, `GroupDelegate.qml` | ✅ |
+| 53 | Прогноз vs целевой: убрано приравнивание forecast к target при `Completed`; `_compute_forecast` не ставит `status = 1` автоматически. | `TaskModel.cpp`, `local_graphs.py` | ✅ |
+| 54 | **Баг 2:** Масштаб не пересчитывает вехи. | `MilestoneBar.qml`, `CalendarHeader.qml` (фрагмент) | 🟡 (правка дана, не проверено) |
+| 55 | **Баг 6 + 3d:** Блокировка прогноза (`lgs === 2` вместо `2 || 3`); dateless (1) — редактируется. | `TaskBar.qml`, `TaskContextMenu.qml` | 🟡 (правка дана, не проверено) |
+| 56 | **Баг 4:** `DefaultGroupsDialog` binding loop (CheckBox.checked). | `DefaultGroupsDialog.qml` | 🟡 (правка дана, не проверено) |
+| 57 | **Баг 1:** После вехи GridArea пустеет. | `ProjectController.cpp`, `GridArea.qml`, `MilestoneModel.cpp` | ❌ (диагноз: `getEarliestDate`/`getLatestDate` могут вернуть today; нужен лог) |
+| 58 | **Баг 3:** GridArea ↔ CalendarHeader рассинхрон (МГ). | `GanttEditorWindow.qml`, `GridArea.qml`, `CalendarHeader.qml` | ❌ (TimelineController) |
+| 59 | **Баг 5:** Создание групп не перерисовывает. | `ProjectController::createGroupsWithPosition` → `reloadMastergraph()` | ✅ (в коде есть) |
 
-### 🟢 Удалить (мёртвый код)
+### 5.3. Сессия 2 (продолжение, 2026-11-26): refresh токена через IPC
+
+| № | Проблема | Файл | Статус |
+|---|---|---|---|
+| 60 | **Баг 7:** Токен истёк → нет соединения. Refresh не работает. | `ApiClient.h/.cpp`, `AuthService.h/.cpp`, `WebSocketClient.h/.cpp`, `TokenRefreshServer.h/.cpp`, `TokenRefreshClient.h/.cpp`, `ProjectController.h/.cpp`, `AppCore.cpp`, `CMakeLists.txt` | 🟡 (собрано, `[TokenRefreshServer] listening` — есть; не проверено в рантайме) |
+| 61 | **Порция B:** Кнопка «Завершить» в ЛГ (BUS endpoint `POST /{lg_id}/complete` + клиент + диалог + MG). | `local_graphs.py`, `schemas/local_graph.py`, `LocalGraphController.h/.cpp`, `CompleteLocalGraphDialog.qml`, `qml.qrc`, `GanttEditorWindow.qml`, `AppToolBar.qml` | 🟡 (правка дана, не применена/не проверена) |
+
+### 5.4. Удалить (мёртвый код) — отложено
+
 | № | Что | Файл |
 |---|---|---|
-| 49 | `CacheManager` | production_client/src/core/ |
-| 50 | `ErrorDialog`, `UpdateNotification`, `ConfirmDialog` | qml/dialogs/ |
-| 51 | `LoadingSpinner`, `MastergraphStatusCard`, `OfflineIndicator`, `ToastNotification` | qml/components/ |
-| 52 | `ProjectsView`, `MastergraphView`, `DashboardView`, `SettingsView` | qml/views/ |
-| 53 | `SearchableSelect` (решить после изучения) | qml/widgets/ |
-| 54 | `DateUtils`, `StringUtils` | qml/utils/ |
-| 55 | `AppStyle` | qml/styles/ |
-| 56 | `HistoryEntry` | gantt_editor/include/, src/ |
+| 62 | `CacheManager` | production_client/src/core/ |
+| 63 | `ErrorDialog`, `UpdateNotification`, `ConfirmDialog` | qml/dialogs/ |
+| 64 | `LoadingSpinner`, `MastergraphStatusCard`, `OfflineIndicator`, `ToastNotification` | qml/components/ |
+| 65 | `ProjectsView`, `MastergraphView`, `DashboardView`, `SettingsView` | qml/views/ |
+| 66 | `SearchableSelect` (решить после изучения) | qml/widgets/ |
+| 67 | `DateUtils`, `StringUtils` | qml/utils/ |
+| 68 | `AppStyle` | qml/styles/ |
+| 69 | `HistoryEntry` | gantt_editor/include/, src/ |
 
-### 📌 Не проблема (проверено)
+### 5.5. Не проблема (проверено)
 - **П.17** (`DataManager` не передаёт Authorization) — `UI Composer` резолвит `sources` сам.
 - **П.26** (заглушки данных) — механизм `renderer_preview`.
 
-### ✅ Завершено (сессия 2, 2026-11-24)
-
-| № | Что | Файлы |
-|---|---|---|
-| 1 | Баг 8: GroupWizardDialog не объявлен в GanttEditorWindow.qml → окно МГ не грузилось. В ЛГ пункты «сверху/снизу» скрыты. | `GanttEditorWindow.qml`, `qml.qrc`, `GroupContextMenu.qml`, `GroupDelegate.qml` |
-| 2 | Баг 8b: позиционирование групп (стандартные/кастомные) — `after_group_id` + `shift_sort_orders_after`; fallback при not found. `DefaultGroupsDialog` → `"top"`. | `ProjectController.h/.cpp`, `GroupWizardDialog.qml`, `DefaultGroupsDialog.qml`, `mastergraphs.py`, `mg_group_repo.py` |
-| 3 | WS snapshot (МГ): `groups` из `get_groups_for_mg` (единый источник с REST, `sort_order`). Fallback `bus_url` на `other_bus`. | `mastergraphs_ws.py`, `mastergraph_repo.py` |
-| 4 | Атомарность `create_custom_group` (rollback при ошибке MgGroup). Проверка привязки группы к МГ в `create_task`/`batch`. | `mastergraphs.py`, `mastergraph_service.py` |
-| 5 | Комментарии в каскаде (`BatchTaskItem.comment`). | `schemas/mastergraph.py`, `mastergraphs.py`, `CascadeDialog.qml` |
-| 6 | Прогноз в МГ: причина не запрашивается для forecast. | `TaskBar.qml`, `EditForecastDatesDialog.qml` |
-| 7 | ЛГ: единый паттерн C (сервер — истина, WS snapshot → перерисовка). CRUD без локальных изменений `TaskModel`. | `LocalGraphController.cpp`, `ProjectController.cpp`, `local_graphs.py`, `local_graphs_ws.py` |
-| 8 | ЛГ-зависимости: BUS endpoints + `DependencyModel::addDependencyWithId` + `GanttApiClient` + `LocalGraphController`. | `local_graphs.py`, `schemas/local_graph.py`, `DependencyModel.h/.cpp`, `GanttApiClient.h/.cpp`, `LocalGraphController.h/.cpp`, `DependencyDialog.qml`, `TaskContextMenu.qml` |
-| 9 | `GanttApiClient::setUserId` + X-User-ID только в BUS-методах (фикс 401). | `GanttApiClient.h/.cpp`, `LocalGraphController.cpp` |
-| 10 | `local_graph_state`: чтение из BUS (не всегда 2), кэш в MG, индикатор только при `=== 2`. | `bus_client.py`, `mastergraphs.py`, `GroupDelegate.qml` |
-| 11 | Прогноз vs целевой: убрано приравнивание forecast к target при `Completed`; `_compute_forecast` не ставит `status = 1` автоматически. | `TaskModel.cpp`, `local_graphs.py` |
-### Сессия 2 (продолжение, 2026-11-26): refresh токена через IPC
-
-**Проблема:** токен истекает через 15 мин, WS рвётся (401 / close code 1008), refresh не работает. `ApiClient` / `AuthService` / `WebSocketClient` не связаны с refresh.
-
-**Решение (единая схема IPC):**
-- `TokenRefreshServer` (production_client, `QLocalServer` имя `engineering_re_token_refresh`) — слушает дочерние процессы. При `{"action":"refresh"}` → `AuthService::refreshToken(currentRefreshToken)`. При `tokenRefreshed(newAccess, newRefresh)` → broadcast `{"action":"token","token":"<newAccess>"}` всем подключённым. При `sessionExpired` → broadcast `{"action":"error","message":"Session expired"}`.
-- `TokenRefreshClient` (gantt_editor, `QLocalSocket`) — при `requestRefresh()` отправляет `{"action":"refresh"}`. При `{"action":"token"}` → `emit tokenRefreshed(newToken)`. При `{"action":"error"}` → `emit refreshFailed`.
-- `ApiClient` (common) — при `401` + `detail == "Token expired"` → `m_onTokenExpired()` (callback от `AuthService`). Если `true` — запрос в `m_pendingAfterRefresh`. `AuthService::refreshToken` → `ApiClient::onTokenRefreshed()` → очередь повторяется. При неудаче — `ApiClient::onTokenRefreshFailed()` → `emit tokenExpired()`.
-- `AuthService` (common) — в конструкторе `m_apiClient->setOnTokenExpired([this]{ return handleTokenExpired(); })`. `handleTokenExpired()` → `refreshToken(m_currentSession.refreshToken)`. `refreshToken` → `m_apiClient->onTokenRefreshed()` при успехе, `onTokenRefreshFailed()` при неудаче.
-- `WebSocketClient` (gantt_editor) — `setOnTokenExpired(callback)`, `onTokenRefreshed(newToken)`, `onTokenRefreshFailed()`. При close code `1008` или WS-сообщении «Token expired» → `m_onTokenExpired()` (callback из `ProjectController` → `TokenRefreshClient::requestRefresh()`). При `onTokenRefreshed(newToken)` → `m_token = newToken` → переподключение `connectToServer(m_url, m_token)`.
-- `ProjectController` (gantt_editor) — создаёт `TokenRefreshClient`, связывает: `TokenRefreshClient::tokenRefreshed` → `m_token = newToken`, `m_apiClient->setToken`, `m_webSocket->onTokenRefreshed(newToken)`. `m_webSocket->setOnTokenExpired([this]{ return m_tokenRefreshClient->requestRefresh(); })`.
-
-**Новые файлы:**
-- `CLIENT/production_client/gantt_editor/include/TokenRefreshClient.h`
-- `CLIENT/production_client/gantt_editor/src/TokenRefreshClient.cpp`
-- `CLIENT/production_client/include/TokenRefreshServer.h`
-- `CLIENT/production_client/src/TokenRefreshServer.cpp`
-
-**Изменены:**
-- `CLIENT/common/include/userserviceclient/ApiClient.h` — `TokenExpiredHandler`, `PendingRequest`, `m_refreshing`, `m_pendingAfterRefresh`, `onTokenRefreshed`, `onTokenRefreshFailed`.
-- `CLIENT/common/src/ApiClient.cpp` — обработка `401 Token expired`, `executeRequest` с сохранением `PendingRequest` в `reply` property, `enqueueAfterRefresh`, `onTokenRefreshed`, `onTokenRefreshFailed`.
-- `CLIENT/common/include/userserviceclient/AuthService.h` — `handleTokenExpired`.
-- `CLIENT/common/src/AuthService.cpp` — `setOnTokenExpired` в конструкторе, `handleTokenExpired`, `onTokenRefreshed` / `onTokenRefreshFailed` в `refreshToken`.
-- `CLIENT/production_client/gantt_editor/include/WebSocketClient.h` — `setOnTokenExpired`, `onTokenRefreshed`, `onTokenRefreshFailed`, `m_refreshing`, `m_reconnectAfterRefresh`.
-- `CLIENT/production_client/gantt_editor/src/WebSocketClient.cpp` — обработка `1008` / WS «Token expired» → refresh → переподключение.
-- `CLIENT/production_client/gantt_editor/include/ProjectController.h` — `+TokenRefreshClient*`, `+Q_PROPERTY tokenRefreshClient`, `+include TokenRefreshClient.h`.
-- `CLIENT/production_client/gantt_editor/src/ProjectController.cpp` — создание `TokenRefreshClient`, связывание с `WebSocketClient`.
-- `CLIENT/production_client/gantt_editor/CMakeLists.txt` — `+TokenRefreshClient.cpp/.h`.
-- `CLIENT/production_client/CMakeLists.txt` — `+TokenRefreshServer.cpp`.
-
-**Ещё не сделано (для полной схемы IPC):**
-- `AppCore.cpp` / `main.cpp` (production_client) — создать `TokenRefreshServer`, связать с `AuthService` (`tokenRefreshed` → `onTokenRefreshed`, `sessionExpired` → `onSessionExpired`), `listen()`, `setCurrentRefreshToken(authService->currentSession().refreshToken)`.
-- **Проверка** (Сценарий 1: production_client refresh после 15 мин; Сценарий 2: gantt_editor IPC refresh + переподключение WS).
-
-**Статус:** правки **не проверены** (ПК не актуален, БД не актуальны). Требуется проверка на чистой среде.
-
-## 6. План правок
-
-### Этап 0: Документация
-1. Аудит старой документации.
-2. `SERVICES.md`, `DECISIONS.md`, `CURRENT_STATE.md`, `TEST_PLAN.md`.
-3. Зафиксировать скрипты запуска.
+## 6. План правок (актуальный)
 
 ### Этап 1: Бэкенд — критические баги (✅ завершён)
-1-10 — исправлены.
+1–10 — исправлены.
 
 ### Этап 2: Бэкенд — безупречность
 11. Outbox.
@@ -269,17 +239,17 @@
 17. Centralized `event_log`.
 
 ### Этап 3: Клиент — критические баги (✅ завершён)
-18-26 — исправлены.
+18–26, 43–53 — исправлены.
 
 ### Этап 4: Клиент — безупречность
-27. Рефакторинг (разбиение файлов).
+27. Рефакторинг (разбиение файлов) — **Шаг 7**.
 28. `CMAKE_CXX_STANDARD 20`.
 29. QML из qrc (Вариант A).
 30. Очистка `resources.qrc`, `gantt_editor/qml.qrc`.
 31. `common/CMakeLists.txt` — `find_package(Threads)`.
 32. `GlobalSettings.fontSize` — синхронизация.
 33. `DataManager::m_cache` — LRU.
-34. Удалить мёртвый код (49–56).
+34. Удалить мёртвый код (62–69).
 35. Н4 (подсветка просроченных в МГ).
 36. Н5 (ответственный в ЛГ) — доработка BUS.
 37. Н6 (пиктограмма пароля).
@@ -290,39 +260,40 @@
 42. `WidgetLoader` — исправить/удалить.
 43. Диалоги — индикатор загрузки.
 44. `qmlRegisterType` — проверить пути.
-45. **Баг 1** — обновление после вехи.
-46. **Баг 5** — `createGroups` → `reloadMastergraph()`.
-47. **Баг 4** — окно групп.
-48. **TimelineController** (B) + zoom «Месяц» (C).
-49. **Целевой период** (D).
-50. **Wizard** (E).
-51. **Согласование МГ** (F).
-52. **Refresh токена / WS** (G).
-53. **Баг 6** — блокировка прогноза при пустом ЛГ.
+45. **Баг 1** — обновление после вехи (нужен лог).
+46. **Баг 2** — правка дана, проверить.
+47. **Баг 4** — правка дана, проверить.
+48. **Баг 6 + 3d** — правка дана, проверить.
+49. **TimelineController** + zoom «Месяц» — **Баг 3**.
+50. **Целевой период** (Шаг 6).
+51. **Wizard**.
+52. **Согласование МГ**.
+53. **Порция B: кнопка «Завершить» в ЛГ** — правка дана, применить/проверить.
+54. **Баг 7 (refresh IPC)** — собрано, проверить Сценарий 1 / 2.
 
 ### Этап 5: Тесты
-54. Characterization.
-55. Smoke.
+55. Characterization.
+56. Smoke.
 
 ### Этап 6: Документация (второй проход)
-56. Обновить все документы.
-57. Финализировать worklog.
+57. Обновить все документы.
+58. Финализировать worklog.
 
 ## 7. Чек-лист проверки
 - Бэкенд: сборка, smoke, миграции, WS.
 - Клиент: сборка, запуск, сценарий, `renderer_preview`.
 - Документация: соответствие коду.
 
-## 8. Текущее состояние
+## 8. Текущее состояние (2026-11-27)
 - Бэкенд: критические баги ✅, outbox/N+1 — ❌.
-- Клиент: критические баги ✅, Timeline/Wizard/Согласование — ❌.
-- Документация: устарела.
+- Клиент: критические баги ✅; refresh IPC — собрано, не проверено; Порция B — правка дана, не применена; Баг 1 — нужен лог; Баг 2/4/6 — правки даны, не проверены; Timeline/Wizard/Согласование/Целевой период — ❌.
+- Документация: **обновлена 2026-11-27** (этот worklog, `progress.md`, `spirals.md`, `phase_1_plan.md`, `phase_1_platform_logic.md`).
 
 ## 9. Что показать в следующем диалоге
 - MG_service: `mastergraphs.py`, `mastergraph_service.py`, `mastergraphs_ws.py`.
 - BUS_service: `local_graphs.py`, `local_graphs_ws.py`.
 - PROJECT_service: `projects.py`, `project_service.py`, `project_repo.py`.
-- CLIENT: `ProjectController.cpp`, `TaskBar.qml`, `GridArea.qml`, `CalendarHeader.qml`, `LocalGraphEditorWindow.qml`, `DefaultGroupsDialog.qml`, `MainWindow.qml`, `AuthService.cpp`, `ApiClient.cpp`, `WebSocketClient.cpp`.
+- CLIENT: `ProjectController.cpp`, `TaskBar.qml`, `GridArea.qml`, `CalendarHeader.qml`, `MilestoneBar.qml`, `LocalGraphEditorWindow.qml`, `DefaultGroupsDialog.qml`, `MainWindow.qml`, `AuthService.cpp`, `ApiClient.cpp`, `WebSocketClient.cpp`, `TokenRefreshServer.cpp`, `TokenRefreshClient.cpp`, `AppCore.cpp`.
 
 ## 10. Идеи на будущее
 - CI/CD (Спираль 12).

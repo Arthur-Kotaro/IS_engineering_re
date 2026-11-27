@@ -1,7 +1,7 @@
 # Фаза 1. Бизнес-логика платформы
 
 **Версия:** 6.1
-**Дата обновления:** 2026-11-24
+**Дата обновления:** 2026-11-27
 
 ## 1. Создание пользователей
 Две страницы: создание, генерация пароля.
@@ -50,9 +50,19 @@
 - **При клике** — диалог подтверждения.
 - **При подтверждении** — `POST /{lg_id}/complete` в BUS → `_compute_forecast` + `status = 1` → `POST /internal/forecast-update` в MG → WS snapshot → перерисовка.
 - **Автоматическое завершение** (когда все ЛГ-задачи Completed) — **отменено**: BUS `_compute_forecast` всегда `status = 0`. Завершение МГ-задачи — **только явное действие пользователя**.
+- **Статус:** правка дана (Порция B), не применена/не проверена.
 
 ## 9. Инициализация ERP (Спираль 11)
 - BDERE, телефонный справочник, workflow.
+
+## 10. Refresh токена через IPC (Спираль 7)
+- **`production_client`:** `TokenRefreshServer` (QLocalServer `engineering_re_token_refresh`). При `{"action":"refresh"}` → `AuthService::refreshToken(currentRefreshToken)`. При `tokenRefreshed` → broadcast `{"action":"token","token":"..."}`. При `sessionExpired` → broadcast `{"action":"error","message":"Session expired"}`.
+- **`gantt_editor`:** `TokenRefreshClient` (QLocalSocket). При `401` / `close code 1008` / WS «Token expired» → `requestRefresh()`. При `{"action":"token"}` → `WebSocketClient::onTokenRefreshed(newToken)` → переподключение.
+- **`ApiClient` (common):** `401 Token expired` → `m_onTokenExpired()` (callback от `AuthService`) → запрос в очередь → повтор после `tokenRefreshed`.
+- **`AuthService`:** `handleTokenExpired` → `refreshToken`. При успехе — `ApiClient::onTokenRefreshed()`. При неудаче — `onTokenRefreshFailed()` → `sessionExpired`.
+- **`WebSocketClient`:** `setOnTokenExpired`, `onTokenRefreshed`, `onTokenRefreshFailed`.
+- **`ProjectController`:** создание `TokenRefreshClient`, связь `WebSocketClient` ↔ `TokenRefreshClient`.
+- **Статус:** собрано, не проверено в рантайме (ПК не актуален, БД не актуальны). Требуется проверка на чистой среде (Сценарий 1: production_client refresh после 15 мин; Сценарий 2: gantt_editor IPC refresh + переподключение WS).
 
 ## Требования к разработке
 (см. `spirals.md`)
