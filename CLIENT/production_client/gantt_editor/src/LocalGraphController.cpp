@@ -13,18 +13,28 @@ LocalGraphController::LocalGraphController(ProjectData* projectData,
                                            SettingsManager* settingsManager,
                                            GanttApiClient* apiClient,
                                            QObject *parent)
-    : QObject(parent)
-    , m_projectData(projectData)
-    , m_resourceManager(resourceManager)
-    , m_settingsManager(settingsManager)
-    , m_apiClient(apiClient)
-    , m_networkManager(new QNetworkAccessManager(this))
+: QObject(parent)
+, m_projectData(projectData)
+, m_resourceManager(resourceManager)
+, m_settingsManager(settingsManager)
+, m_apiClient(apiClient)
+, m_networkManager(new QNetworkAccessManager(this))
 {
     connect(m_apiClient, &GanttApiClient::localGraphCreated, this, &LocalGraphController::onLocalGraphCreated);
     connect(m_apiClient, &GanttApiClient::forecastRecalculated, this, &LocalGraphController::onForecastRecalculated);
     connect(m_apiClient, &GanttApiClient::lgDependencyCreated, this, &LocalGraphController::onLgDependencyCreated);
     connect(m_apiClient, &GanttApiClient::lgDependencyDeleted, this, &LocalGraphController::onLgDependencyDeleted);
     connect(m_apiClient, &GanttApiClient::lgDependenciesLoaded, this, &LocalGraphController::onLgDependenciesLoaded);
+
+    // canCompleteLocalGraph зависит от состояния TaskModel — пересчитываем при изменениях
+    connect(m_projectData->get_taskModel(), &QAbstractItemModel::dataChanged,
+            this, [this]() { emit localGraphCanBeCompletedChanged(); });
+    connect(m_projectData->get_taskModel(), &QAbstractItemModel::rowsInserted,
+            this, [this]() { emit localGraphCanBeCompletedChanged(); });
+    connect(m_projectData->get_taskModel(), &QAbstractItemModel::rowsRemoved,
+            this, [this]() { emit localGraphCanBeCompletedChanged(); });
+    connect(m_projectData->get_taskModel(), &QAbstractItemModel::modelReset,
+            this, [this]() { emit localGraphCanBeCompletedChanged(); });
 }
 
 void LocalGraphController::setLocalGraphContext(const QString& lgId, const QString& busUrl,
@@ -375,4 +385,80 @@ void LocalGraphController::onLgDependenciesLoaded(const QVariantList& deps)
             d.value("predecessor_id").toString(),
             d.value("successor_id").toString());
     }
+}
+
+// ============================================================
+// Явное завершение МГ-задачи из ЛГ (кнопка «Завершить»).
+// Активна, когда: пользователь — ответственный, в ЛГ есть задачи
+// со сроками, все они Completed, нет задач без сроков,
+// МГ-задача ещё не завершена.
+// ============================================================
+
+bool LocalGraphController::canCompleteLocalGraph() const
+{
+    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) return false;
+    if (m_responsibleId <= 0) return false;
+    if (m_settingsManager->editingLocked()) return false;
+
+    // МГ-задача уже завершена?
+    if (m_masterTaskId.isEmpty()) return false;
+    QVariantMap masterTask = m_projectData->get_taskModel()->getTask(m_masterTaskId);
+    if (!masterTask.isEmpty() && masterTask.value("status").toInt() == 1) return false;
+
+    // Все ЛГ-задачи в модели (после WS snapshot)
+    auto* taskModel = m_projectData->get_taskModel();
+    if (!taskModel || taskModel->rowCount() == 0) return false;
+
+    bool hasTasksWithDates = false;
+    bool hasTasksWithoutDates = false;
+    bool allCompleted = true;
+    for (int i = 0; i < taskModel->rowCount(); ++i) {
+        QModelIndex idx = taskModel->index(i);
+        QDate s = idx.data(GanttDefines::StartDateRole).toDate();
+        QDate e = idx.data(GanttDefines::EndDateRole).toDate();
+        int st = idx.data(GanttDefines::StatusRole).toInt();
+        if (s.isValid() && e.isValid()) {
+            hasTasksWithDates = true;
+            if (st != 1) allCompleted = false;
+        } else {
+            hasTasksWithoutDates = true;
+        }
+    }
+    return hasTasksWithDates && !hasTasksWithoutDates && allCompleted;
+}
+
+void LocalGraphController::completeLocalGraph(const QString& reason)
+{
+    qDebug() << "[LocalGraphController] completeLocalGraph lgId=" << m_lgId
+    << "reason=" << reason;
+    if (m_lgId.isEmpty() || m_busUrl.isEmpty()) {
+        emit errorOccurred("Локальный график не инициализирован");
+        return;
+    }
+    if (!canCompleteLocalGraph()) {
+        emit errorOccurred("Завершение невозможно: не все задачи ЛГ завершены или есть задачи без сроков");
+        return;
+    }
+
+    QNetworkRequest req(QUrl(m_busUrl + "/internal/local-graphs/" + m_lgId + "/complete"));
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setRawHeader("X-User-ID", QByteArray::number(m_responsibleId));
+
+    QJsonObject payload;
+    if (!reason.isEmpty()) payload["reason"] = reason;
+
+    QNetworkReply* reply = m_networkManager->post(req, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        QByteArray body = reply->readAll();
+        qDebug() << "[LocalGraphController] completeLocalGraph FINISHED status=" << status
+        << "error=" << reply->error() << "body=" << body;
+        if (reply->error() != QNetworkReply::NoError) {
+            emit errorOccurred(QString("completeLocalGraph: %1 (HTTP %2, body=%3)")
+            .arg(reply->errorString()).arg(status).arg(QString(body)));
+            return;
+        }
+        emit localGraphCompleted(m_masterTaskId);
+    });
 }

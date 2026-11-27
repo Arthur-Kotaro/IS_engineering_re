@@ -60,6 +60,7 @@ ApplicationWindow
     property alias defaultGroupsDialog: defaultGroupsDialog
     property alias createGroupDialog: createGroupDialog
     property alias groupWizardDialog: groupWizardDialog
+    property alias completeLocalGraphDialog: completeLocalGraphDialog
     property alias cascadeUpdateDialog: cascadeUpdateDialog
 
     Connections
@@ -242,6 +243,7 @@ ApplicationWindow
     DefaultGroupsDialog { id: defaultGroupsDialog }
     CreateGroupDialog { id: createGroupDialog }
     GroupWizardDialog { id: groupWizardDialog }
+    CompleteLocalGraphDialog { id: completeLocalGraphDialog }
     CascadeUpdateDialog { id: cascadeUpdateDialog }
 
     Rectangle

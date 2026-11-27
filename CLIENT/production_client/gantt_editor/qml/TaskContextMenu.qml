@@ -32,8 +32,13 @@ Menu
         if (!task) return
         isTaskCompleted = (task.status === 1)
         localGraphState = task.localGraphState !== undefined ? task.localGraphState : 0
-        canEditForecast = !(localGraphState === 2 || localGraphState === 3)
-        canSetProgress = !isTaskCompleted && (localGraphState === 0)
+        // Блокируем только при ATTACHED (2) — ЛГ содержит задачи со сроками.
+        // dateless (1) — ЛГ есть, но без задач со сроками → прогноз редактируется.
+        // NOT_REQUIRED (0) — ЛГ нет.
+        // MISSING (3) — трактуем как «нет ЛГ».
+        canEditForecast = (localGraphState !== 2)
+        // Прогресс вручную — только если ЛГ нет (0) или dateless (1) (без сроков).
+        canSetProgress = !isTaskCompleted && (localGraphState !== 2)
         if (projectController.settingsManager.editingLocked) return
         if (isTaskCompleted) return
         var fs = task.forecastStart; var fe = task.forecastEnd

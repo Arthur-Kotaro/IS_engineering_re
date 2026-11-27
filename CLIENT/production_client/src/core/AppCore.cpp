@@ -5,6 +5,7 @@
 #include "userserviceclient/ApiClient.h"
 #include "userserviceclient/AuthService.h"
 #include "userserviceclient/TokenManager.h"
+#include "TokenRefreshServer.h"
 
 #include <QDebug>
 #include <QFont>
@@ -37,6 +38,17 @@ void AppCore::init()
     s_tokenManager = std::make_shared<UsersService::TokenManager>();
 
     s_authService = std::make_shared<UsersService::AuthService>(s_apiClient);
+
+    // IPC-сервер для refresh токена (дочерние процессы: gantt_editor)
+    m_tokenRefreshServer = new TokenRefreshServer(this);
+    m_tokenRefreshServer->setAuthService(s_authService.get());
+    m_tokenRefreshServer->setCurrentRefreshToken(s_authService->currentSession().refreshToken);
+    m_tokenRefreshServer->listen();
+
+    QObject::connect(s_authService.get(), &UsersService::AuthService::tokenRefreshed,
+                     m_tokenRefreshServer, &TokenRefreshServer::onTokenRefreshed);
+    QObject::connect(s_authService.get(), &UsersService::AuthService::sessionExpired,
+                     m_tokenRefreshServer, &TokenRefreshServer::onSessionExpired);
 
     m_dataManager = new DataManager(this);
 

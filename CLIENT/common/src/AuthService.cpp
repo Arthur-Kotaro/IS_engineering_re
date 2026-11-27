@@ -13,6 +13,9 @@ namespace UsersService
 AuthService::AuthService(std::shared_ptr<ApiClient> apiClient, QObject *parent)
     : QObject(parent), m_apiClient(apiClient)
 {
+    // ApiClient при 401 + "Token expired" вызывает этот callback.
+    // Возвращает true — если refresh запрошен (запрос будет повторён после tokenRefreshed).
+    m_apiClient->setOnTokenExpired([this]() { return handleTokenExpired(); });
 }
 
 void AuthService::parseJwtPayload(const QString &token, QJsonObject &payload)
@@ -28,6 +31,17 @@ void AuthService::parseJwtPayload(const QString &token, QJsonObject &payload)
         QJsonDocument doc = QJsonDocument::fromJson(payloadJson);
         payload = doc.object();
     }
+}
+
+bool AuthService::handleTokenExpired()
+{
+    if (m_currentSession.refreshToken.isEmpty()) {
+        qDebug() << "AuthService::handleTokenExpired: no refresh token, session expired";
+        return false;
+    }
+    qDebug() << "AuthService::handleTokenExpired: requesting refresh";
+    refreshToken(m_currentSession.refreshToken);
+    return true;
 }
 
 void AuthService::login(const QString &email, const QString &password)
@@ -61,12 +75,11 @@ void AuthService::login(const QString &email, const QString &password)
 
                           m_apiClient->setAuthToken(result.session.accessToken);
                           m_currentSession = result.session;
+                          m_currentSession.isValid = true;
 
-                          // Парсим JWT для получения user_id и ролей
                           parseJwtPayload(result.session.accessToken, m_currentSession.userPayload);
                           updateSessionFromTokens();
 
-                          // Получаем профиль пользователя
                           fetchUserProfile();
                           checkPasswordExpiry();
 
@@ -133,21 +146,27 @@ void AuthService::refreshToken(const QString &refreshToken)
                               QJsonObject data = response.data.object();
                               QString newAccess = data["access_token"].toString();
                               QString newRefresh = data["refresh_token"].toString();
-                              
-                              // Обновляем текущую сессию
+
                               m_currentSession.accessToken = newAccess;
                               m_currentSession.refreshToken = newRefresh;
+                              m_currentSession.isValid = true;
                               m_apiClient->setAuthToken(newAccess);
-                              
-                              // Обновляем payload (если изменился user_id / роли)
+
                               parseJwtPayload(newAccess, m_currentSession.userPayload);
                               updateSessionFromTokens();
-                              
+
+                              qDebug() << "AuthService: token refreshed successfully";
+
+                              // Сообщаем ApiClient — можно повторять очередь
+                              m_apiClient->onTokenRefreshed();
+
                               emit tokenRefreshed(newAccess, newRefresh);
                           }
                           else
                           {
                               qDebug() << "Refresh token failed:" << response.errorString;
+                              // Refresh не удался — сессия истекла
+                              m_apiClient->onTokenRefreshFailed();
                               emit sessionExpired();
                           }
                       });
@@ -182,11 +201,11 @@ void AuthService::changePassword(const QString &currentPassword, const QString &
                           if (response.success)
                           {
                               QJsonObject data = response.data.object();
-                              
+
                               // После смены пароля — очищаем токен (сессия недействительна)
                               m_apiClient->clearAuthToken();
                               m_currentSession = UserSession();
-                              
+
                               emit passwordChanged(true, data["message"].toString());
                               emit sessionExpired();
                           }
@@ -231,6 +250,7 @@ UserSession AuthService::currentSession() const
 {
     return m_currentSession;
 }
+
 void AuthService::restoreSession(const QString &accessToken, const QString &refreshToken)
 {
     m_currentSession.accessToken = accessToken;

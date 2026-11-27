@@ -29,7 +29,6 @@ set(RENDERER_HEADERS
     src/core/DataManager.h
 )
 
-# Gantt Editor (GDERE) - статическая библиотека + QML-модуль GanttEditor
 add_subdirectory(gantt_editor)
 
 add_library(RendererLib STATIC ${RENDERER_SOURCES} ${RENDERER_HEADERS})
@@ -41,10 +40,8 @@ target_include_directories(RendererLib PUBLIC
 )
 target_link_libraries(RendererLib PUBLIC Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Network)
 
-# --- Основной модуль клиента ---
 set(QML_FILES
     qml/main.qml
-
     qml/windows/AuthWindow.qml
     qml/windows/MainWindow.qml
     qml/windows/SplashScreen.qml
@@ -52,7 +49,6 @@ set(QML_FILES
     qml/windows/NotificationsWindow.qml
     qml/windows/DelegatedWindow.qml
     qml/windows/ImpersonateWindow.qml
-
     qml/components/TopBar.qml
     qml/components/TabContent.qml
     qml/components/WidgetLoader.qml
@@ -62,28 +58,22 @@ set(QML_FILES
     qml/components/ProjectRolesList.qml
     qml/components/OfflineIndicator.qml
     qml/components/UserInfoPanel.qml
-
     qml/widgets/SearchableListSingle.qml
     qml/widgets/SearchableListMulti.qml
     qml/widgets/SearchableSelect.qml
-
     qml/delegates/ProjectDelegate.qml
     qml/delegates/MastergraphDelegate.qml
     qml/delegates/RoleDelegate.qml
-
     qml/views/DashboardView.qml
     qml/views/ProjectsView.qml
     qml/views/MastergraphView.qml
     qml/views/SettingsView.qml
-
     qml/dialogs/ChangePasswordDialog.qml
     qml/dialogs/ConfirmDialog.qml
     qml/dialogs/ErrorDialog.qml
     qml/dialogs/UpdateNotification.qml
     qml/dialogs/ValidationErrorDialog.qml
-
     qml/styles/AppStyle.qml
-
     qml/ThemeManager.qml
 )
 
@@ -93,7 +83,6 @@ qt_add_qml_module(ProductionClient
     QML_FILES ${QML_FILES}
 )
 
-# --- Модуль Styles ---
 set_source_files_properties(
     qml/styles/Colors.qml
     qml/styles/Typography.qml
@@ -112,7 +101,6 @@ qt_add_qml_module(StylesModule
         qml/styles/Button.qml
 )
 
-# --- Модуль Utils ---
 set_source_files_properties(
     qml/utils/Validators.qml
     qml/utils/DateUtils.qml
@@ -140,7 +128,12 @@ add_executable(ProductionClientApp
     src/core/AppCore.cpp
     src/core/ConfigManager.cpp
     src/core/CacheManager.cpp
+    src/TokenRefreshServer.cpp
 )
+
+# Явно сообщаем AUTOMOC: заголовок TokenRefreshServer.h нужно обработать,
+# хотя он не лежит рядом с .cpp и не указан в add_executable.
+set_property(SOURCE include/TokenRefreshServer.h PROPERTY AUTOMOC ON)
 
 target_link_libraries(ProductionClientApp
     PRIVATE
@@ -163,10 +156,10 @@ target_include_directories(ProductionClientApp PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/qml_bridge
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${COMMON_INCLUDE}
 )
 
-# Копировать gantt_editor рядом с ProductionClientApp
 add_custom_command(TARGET ProductionClientApp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:gantt_editor>

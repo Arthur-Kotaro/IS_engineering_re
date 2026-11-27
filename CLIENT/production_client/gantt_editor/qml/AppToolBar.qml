@@ -148,6 +148,21 @@ Rectangle
             }
         }
 
+        Button
+        {
+            text: "Завершить"
+            visible: appToolBar.isLocalMode
+            Layout.preferredWidth: 120
+            font.pixelSize: 11
+            enabled: projectController
+            && projectController.localGraphController
+            && projectController.localGraphController.canCompleteLocalGraph
+            onClicked: {
+                if (mainWindow.completeLocalGraphDialog)
+                    mainWindow.completeLocalGraphDialog.openForTask("")
+            }
+        }
+
         Rectangle { width: 1; height: 24; color: "#b0b0b0"; Layout.alignment: Qt.AlignVCenter }
 
         ComboBox

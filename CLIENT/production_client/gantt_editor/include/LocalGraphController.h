@@ -12,6 +12,8 @@
 class LocalGraphController : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(bool canCompleteLocalGraph READ canCompleteLocalGraph NOTIFY localGraphCanBeCompletedChanged)
+
 public:
     explicit LocalGraphController(ProjectData* projectData,
                                    ResourceManager* resourceManager,
@@ -21,6 +23,8 @@ public:
 
     void setLocalGraphContext(const QString& lgId, const QString& busUrl,
                               int projectId, int responsibleId, const QString& masterTaskId);
+
+    bool canCompleteLocalGraph() const;
 
     Q_INVOKABLE void markTaskRequiresLocalGraph(const QString& taskId);
     Q_INVOKABLE bool createLocalGraph(const QString& taskId);
@@ -36,6 +40,7 @@ public:
     Q_INVOKABLE void addLocalDependency(const QString& predecessorId, const QString& successorId);
     Q_INVOKABLE void removeLocalDependency(const QString& depId);
     Q_INVOKABLE void loadLocalDependencies();
+    Q_INVOKABLE void completeLocalGraph(const QString& reason = QString());
 
 signals:
     void errorOccurred(const QString& message);
@@ -44,6 +49,8 @@ signals:
     void localTasksReloaded();
     void localDependenciesReloaded();
     void cascadeUpdateRequested(const QVariantList& successors, const QString& baseReason);
+    void localGraphCompleted(const QString& taskId);
+    void localGraphCanBeCompletedChanged();
 
 private slots:
     void onLocalGraphCreated(const QVariantMap& result);

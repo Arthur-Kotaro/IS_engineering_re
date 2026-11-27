@@ -72,6 +72,7 @@ class USERSERVICECLIENT_EXPORT AuthService : public QObject
   private:
     void parseJwtPayload(const QString &token, QJsonObject &payload);
     void updateSessionFromTokens();
+    bool handleTokenExpired();
 
   private:
     std::shared_ptr<ApiClient> m_apiClient;

@@ -102,3 +102,8 @@ class LgDependencyResponse(BaseModel):
 class LgDependencyListResponse(BaseModel):
     lg_id: UUID
     dependencies: List[LgDependencyResponse] = []
+
+# ---------------- Завершение ЛГ (явное действие пользователя) ----------------
+
+class LgCompleteRequest(BaseModel):
+    reason: Optional[str] = None

@@ -8,6 +8,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QObject>
+#include <QQueue>
 #include <functional>
 #include <memory>
 
@@ -47,6 +48,18 @@ class USERSERVICECLIENT_EXPORT ApiClient : public QObject
     virtual void put(const QString &endpoint, const QJsonObject &data, ApiCallback callback);
     virtual void del(const QString &endpoint, ApiCallback callback);
 
+    // Callback для refresh токена. Устанавливается из AuthService.
+    // Вызывается при 401 + "Token expired". Возвращает true, если refresh
+    // запрошен (запрос будет повторён после tokenRefreshed()).
+    using TokenExpiredHandler = std::function<bool()>;
+    void setOnTokenExpired(TokenExpiredHandler handler) { m_onTokenExpired = std::move(handler); }
+
+    // Вызывается AuthService после успешного refresh — повторяет очередь.
+    void onTokenRefreshed();
+
+    // Вызывается AuthService при неудачном refresh — очищает очередь, эмитит tokenExpired.
+    void onTokenRefreshFailed();
+
   signals:
     void onlineStatusChanged(bool isOnline);
     void tokenExpired();
@@ -57,12 +70,26 @@ class USERSERVICECLIENT_EXPORT ApiClient : public QObject
     void setupSslConfiguration();
     void checkConnectivity();
 
+    // Повтор запроса после refresh
+    struct PendingRequest {
+        enum Method { Get, Post, Put, Del } method;
+        QString endpoint;
+        QJsonObject data;
+        ApiCallback callback;
+    };
+    void executeRequest(const PendingRequest &req);
+    void enqueueAfterRefresh(const PendingRequest &req);
+
   protected:
     bool m_isOnline = false;
     QString m_authToken;
     QString m_host;
     int m_port = 8000;
     std::unique_ptr<QNetworkAccessManager> m_nam;
+
+    TokenExpiredHandler m_onTokenExpired;
+    bool m_refreshing = false;
+    QQueue<PendingRequest> m_pendingAfterRefresh;
 };
 
 } // namespace UsersService

@@ -71,6 +71,7 @@
         <file>qml/icons/edit_off.svg</file>
         <file>qml/icons/draft.svg</file>
         <file>qml/icons/approved.svg</file>
+        <file>qml/CompleteLocalGraphDialog.qml</file>
         <file alias="default_typologies.json">resources/default_typologies.json</file>
         <file alias="default_tasks.json">resources/default_tasks.json</file>
         <file alias="default_holidays.json">resources/default_holidays.json</file>

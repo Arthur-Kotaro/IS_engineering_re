@@ -311,7 +311,8 @@ Rectangle
             width: contentWidth
             height: root.isLocalMode ? 0 : root.rowHeight
             milestonesModel: projectController?.projectData?.milestoneModel
-            startDate: displayStart; dayWidth: dayWidth
+            startDate: root.displayStart
+            dayWidth: root.dayWidth
         }
 
         Rectangle

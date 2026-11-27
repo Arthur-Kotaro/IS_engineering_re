@@ -15,6 +15,7 @@
 #include "DependencyController.h"
 #include "GanttApiClient.h"
 #include "WebSocketClient.h"
+#include "TokenRefreshClient.h"
 
 class ProjectController : public QObject
 {
@@ -27,6 +28,7 @@ class ProjectController : public QObject
     Q_PROPERTY(LocalGraphController* localGraphController READ get_localGraphController CONSTANT)
     Q_PROPERTY(DependencyController* dependencyController READ get_dependencyController CONSTANT)
     Q_PROPERTY(WebSocketClient* webSocket READ get_webSocket CONSTANT)
+    Q_PROPERTY(TokenRefreshClient* tokenRefreshClient READ get_tokenRefreshClient CONSTANT)
     Q_PROPERTY(bool inEditMode READ get_inEditMode WRITE set_InEditMode NOTIFY inEditModeChanged)
     Q_PROPERTY(bool isPure READ get_isPure NOTIFY isPureChanged)
     Q_PROPERTY(bool canEdit READ get_canEdit NOTIFY canEditChanged)
@@ -45,6 +47,7 @@ public:
     LocalGraphController* get_localGraphController() const;
     DependencyController* get_dependencyController() const;
     WebSocketClient* get_webSocket() const;
+    TokenRefreshClient* get_tokenRefreshClient() const;
 
     bool get_inEditMode() const;
     void set_InEditMode(bool editMode);
@@ -178,6 +181,7 @@ private:
 
     GanttApiClient* m_apiClient;
     WebSocketClient* m_webSocket;
+    TokenRefreshClient* m_tokenRefreshClient;
 
     bool m_inEditMode;
     QString m_token;

@@ -28,11 +28,14 @@ Rectangle
 
     function isForecastLocked() {
         if (!rowData) return false
-        if (rowData.rowKind !== "forecast") return false
-        var lgs = rowData.localGraphState !== undefined ? rowData.localGraphState : 0
-        return (lgs === 2 || lgs === 3)
+            if (rowData.rowKind !== "forecast") return false
+                // Блокируем только когда ЛГ содержит задачи со сроками (ATTACHED = 2).
+                // dateless (1) — ЛГ есть, но без задач со сроками → прогноз редактируется вручную.
+                // NOT_REQUIRED (0) — ЛГ нет → редактируется.
+                // MISSING (3) — ЛГ был, но пропал → трактуем как «нет ЛГ» (не блокируем).
+                var lgs = rowData.localGraphState !== undefined ? rowData.localGraphState : 0
+                return (lgs === 2)
     }
-
     x: {
         if (!rowData) return 0
         var startVal = (rowData.hasDates === true) ? rowData.taskStart : rowData.forecastStart

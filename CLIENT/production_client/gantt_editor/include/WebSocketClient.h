@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QQueue>
 #include <QTimer>
+#include <functional>
 
 class WebSocketClient : public QObject
 {
@@ -20,6 +21,15 @@ public:
 
     // Установка ID пользователя для прямых подключений (WS к BUS)
     void setUserId(int userId) { m_userId = userId; }
+
+    // Callback для refresh токена (аналогично ApiClient).
+    // Вызывается при 401 / "Token expired" / close code 1008.
+    // Возвращает true, если refresh запрошен; после успешного refresh
+    // клиент должен вызвать onTokenRefreshed(newToken) — переподключение.
+    using TokenExpiredHandler = std::function<bool()>;
+    void setOnTokenExpired(TokenExpiredHandler handler) { m_onTokenExpired = std::move(handler); }
+    void onTokenRefreshed(const QString& newToken);
+    void onTokenRefreshFailed();
 
     // Индикатор состояния
     Q_PROPERTY(QString connectionState READ connectionState NOTIFY connectionStateChanged)
@@ -67,6 +77,10 @@ private:
     int m_lastVersion = 0;
     State m_state = Disconnected;
     bool m_manualDisconnect = false;
+
+    TokenExpiredHandler m_onTokenExpired;
+    bool m_refreshing = false;
+    bool m_reconnectAfterRefresh = false;
 };
 
 #endif // WEBSOCKETCLIENT_H

@@ -16,6 +16,7 @@ from app.schemas.local_graph import (
     LgTaskResponse, LgTaskCreate, LgTaskUpdate,
     ForecastRecalcRequest, ForecastRecalcResponse,
     LgDependencyCreate, LgDependencyResponse, LgDependencyListResponse,
+    LgCompleteRequest,
 )
 from app.ws.manager import manager
 
@@ -463,6 +464,103 @@ async def delete_lg_dependency(lg_id: UUID, dep_id: UUID, request: Request, db: 
     await _broadcast_snapshot(lg_id, db)
     return None
 
+# ---------------- Завершение ЛГ (явное действие пользователя) ----------------
+
+@router.post("/{lg_id}/complete")
+async def complete_local_graph(lg_id: UUID, data: LgCompleteRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """
+    Явное завершение МГ-задачи через ЛГ.
+    Условия:
+      - пользователь — ответственный (право редактирования ЛГ);
+      - в ЛГ есть хотя бы одна задача со сроками;
+      - нет задач без сроков (start_date/end_date null);
+      - все задачи со сроками имеют status = 1 (Completed);
+      - МГ-задача ещё не завершена (в BUS нет флага, проверяем через _recalc_and_push).
+    Действие:
+      - _compute_forecast (max из ЛГ) + status = 1;
+      - POST /internal/forecast-update в MG (status = 1, local_graph_state = ATTACHED);
+      - broadcast WS snapshot.
+    """
+    user_id = _user_id(request)
+    lg_res = await db.execute(select(LocalGraph).where(LocalGraph.lg_id == lg_id, LocalGraph.is_deleted == 0))
+    lg = lg_res.scalar_one_or_none()
+    if not lg:
+        raise HTTPException(404, "LocalGraph not found")
+    await _check_edit_access(lg, user_id)
+
+    # Все активные задачи ЛГ
+    tasks_res = await db.execute(
+        select(LgTask).where(LgTask.lg_id == lg_id, LgTask.is_deleted == 0)
+    )
+    tasks = tasks_res.scalars().all()
+
+    if not tasks:
+        raise HTTPException(400, "В ЛГ нет задач")
+
+    # Проверка: нет задач без сроков
+    tasks_without_dates = [t for t in tasks if not t.start_date or not t.end_date]
+    if tasks_without_dates:
+        raise HTTPException(
+            400,
+            f"В ЛГ есть задачи без сроков ({len(tasks_without_dates)}). "
+            f"Завершение невозможно."
+        )
+
+    # Проверка: все задачи Completed
+    not_completed = [t for t in tasks if t.status != 1]
+    if not_completed:
+        raise HTTPException(
+            400,
+            f"Не все задачи ЛГ завершены ({len(not_completed)} из {len(tasks)}). "
+            f"Завершение невозможно."
+        )
+
+    # Вычисляем forecast (max из ЛГ)
+    forecast = await _compute_forecast(lg, db)
+    # Принудительно status = 1 (явное завершение)
+    forecast.status = 1
+
+    # Логируем событие завершения
+    await _log_event(
+        db, lg_id, LgEntityType.LOCAL_GRAPH, lg.lg_id, LgEventType.STATUS_CHANGE,
+        new_value={"status": "completed", "reason": data.reason},
+        reason=data.reason,
+        actor_id=user_id,
+    )
+
+    await db.commit()
+
+    # Push в MG с status = 1
+    payload = {
+        "project_id": lg.project_id,
+        "task_id": str(lg.task_id),
+        "forecast_start": forecast.forecast_start.isoformat() if forecast.forecast_start else None,
+        "forecast_end": forecast.forecast_end.isoformat() if forecast.forecast_end else None,
+        "progress_current": forecast.progress_current,
+        "progress_total": forecast.progress_total,
+        "status": 1,  # ← явное завершение
+        "local_graph_state": lg.local_graph_state,
+    }
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3.0)) as s:
+            async with s.post(f"{MG_SERVICE_URL}/internal/forecast-update", json=payload) as resp:
+                if resp.status == 200:
+                    logger.info(f"complete_local_graph: pushed to MG, task={lg.task_id}")
+                else:
+                    logger.warning(f"complete_local_graph: push to MG HTTP {resp.status}")
+    except Exception as e:
+        logger.warning(f"complete_local_graph: push to MG: {e}")
+
+    await _broadcast_snapshot(lg_id, db)
+
+    return {
+        "lg_id": str(lg_id),
+        "status": "completed",
+        "forecast_start": forecast.forecast_start.isoformat() if forecast.forecast_start else None,
+        "forecast_end": forecast.forecast_end.isoformat() if forecast.forecast_end else None,
+        "progress_current": forecast.progress_current,
+        "progress_total": forecast.progress_total,
+    }
 
 # ---------------- Пересчёт прогноза ----------------
 

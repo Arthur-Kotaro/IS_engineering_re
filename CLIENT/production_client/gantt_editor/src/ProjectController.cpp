@@ -17,7 +17,10 @@
 #include <functional>
 
 ProjectController::ProjectController(QObject *parent)
-    : QObject(parent), m_projectData(nullptr), m_inEditMode(false)
+: QObject(parent)
+, m_projectData(nullptr)
+, m_inEditMode(false)
+, m_tokenRefreshClient(nullptr)
 {
     m_projectData = new ProjectData(this);
     m_resourceManager = new ResourceManager(this);
@@ -25,6 +28,7 @@ ProjectController::ProjectController(QObject *parent)
     m_exportManager = new ExportManager(this);
     m_apiClient = new GanttApiClient(this);
     m_webSocket = new WebSocketClient(this);
+    m_tokenRefreshClient = new TokenRefreshClient(this);
 
     m_taskController = new TaskController(m_projectData, m_settingsManager, this);
     m_localGraphController = new LocalGraphController(m_projectData, m_resourceManager, m_settingsManager, m_apiClient, this);
@@ -56,6 +60,26 @@ ProjectController::ProjectController(QObject *parent)
     connect(m_projectData, &ProjectData::canEditChanged, this, &ProjectController::canEditChanged);
 
     m_apiClient->setBaseUrl("http://localhost:8080");
+
+    // ---- IPC refresh токена ----
+    connect(m_tokenRefreshClient, &TokenRefreshClient::tokenRefreshed,
+            this, [this](const QString& newToken) {
+                qDebug() << "[ProjectController] token refreshed via IPC, reconnecting WS";
+                m_token = newToken;
+                m_apiClient->setToken(newToken);
+                m_webSocket->onTokenRefreshed(newToken);
+            });
+    connect(m_tokenRefreshClient, &TokenRefreshClient::refreshFailed,
+            this, [this](const QString& message) {
+                qWarning() << "[ProjectController] token refresh failed:" << message;
+                emit errorOccurred("Сессия истекла: " + message);
+            });
+
+    // WebSocketClient при 401 / 1008 → запрос refresh через IPC
+    m_webSocket->setOnTokenExpired([this]() {
+        qDebug() << "[ProjectController] WS token expired, requesting refresh via IPC";
+        return m_tokenRefreshClient->requestRefresh();
+    });
 }
 
 ProjectData* ProjectController::get_projectData() const { return m_projectData; }
@@ -66,6 +90,7 @@ TaskController* ProjectController::get_taskController() const { return m_taskCon
 LocalGraphController* ProjectController::get_localGraphController() const { return m_localGraphController; }
 DependencyController* ProjectController::get_dependencyController() const { return m_dependencyController; }
 WebSocketClient* ProjectController::get_webSocket() const { return m_webSocket; }
+TokenRefreshClient* ProjectController::get_tokenRefreshClient() const { return m_tokenRefreshClient; }
 
 bool ProjectController::get_inEditMode() const { return m_inEditMode; }
 void ProjectController::set_InEditMode(bool editMode)

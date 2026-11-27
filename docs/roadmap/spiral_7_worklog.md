@@ -37,6 +37,8 @@
 | 23 | **Zoom level «Месяц»** (3px, без дней). | Обзор хронологии. |
 | 24 | **Wizard инициализации МГ** (авто при пустом МГ, CVE/IPP). | Ускорение. |
 | 25 | **Согласование МГ:** кнопка «Черновик/Чистовик» → workflow (см. раздел 13). | Управляемость. |
+| 26 | **Единый паттерн C для ЛГ:** клиент шлёт команду → сервер применяет → WS snapshot всем → клиент перерисовывает. Никаких optimistic update / локальных изменений `TaskModel` в CRUD. | Сервер — единственный источник истины. Будущее: бизнес-сервисы автоматически пересчитывают ЛГ всех проектов, клиент — тонкий терминал. |
+| 27 | **Явное завершение МГ-задачи из ЛГ** (кнопка «Завершить»). Автоматическое завершение (когда все ЛГ-задачи Completed) — отменено. | Целевой срок задаёт только человек; «псевдо-фактический» срок (forecast = target при Completed) — баг. |
 
 ## 3. События и уведомления (PROJECT_service → другие)
 
@@ -195,6 +197,57 @@
 ### 📌 Не проблема (проверено)
 - **П.17** (`DataManager` не передаёт Authorization) — `UI Composer` резолвит `sources` сам.
 - **П.26** (заглушки данных) — механизм `renderer_preview`.
+
+### ✅ Завершено (сессия 2, 2026-11-24)
+
+| № | Что | Файлы |
+|---|---|---|
+| 1 | Баг 8: GroupWizardDialog не объявлен в GanttEditorWindow.qml → окно МГ не грузилось. В ЛГ пункты «сверху/снизу» скрыты. | `GanttEditorWindow.qml`, `qml.qrc`, `GroupContextMenu.qml`, `GroupDelegate.qml` |
+| 2 | Баг 8b: позиционирование групп (стандартные/кастомные) — `after_group_id` + `shift_sort_orders_after`; fallback при not found. `DefaultGroupsDialog` → `"top"`. | `ProjectController.h/.cpp`, `GroupWizardDialog.qml`, `DefaultGroupsDialog.qml`, `mastergraphs.py`, `mg_group_repo.py` |
+| 3 | WS snapshot (МГ): `groups` из `get_groups_for_mg` (единый источник с REST, `sort_order`). Fallback `bus_url` на `other_bus`. | `mastergraphs_ws.py`, `mastergraph_repo.py` |
+| 4 | Атомарность `create_custom_group` (rollback при ошибке MgGroup). Проверка привязки группы к МГ в `create_task`/`batch`. | `mastergraphs.py`, `mastergraph_service.py` |
+| 5 | Комментарии в каскаде (`BatchTaskItem.comment`). | `schemas/mastergraph.py`, `mastergraphs.py`, `CascadeDialog.qml` |
+| 6 | Прогноз в МГ: причина не запрашивается для forecast. | `TaskBar.qml`, `EditForecastDatesDialog.qml` |
+| 7 | ЛГ: единый паттерн C (сервер — истина, WS snapshot → перерисовка). CRUD без локальных изменений `TaskModel`. | `LocalGraphController.cpp`, `ProjectController.cpp`, `local_graphs.py`, `local_graphs_ws.py` |
+| 8 | ЛГ-зависимости: BUS endpoints + `DependencyModel::addDependencyWithId` + `GanttApiClient` + `LocalGraphController`. | `local_graphs.py`, `schemas/local_graph.py`, `DependencyModel.h/.cpp`, `GanttApiClient.h/.cpp`, `LocalGraphController.h/.cpp`, `DependencyDialog.qml`, `TaskContextMenu.qml` |
+| 9 | `GanttApiClient::setUserId` + X-User-ID только в BUS-методах (фикс 401). | `GanttApiClient.h/.cpp`, `LocalGraphController.cpp` |
+| 10 | `local_graph_state`: чтение из BUS (не всегда 2), кэш в MG, индикатор только при `=== 2`. | `bus_client.py`, `mastergraphs.py`, `GroupDelegate.qml` |
+| 11 | Прогноз vs целевой: убрано приравнивание forecast к target при `Completed`; `_compute_forecast` не ставит `status = 1` автоматически. | `TaskModel.cpp`, `local_graphs.py` |
+### Сессия 2 (продолжение, 2026-11-26): refresh токена через IPC
+
+**Проблема:** токен истекает через 15 мин, WS рвётся (401 / close code 1008), refresh не работает. `ApiClient` / `AuthService` / `WebSocketClient` не связаны с refresh.
+
+**Решение (единая схема IPC):**
+- `TokenRefreshServer` (production_client, `QLocalServer` имя `engineering_re_token_refresh`) — слушает дочерние процессы. При `{"action":"refresh"}` → `AuthService::refreshToken(currentRefreshToken)`. При `tokenRefreshed(newAccess, newRefresh)` → broadcast `{"action":"token","token":"<newAccess>"}` всем подключённым. При `sessionExpired` → broadcast `{"action":"error","message":"Session expired"}`.
+- `TokenRefreshClient` (gantt_editor, `QLocalSocket`) — при `requestRefresh()` отправляет `{"action":"refresh"}`. При `{"action":"token"}` → `emit tokenRefreshed(newToken)`. При `{"action":"error"}` → `emit refreshFailed`.
+- `ApiClient` (common) — при `401` + `detail == "Token expired"` → `m_onTokenExpired()` (callback от `AuthService`). Если `true` — запрос в `m_pendingAfterRefresh`. `AuthService::refreshToken` → `ApiClient::onTokenRefreshed()` → очередь повторяется. При неудаче — `ApiClient::onTokenRefreshFailed()` → `emit tokenExpired()`.
+- `AuthService` (common) — в конструкторе `m_apiClient->setOnTokenExpired([this]{ return handleTokenExpired(); })`. `handleTokenExpired()` → `refreshToken(m_currentSession.refreshToken)`. `refreshToken` → `m_apiClient->onTokenRefreshed()` при успехе, `onTokenRefreshFailed()` при неудаче.
+- `WebSocketClient` (gantt_editor) — `setOnTokenExpired(callback)`, `onTokenRefreshed(newToken)`, `onTokenRefreshFailed()`. При close code `1008` или WS-сообщении «Token expired» → `m_onTokenExpired()` (callback из `ProjectController` → `TokenRefreshClient::requestRefresh()`). При `onTokenRefreshed(newToken)` → `m_token = newToken` → переподключение `connectToServer(m_url, m_token)`.
+- `ProjectController` (gantt_editor) — создаёт `TokenRefreshClient`, связывает: `TokenRefreshClient::tokenRefreshed` → `m_token = newToken`, `m_apiClient->setToken`, `m_webSocket->onTokenRefreshed(newToken)`. `m_webSocket->setOnTokenExpired([this]{ return m_tokenRefreshClient->requestRefresh(); })`.
+
+**Новые файлы:**
+- `CLIENT/production_client/gantt_editor/include/TokenRefreshClient.h`
+- `CLIENT/production_client/gantt_editor/src/TokenRefreshClient.cpp`
+- `CLIENT/production_client/include/TokenRefreshServer.h`
+- `CLIENT/production_client/src/TokenRefreshServer.cpp`
+
+**Изменены:**
+- `CLIENT/common/include/userserviceclient/ApiClient.h` — `TokenExpiredHandler`, `PendingRequest`, `m_refreshing`, `m_pendingAfterRefresh`, `onTokenRefreshed`, `onTokenRefreshFailed`.
+- `CLIENT/common/src/ApiClient.cpp` — обработка `401 Token expired`, `executeRequest` с сохранением `PendingRequest` в `reply` property, `enqueueAfterRefresh`, `onTokenRefreshed`, `onTokenRefreshFailed`.
+- `CLIENT/common/include/userserviceclient/AuthService.h` — `handleTokenExpired`.
+- `CLIENT/common/src/AuthService.cpp` — `setOnTokenExpired` в конструкторе, `handleTokenExpired`, `onTokenRefreshed` / `onTokenRefreshFailed` в `refreshToken`.
+- `CLIENT/production_client/gantt_editor/include/WebSocketClient.h` — `setOnTokenExpired`, `onTokenRefreshed`, `onTokenRefreshFailed`, `m_refreshing`, `m_reconnectAfterRefresh`.
+- `CLIENT/production_client/gantt_editor/src/WebSocketClient.cpp` — обработка `1008` / WS «Token expired» → refresh → переподключение.
+- `CLIENT/production_client/gantt_editor/include/ProjectController.h` — `+TokenRefreshClient*`, `+Q_PROPERTY tokenRefreshClient`, `+include TokenRefreshClient.h`.
+- `CLIENT/production_client/gantt_editor/src/ProjectController.cpp` — создание `TokenRefreshClient`, связывание с `WebSocketClient`.
+- `CLIENT/production_client/gantt_editor/CMakeLists.txt` — `+TokenRefreshClient.cpp/.h`.
+- `CLIENT/production_client/CMakeLists.txt` — `+TokenRefreshServer.cpp`.
+
+**Ещё не сделано (для полной схемы IPC):**
+- `AppCore.cpp` / `main.cpp` (production_client) — создать `TokenRefreshServer`, связать с `AuthService` (`tokenRefreshed` → `onTokenRefreshed`, `sessionExpired` → `onSessionExpired`), `listen()`, `setCurrentRefreshToken(authService->currentSession().refreshToken)`.
+- **Проверка** (Сценарий 1: production_client refresh после 15 мин; Сценарий 2: gantt_editor IPC refresh + переподключение WS).
+
+**Статус:** правки **не проверены** (ПК не актуален, БД не актуальны). Требуется проверка на чистой среде.
 
 ## 6. План правок
 

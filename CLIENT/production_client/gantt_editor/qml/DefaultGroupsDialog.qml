@@ -56,8 +56,6 @@ Dialog
                         ids.push(root.groups[i].group_id)
                 }
                 root.selectedIds = ids
-                repeater.model = null
-                repeater.model = root.groups
             }
         }
 
@@ -82,14 +80,28 @@ Dialog
 
                     delegate: CheckBox
                     {
+                        id: delegateCheckBox
+                        property bool _updating: false
+
                         text: modelData.name + " (" + modelData.group_id + ")"
-                        checked: root.selectedIds.indexOf(modelData.group_id) >= 0
+
+                        Binding {
+                            target: delegateCheckBox
+                            property: "checked"
+                            value: root.selectedIds.indexOf(modelData.group_id) >= 0
+                            when: !delegateCheckBox._updating
+                            restoreMode: Binding.RestoreBindingOrValue
+                        }
+
                         onCheckedChanged: {
-                            var arr = root.selectedIds.slice()
-                            var idx = arr.indexOf(modelData.group_id)
-                            if (checked && idx < 0) arr.push(modelData.group_id)
-                            else if (!checked && idx >= 0) arr.splice(idx, 1)
-                            root.selectedIds = arr
+                            if (delegateCheckBox._updating) return
+                                delegateCheckBox._updating = true
+                                var arr = root.selectedIds.slice()
+                                var idx = arr.indexOf(modelData.group_id)
+                                if (checked && idx < 0) arr.push(modelData.group_id)
+                                    else if (!checked && idx >= 0) arr.splice(idx, 1)
+                                        root.selectedIds = arr
+                                        delegateCheckBox._updating = false
                         }
                     }
                 }

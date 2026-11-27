@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <memory>
+#include "TokenRefreshServer.h"
 
 class QQmlEngine;
 class DataManager;
@@ -44,6 +45,8 @@ class AppCore : public QObject
     QQmlEngine *m_engine;
     DataManager *m_dataManager = nullptr;
     JsonUiRenderer *m_renderer = nullptr;
+
+    TokenRefreshServer* m_tokenRefreshServer = nullptr;
 
     static std::shared_ptr<UsersService::ApiClient> s_apiClient;
     static std::shared_ptr<UsersService::AuthService> s_authService;

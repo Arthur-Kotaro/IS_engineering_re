@@ -10,7 +10,14 @@ Rectangle
     border.width: 1
 
     property int dayWidth: 30
-    onDayWidthChanged: { updateMilestones(); milestoneCanvas.requestPaint() }
+    onDayWidthChanged: {
+        // Пересчитываем после того, как binding CalendarHeader.dayWidth обновится.
+        // Иначе Canvas может перерисоваться со старым dayWidth (порядок binding в QML не гарантирован).
+        Qt.callLater(function() {
+            updateMilestones()
+            milestoneCanvas.requestPaint()
+        })
+    }
     property var milestonesModel: null
     property date startDate: new Date()
     property var milestones: []
@@ -62,6 +69,9 @@ Rectangle
         id: milestoneCanvas
         anchors.fill: parent
         z: 1
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onVisibleChanged: if (visible) requestPaint()
         onPaint: {
             var ctx = getContext("2d")
             ctx.clearRect(0, 0, width, height)
@@ -119,10 +129,8 @@ Rectangle
         }
     }
 
-    // Диалог причины
     ChangeReasonDialog { id: changeReasonDialog }
 
-    // Диалог подтверждения «Пройти веху»
     Dialog
     {
         id: confirmMilestoneDialog
@@ -154,7 +162,6 @@ Rectangle
         }
     }
 
-    // Диалог переноса
     Dialog
     {
         id: rescheduleMilestoneDialog
@@ -210,7 +217,6 @@ Rectangle
         }
     }
 
-    // Информация о вехе
     Dialog
     {
         id: infoMilestoneDialog
@@ -253,7 +259,6 @@ Rectangle
         }
     }
 
-    // Контекстное меню
     Menu
     {
         id: milestoneContextMenu

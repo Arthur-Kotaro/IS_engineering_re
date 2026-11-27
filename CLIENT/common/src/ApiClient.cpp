@@ -1,6 +1,7 @@
 #include "userserviceclient/ApiClient.h"
 
 #include <QDebug>
+#include <QJsonObject>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QSslConfiguration>
@@ -46,10 +47,8 @@ QUrl ApiClient::buildUrl(const QString &endpoint) const
 
     QString normalizedEndpoint = endpoint;
 
-    // Если endpoint уже начинается с /api/v1/ — оставляем как есть
     if (!endpoint.startsWith("/api/v1/") && endpoint != "/")
     {
-        // Специфичные auth-эндпоинты
         if (endpoint == "/login" || endpoint == "/refresh" || endpoint == "/logout" ||
             endpoint == "/reset-password" || endpoint == "/password-expiry" ||
             endpoint == "/change-password")
@@ -58,7 +57,6 @@ QUrl ApiClient::buildUrl(const QString &endpoint) const
         }
         else
         {
-            // Всё остальное (users, navigation, и т.д.) — добавляем /api/v1
             normalizedEndpoint = "/api/v1" + endpoint;
         }
     }
@@ -68,9 +66,9 @@ QUrl ApiClient::buildUrl(const QString &endpoint) const
     return QUrl(urlStr);
 }
 
-void ApiClient::get(const QString &endpoint, ApiCallback callback)
+void ApiClient::executeRequest(const PendingRequest &req)
 {
-    QUrl url = buildUrl(endpoint);
+    QUrl url = buildUrl(req.endpoint);
     QNetworkRequest request(url);
 
     if (!m_authToken.isEmpty())
@@ -78,65 +76,66 @@ void ApiClient::get(const QString &endpoint, ApiCallback callback)
         request.setRawHeader("Authorization", "Bearer " + m_authToken.toUtf8());
     }
 
-    qDebug() << "GET request to:" << url.toString();
+    QNetworkReply *reply = nullptr;
+    ApiCallback callback = req.callback;
 
-    QNetworkReply *reply = m_nam->get(request);
+    switch (req.method) {
+    case PendingRequest::Get:
+        qDebug() << "GET request to:" << url.toString();
+        reply = m_nam->get(request);
+        break;
+    case PendingRequest::Post:
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        qDebug() << "POST request to:" << url.toString();
+        reply = m_nam->post(request, QJsonDocument(req.data).toJson());
+        break;
+    case PendingRequest::Put:
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        qDebug() << "PUT request to:" << url.toString();
+        reply = m_nam->put(request, QJsonDocument(req.data).toJson());
+        break;
+    case PendingRequest::Del:
+        qDebug() << "DELETE request to:" << url.toString();
+        reply = m_nam->deleteResource(request);
+        break;
+    }
+
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, callback]() { processReply(reply, callback); });
+            [this, reply, callback, req]() { processReply(reply, callback); });
+}
+
+void ApiClient::enqueueAfterRefresh(const PendingRequest &req)
+{
+    m_pendingAfterRefresh.enqueue(req);
+    qDebug() << "ApiClient: request queued after refresh, queue size =" << m_pendingAfterRefresh.size();
+}
+
+void ApiClient::get(const QString &endpoint, ApiCallback callback)
+{
+    PendingRequest req{PendingRequest::Get, endpoint, {}, callback};
+    if (m_refreshing) { enqueueAfterRefresh(req); return; }
+    executeRequest(req);
 }
 
 void ApiClient::post(const QString &endpoint, const QJsonObject &data, ApiCallback callback)
 {
-    QUrl url = buildUrl(endpoint);
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-
-    if (!m_authToken.isEmpty())
-    {
-        request.setRawHeader("Authorization", "Bearer " + m_authToken.toUtf8());
-    }
-
-    qDebug() << "POST request to:" << url.toString();
-    qDebug() << "Request data:" << QJsonDocument(data).toJson(QJsonDocument::Compact);
-
-    QNetworkReply *reply = m_nam->post(request, QJsonDocument(data).toJson());
-    connect(reply, &QNetworkReply::finished, this,
-            [this, reply, callback]() { processReply(reply, callback); });
+    PendingRequest req{PendingRequest::Post, endpoint, data, callback};
+    if (m_refreshing) { enqueueAfterRefresh(req); return; }
+    executeRequest(req);
 }
 
 void ApiClient::put(const QString &endpoint, const QJsonObject &data, ApiCallback callback)
 {
-    QUrl url = buildUrl(endpoint);
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-
-    if (!m_authToken.isEmpty())
-    {
-        request.setRawHeader("Authorization", "Bearer " + m_authToken.toUtf8());
-    }
-
-    qDebug() << "PUT request to:" << url.toString();
-
-    QNetworkReply *reply = m_nam->put(request, QJsonDocument(data).toJson());
-    connect(reply, &QNetworkReply::finished, this,
-            [this, reply, callback]() { processReply(reply, callback); });
+    PendingRequest req{PendingRequest::Put, endpoint, data, callback};
+    if (m_refreshing) { enqueueAfterRefresh(req); return; }
+    executeRequest(req);
 }
 
 void ApiClient::del(const QString &endpoint, ApiCallback callback)
 {
-    QUrl url = buildUrl(endpoint);
-    QNetworkRequest request(url);
-
-    if (!m_authToken.isEmpty())
-    {
-        request.setRawHeader("Authorization", "Bearer " + m_authToken.toUtf8());
-    }
-
-    qDebug() << "DELETE request to:" << url.toString();
-
-    QNetworkReply *reply = m_nam->deleteResource(request);
-    connect(reply, &QNetworkReply::finished, this,
-            [this, reply, callback]() { processReply(reply, callback); });
+    PendingRequest req{PendingRequest::Del, endpoint, {}, callback};
+    if (m_refreshing) { enqueueAfterRefresh(req); return; }
+    executeRequest(req);
 }
 
 void ApiClient::processReply(QNetworkReply *reply, ApiCallback callback)
@@ -150,6 +149,37 @@ void ApiClient::processReply(QNetworkReply *reply, ApiCallback callback)
     qDebug() << "=== HTTP Response ===";
     qDebug() << "Status code:" << response.httpCode;
     qDebug() << "Response data:" << responseData;
+
+    // Обработка 401 Token expired → refresh
+    if (response.httpCode == 401) {
+        QJsonDocument errDoc = QJsonDocument::fromJson(responseData);
+        QString detail = errDoc.object().value("detail").toString();
+        qDebug() << "ApiClient: 401 detail =" << detail;
+
+        if (detail == "Token expired" && m_onTokenExpired) {
+            // Спрашиваем refresh. Если запрошен — ставим запрос в очередь.
+            bool refreshRequested = m_onTokenExpired();
+            if (refreshRequested) {
+                // Восстанавливаем параметры запроса из reply (для повтора)
+                // Для простоты: повторяем через сохранённые поля в PendingRequest — см. get/post/put/del
+                // Здесь мы не знаем method/endpoint (это внутри lambda). Поэтому используем
+                // сохранённый в замыкании req — но его нет в processReply.
+                // Решение: сохраняем в reply property "pendingRequest". См. executeRequest.
+                QVariant v = reply->property("pendingRequest");
+                if (v.isValid()) {
+                    PendingRequest req = v.value<PendingRequest>();
+                    enqueueAfterRefresh(req);
+                    m_refreshing = true;
+                    response.errorType = "auth";
+                    response.errorString = "Token expired (refresh requested)";
+                    qDebug() << "ApiClient: queued for retry after refresh";
+                    callback(response);
+                    reply->deleteLater();
+                    return;
+                }
+            }
+        }
+    }
 
     if (reply->error() == QNetworkReply::NoError)
     {
@@ -173,7 +203,6 @@ void ApiClient::processReply(QNetworkReply *reply, ApiCallback callback)
         }
         else
         {
-            // Пустой ответ — может быть 204 No Content
             if (response.httpCode == 204)
             {
                 response.success = true;
@@ -214,7 +243,6 @@ void ApiClient::processReply(QNetworkReply *reply, ApiCallback callback)
 
         qDebug() << "Network error:" << response.errorString;
 
-        // Пытаемся получить тело ошибки
         if (!responseData.isEmpty())
         {
             qDebug() << "Error response body:" << responseData;
@@ -223,6 +251,24 @@ void ApiClient::processReply(QNetworkReply *reply, ApiCallback callback)
 
     callback(response);
     reply->deleteLater();
+}
+
+void ApiClient::onTokenRefreshed()
+{
+    qDebug() << "ApiClient: token refreshed, resuming queue (size =" << m_pendingAfterRefresh.size() << ")";
+    m_refreshing = false;
+    while (!m_pendingAfterRefresh.isEmpty()) {
+        PendingRequest req = m_pendingAfterRefresh.dequeue();
+        executeRequest(req);
+    }
+}
+
+void ApiClient::onTokenRefreshFailed()
+{
+    qDebug() << "ApiClient: token refresh failed, clearing queue";
+    m_refreshing = false;
+    m_pendingAfterRefresh.clear();
+    emit tokenExpired();
 }
 
 } // namespace UsersService
